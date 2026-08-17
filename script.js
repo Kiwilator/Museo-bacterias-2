@@ -202,9 +202,12 @@ AFRAME.registerComponent('fake-glow-test', {
       { name: 'CINTA_Peana_Mesh_21', color: turquoise }
     ];
     for (let i = 23; i <= 50; i++) targets.push({ name: `CONTORNO_Nicho_Mesh_${i}`, color: turquoise });
-    targets.push({ name: 'CONTORNO_Nicho_Mesh_51', color: purple });
+    // Mesh_51 is not a small ring but one continuous ~8m strip running along
+    // the whole ceiling arch — same material, but thin geometry reads much
+    // fainter than the small niche rings, so it gets a stronger boost.
+    targets.push({ name: 'CONTORNO_Nicho_Mesh_51', color: purple, intensity: 2.5, glowOpacity: 0.4 });
 
-    targets.forEach(({ name, color }) => {
+    targets.forEach(({ name, color, intensity, glowOpacity }) => {
       const strip = mesh.getObjectByName(name);
       if (!strip || !strip.isMesh) {
         console.warn(`[fake-glow-test] strip not found: ${name}`);
@@ -215,7 +218,7 @@ AFRAME.registerComponent('fake-glow-test', {
       strip.material = strip.material.clone();
       strip.material.color.setHex(0x000000);
       strip.material.emissive.setHex(color);
-      strip.material.emissiveIntensity = 1.0;
+      strip.material.emissiveIntensity = intensity || 1.0;
       strip.material.toneMapped = false;
       strip.material.needsUpdate = true;
 
@@ -229,7 +232,7 @@ AFRAME.registerComponent('fake-glow-test', {
       const glowMat = new THREE.MeshBasicMaterial({
         color,
         transparent: true,
-        opacity: 0.28,
+        opacity: glowOpacity || 0.28,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         side: THREE.DoubleSide
