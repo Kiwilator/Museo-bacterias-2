@@ -42,6 +42,34 @@ AFRAME.registerComponent('scale-to-real-size', {
   }
 });
 
+/*
+  The Blender export bakes ~46 point/directional lights into the GLB
+  (LUZ_*, REBOTE_*) with raw-wattage intensities in the thousands
+  (e.g. 46000+), because Blender's light power (W) isn't the same unit
+  as glTF's photometric intensity (candela/lux). Left as-is they blow out
+  the whole render to white regardless of the scene's own lights.
+  This strips them out on load so only the scene lights (in index.html)
+  illuminate the model.
+*/
+AFRAME.registerComponent('strip-embedded-lights', {
+  init() {
+    this.el.addEventListener('model-loaded', () => {
+      const root = this.el.getObject3D('mesh');
+      if (!root) return;
+      const found = [];
+      root.traverse((o) => {
+        if (o.isLight) found.push(o);
+      });
+      found.forEach((light) => {
+        light.intensity = 0;
+        light.visible = false;
+        if (light.parent) light.parent.remove(light);
+      });
+      console.log(`[strip-embedded-lights] removed ${found.length} baked lights from the model`);
+    });
+  }
+});
+
 // Attach to all gltf-model entities automatically
 AFRAME.scenes[0]?.addEventListener('loaded', () => {
   document.querySelectorAll('[gltf-model]').forEach(el => {
