@@ -161,13 +161,11 @@ AFRAME.registerComponent('clamp-to-bounds', {
 });
 
 /*
-  TEST ONLY (per spec) — fake glow/halo on exactly two LED strips
-  (one purple, one turquoise) to see if it reads better than the flat
-  emissive material alone, since there's no real bloom post-process here.
-  Clones the strip's geometry, nudges it out slightly along its own
-  normals-ish (simple uniform scale about its bbox center) and renders it
-  unlit + additive + very low opacity behind/around the real strip.
-  Do NOT replicate to the other 8 strips until this is confirmed to look right.
+  Fake glow/halo on the CINTA_Peana_Mesh_* LED strips (confirmed good on a
+  2-strip test, now replicated to all 10). Clones each strip's geometry,
+  renders it unlit + additive + very low opacity slightly larger than the
+  original, to fake a bloom halo since there's no real bloom post-process.
+  Cheap: 10 extra unlit transparent draw calls, no extra lights.
 */
 AFRAME.registerComponent('fake-glow-test', {
   init() {
@@ -177,9 +175,19 @@ AFRAME.registerComponent('fake-glow-test', {
     const mesh = this.el.getObject3D('mesh');
     if (!mesh) return;
 
+    const purple = 0x8a3ff0;
+    const turquoise = 0x1fd8cc;
     const targets = [
-      { name: 'CINTA_Peana_Mesh_0', color: 0x8a3ff0 },   // morado/lila
-      { name: 'CINTA_Peana_Mesh_20', color: 0x1fd8cc }   // turquesa/cian
+      { name: 'CINTA_Peana_Mesh_0', color: purple },
+      { name: 'CINTA_Peana_Mesh_1', color: purple },
+      { name: 'CINTA_Peana_Mesh_2', color: purple },
+      { name: 'CINTA_Peana_Mesh_3', color: purple },
+      { name: 'CINTA_Peana_Mesh_4', color: purple },
+      { name: 'CINTA_Peana_Mesh_5', color: purple },
+      { name: 'CINTA_Peana_Mesh_6', color: purple },
+      { name: 'CINTA_Peana_Mesh_7', color: purple },
+      { name: 'CINTA_Peana_Mesh_20', color: turquoise },
+      { name: 'CINTA_Peana_Mesh_21', color: turquoise }
     ];
 
     targets.forEach(({ name, color }) => {

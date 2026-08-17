@@ -11,7 +11,7 @@
 <body>
 
   <a-scene
-    renderer="colorManagement: true; physicallyCorrectLights: true; toneMapping: ACESFilmic; exposure: 0.95; shadowMap: true;"
+    renderer="colorManagement: true; physicallyCorrectLights: true; toneMapping: ACESFilmic; exposure: 1.05; shadowMap: true;"
     background="color: #9aa7b3"
     fog="type: exponential; color: #7a8793; density: 0.06"
   >
@@ -35,29 +35,47 @@
       <!-- Luces de apoyo de neón: posiciones reales tomadas de las luces
            originales de Blender (LUZ_Peana_Mesh_*, REBOTE_Nicho_Mesh_*),
            recalibradas a intensidad razonable, alcance corto, sin sombra.
-           Pocas luces, no una por tira de LED. -->
+           Sin sombra + distance corta = barato en GPU aunque sean varias. -->
 
-      <!-- Peanas — izquierda morado/lila (suelo) -->
-      <a-entity light="type: point; color: #8a3ff0; intensity: 0.8; distance: 2.2; decay: 2" position="-0.920 0.050 -3.683"></a-entity>
-      <a-entity light="type: point; color: #8a3ff0; intensity: 0.8; distance: 2.2; decay: 2" position="-2.130 0.050 3.013"></a-entity>
+      <!-- Peanas — izquierda morado/lila, una por peana (8) -->
+      <a-entity light="type: point; color: #8a3ff0; intensity: 1.0; distance: 2.2; decay: 2" position="-0.920 0.050 -3.683"></a-entity>
+      <a-entity light="type: point; color: #8a3ff0; intensity: 1.0; distance: 2.2; decay: 2" position="-0.676 0.050 -0.337"></a-entity>
+      <a-entity light="type: point; color: #8a3ff0; intensity: 1.0; distance: 2.2; decay: 2" position="-2.482 0.050 -3.626"></a-entity>
+      <a-entity light="type: point; color: #8a3ff0; intensity: 1.0; distance: 2.2; decay: 2" position="-2.403 0.050 -2.853"></a-entity>
+      <a-entity light="type: point; color: #8a3ff0; intensity: 1.0; distance: 2.2; decay: 2" position="-2.215 0.050 -2.113"></a-entity>
+      <a-entity light="type: point; color: #8a3ff0; intensity: 1.0; distance: 2.2; decay: 2" position="-1.871 0.050 1.498"></a-entity>
+      <a-entity light="type: point; color: #8a3ff0; intensity: 1.0; distance: 2.2; decay: 2" position="-2.057 0.050 2.253"></a-entity>
+      <a-entity light="type: point; color: #8a3ff0; intensity: 1.0; distance: 2.2; decay: 2" position="-2.130 0.050 3.013"></a-entity>
 
-      <!-- Peanas — derecha turquesa/cian (suelo) -->
-      <a-entity light="type: point; color: #1fd8cc; intensity: 0.8; distance: 2.2; decay: 2" position="0.705 0.050 2.387"></a-entity>
-      <a-entity light="type: point; color: #1fd8cc; intensity: 0.8; distance: 2.2; decay: 2" position="0.722 0.050 -3.598"></a-entity>
+      <!-- Peanas — derecha turquesa/cian, una por peana (2) -->
+      <a-entity light="type: point; color: #1fd8cc; intensity: 1.0; distance: 2.2; decay: 2" position="0.705 0.050 2.387"></a-entity>
+      <a-entity light="type: point; color: #1fd8cc; intensity: 1.0; distance: 2.2; decay: 2" position="0.722 0.050 -3.598"></a-entity>
 
-      <!-- Nichos/techo — derecha turquesa/cian (rebote suave) -->
-      <a-entity light="type: point; color: #1fd8cc; intensity: 0.5; distance: 2.5; decay: 2" position="0.468 2.641 -4.860"></a-entity>
-      <a-entity light="type: point; color: #1fd8cc; intensity: 0.5; distance: 2.5; decay: 2" position="0.408 2.291 3.956"></a-entity>
+      <!-- Nichos/techo — derecha turquesa/cian, 1 de cada 3 nichos (10 de 30) -->
+      <a-entity light="type: point; color: #1fd8cc; intensity: 0.6; distance: 2.5; decay: 2" position="0.841 2.843 2.100"></a-entity>
+      <a-entity light="type: point; color: #1fd8cc; intensity: 0.6; distance: 2.5; decay: 2" position="0.401 2.959 1.738"></a-entity>
+      <a-entity light="type: point; color: #1fd8cc; intensity: 0.6; distance: 2.5; decay: 2" position="0.389 2.742 -0.203"></a-entity>
+      <a-entity light="type: point; color: #1fd8cc; intensity: 0.6; distance: 2.5; decay: 2" position="0.810 2.930 -3.101"></a-entity>
+      <a-entity light="type: point; color: #1fd8cc; intensity: 0.6; distance: 2.5; decay: 2" position="0.811 2.651 0.112"></a-entity>
+      <a-entity light="type: point; color: #1fd8cc; intensity: 0.6; distance: 2.5; decay: 2" position="0.513 2.538 -1.377"></a-entity>
+      <a-entity light="type: point; color: #1fd8cc; intensity: 0.6; distance: 2.5; decay: 2" position="0.664 2.593 3.016"></a-entity>
+      <a-entity light="type: point; color: #1fd8cc; intensity: 0.6; distance: 2.5; decay: 2" position="0.395 2.682 1.708"></a-entity>
+      <a-entity light="type: point; color: #1fd8cc; intensity: 0.6; distance: 2.5; decay: 2" position="1.047 2.298 -0.937"></a-entity>
+      <a-entity light="type: point; color: #1fd8cc; intensity: 0.6; distance: 2.5; decay: 2" position="0.904 2.399 -4.130"></a-entity>
 
-      <!-- Nichos/techo — izquierda morado/lila (rebote suave) -->
-      <a-entity light="type: point; color: #8a3ff0; intensity: 0.5; distance: 2.5; decay: 2" position="-1.032 2.631 3.188"></a-entity>
-      <a-entity light="type: point; color: #8a3ff0; intensity: 0.5; distance: 2.5; decay: 2" position="-1.317 2.438 -4.453"></a-entity>
+      <!-- Nichos/techo — izquierda morado/lila, todos los detectados (6) -->
+      <a-entity light="type: point; color: #8a3ff0; intensity: 0.6; distance: 2.5; decay: 2" position="-1.032 2.631 3.188"></a-entity>
+      <a-entity light="type: point; color: #8a3ff0; intensity: 0.6; distance: 2.5; decay: 2" position="-0.512 2.914 2.940"></a-entity>
+      <a-entity light="type: point; color: #8a3ff0; intensity: 0.6; distance: 2.5; decay: 2" position="-0.230 2.955 2.300"></a-entity>
+      <a-entity light="type: point; color: #8a3ff0; intensity: 0.6; distance: 2.5; decay: 2" position="-0.283 2.958 -3.752"></a-entity>
+      <a-entity light="type: point; color: #8a3ff0; intensity: 0.6; distance: 2.5; decay: 2" position="-1.317 2.438 -4.453"></a-entity>
+      <a-entity light="type: point; color: #8a3ff0; intensity: 0.6; distance: 2.5; decay: 2" position="-0.760 2.549 -4.732"></a-entity>
     </a-entity>
 
     <!-- Iluminación general: hemisferio suave (crema arriba / tierra cálida
          abajo) en vez de ambient plano, + directional cálida y débil -->
-    <a-entity light="type: hemisphere; color: #fff6e8; groundColor: #b89f7d; intensity: 1.0"></a-entity>
-    <a-entity light="type: directional; intensity: 0.6; color: #fff1dd" position="3 6 3" shadow="cast: true"></a-entity>
+    <a-entity light="type: hemisphere; color: #fff6e8; groundColor: #b89f7d; intensity: 1.6"></a-entity>
+    <a-entity light="type: directional; intensity: 0.85; color: #fff1dd" position="3 6 3" shadow="cast: true"></a-entity>
 
     <!-- Cámara (WASD + look en la misma entidad, igual que bacterias-purpura) -->
     <!-- posición inicial la fija en runtime setup-museum-model al cargar el modelo -->
