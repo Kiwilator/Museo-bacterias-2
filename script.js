@@ -467,21 +467,25 @@ AFRAME.registerComponent('neon-strips-fix', {
     };
     const halo1Mat = {
       [PURPLE]: new THREE.MeshBasicMaterial({
-        color: PURPLE, transparent: true, opacity: 0.55,
+        color: PURPLE, transparent: true, opacity: 0.65,
         blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
       }),
       [CYAN]: new THREE.MeshBasicMaterial({
-        color: CYAN, transparent: true, opacity: 0.55,
+        color: CYAN, transparent: true, opacity: 0.65,
         blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
       })
     };
+    // wider + more opaque than before: against this room's dense tangle of
+    // plain architectural trim lines, a thin halo reads as barely-there —
+    // this one is meant to visibly "stain" the ceiling/wall around the
+    // strip with color, not just edge-light the line itself.
     const halo2Mat = {
       [PURPLE]: new THREE.MeshBasicMaterial({
-        color: PURPLE, transparent: true, opacity: 0.16,
+        color: PURPLE, transparent: true, opacity: 0.3,
         blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
       }),
       [CYAN]: new THREE.MeshBasicMaterial({
-        color: CYAN, transparent: true, opacity: 0.16,
+        color: CYAN, transparent: true, opacity: 0.3,
         blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
       })
     };
@@ -525,8 +529,8 @@ AFRAME.registerComponent('neon-strips-fix', {
       strip.material = coreMat[color];
       strip.userData.museoType = 'neon-strip';
 
-      addHaloLayer(strip, color, halo1Mat, 1.15, '_halo1'); // close, more intense
-      addHaloLayer(strip, color, halo2Mat, 1.6, '_halo2');  // wide, very soft
+      addHaloLayer(strip, color, halo1Mat, 1.3, '_halo1'); // close, more intense
+      addHaloLayer(strip, color, halo2Mat, 2.4, '_halo2'); // wide colored wash
       fixed++;
     });
     console.log(`[neon-strips-fix] fixed material + 2-layer glow on ${fixed} strips (shared materials, not cloned)`);
@@ -551,23 +555,23 @@ AFRAME.registerComponent('neon-support-lights', {
     const turquoise = 0x28d7e5;
     const configs = [
       // peanas — izquierda morada (suelo, alcance corto)
-      { color: purple, intensity: 1.5, distance: 2.6, pos: [-0.920, 0.050, -3.683] },
-      { color: purple, intensity: 1.5, distance: 2.6, pos: [-0.676, 0.050, -0.337] },
-      { color: purple, intensity: 1.5, distance: 2.6, pos: [-2.130, 0.050, 3.013] },
+      { color: purple, intensity: 2.1, distance: 2.9, pos: [-0.920, 0.050, -3.683] },
+      { color: purple, intensity: 2.1, distance: 2.9, pos: [-0.676, 0.050, -0.337] },
+      { color: purple, intensity: 2.1, distance: 2.9, pos: [-2.130, 0.050, 3.013] },
       // peanas — derecha turquesa (suelo, alcance corto)
-      { color: turquoise, intensity: 1.5, distance: 2.6, pos: [0.705, 0.050, 2.387] },
-      { color: turquoise, intensity: 1.5, distance: 2.6, pos: [0.722, 0.050, -3.598] },
+      { color: turquoise, intensity: 2.1, distance: 2.9, pos: [0.705, 0.050, 2.387] },
+      { color: turquoise, intensity: 2.1, distance: 2.9, pos: [0.722, 0.050, -3.598] },
       // nichos — derecha turquesa (rebote suave en pared)
-      { color: turquoise, intensity: 1.1, distance: 2.9, pos: [0.560, 1.976, -4.926] },
-      { color: turquoise, intensity: 1.1, distance: 2.9, pos: [0.389, 2.742, -0.203] },
-      { color: turquoise, intensity: 1.1, distance: 2.9, pos: [0.408, 2.291, 3.956] },
+      { color: turquoise, intensity: 1.7, distance: 3.2, pos: [0.560, 1.976, -4.926] },
+      { color: turquoise, intensity: 1.7, distance: 3.2, pos: [0.389, 2.742, -0.203] },
+      { color: turquoise, intensity: 1.7, distance: 3.2, pos: [0.408, 2.291, 3.956] },
       // nichos — izquierda morada (rebote suave en pared)
-      { color: purple, intensity: 1.1, distance: 2.9, pos: [-1.032, 2.631, 3.188] },
-      { color: purple, intensity: 1.1, distance: 2.9, pos: [-1.317, 2.438, -4.453] },
+      { color: purple, intensity: 1.7, distance: 3.2, pos: [-1.032, 2.631, 3.188] },
+      { color: purple, intensity: 1.7, distance: 3.2, pos: [-1.317, 2.438, -4.453] },
       // tira larga del techo (CONTORNO_Nicho_Mesh_51) — un par de puntos de
       // rebote a lo largo de su recorrido de ~8m
-      { color: purple, intensity: 1.5, distance: 3.4, pos: [-0.9, 1.98, -2.0] },
-      { color: purple, intensity: 1.5, distance: 3.4, pos: [-0.9, 1.98, 2.0] }
+      { color: purple, intensity: 2.1, distance: 3.8, pos: [-0.9, 1.98, -2.0] },
+      { color: purple, intensity: 2.1, distance: 3.8, pos: [-0.9, 1.98, 2.0] }
     ];
 
     configs.forEach(({ color, intensity, distance, pos }) => {
