@@ -11,7 +11,7 @@
 <body>
 
   <a-scene
-    renderer="colorManagement: true; physicallyCorrectLights: true; toneMapping: ACESFilmic; exposure: 1.15; shadowMap: true;"
+    renderer="colorManagement: true; physicallyCorrectLights: true; toneMapping: ACESFilmic; exposure: 1.1; shadowMap: true;"
     background="color: #9aa7b3"
     fog="type: exponential; color: #7a8793; density: 0.06"
   >
@@ -48,20 +48,38 @@
       <a-entity light="type: point; color: #8a3ff0; intensity: 1.0; distance: 2.2; decay: 2" position="-2.130 0.050 3.013"></a-entity>
 
       <!-- Peanas — derecha turquesa/cian, una por peana (2) -->
-      <a-entity light="type: point; color: #1fd8cc; intensity: 1.0; distance: 2.2; decay: 2" position="0.705 0.050 2.387"></a-entity>
-      <a-entity light="type: point; color: #1fd8cc; intensity: 1.0; distance: 2.2; decay: 2" position="0.722 0.050 -3.598"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 1.0; distance: 2.2; decay: 2" position="0.705 0.050 2.387"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 1.0; distance: 2.2; decay: 2" position="0.722 0.050 -3.598"></a-entity>
 
-      <!-- Nichos/techo — derecha turquesa/cian, 1 de cada 3 nichos (10 de 30) -->
-      <a-entity light="type: point; color: #1fd8cc; intensity: 0.6; distance: 2.5; decay: 2" position="0.841 2.843 2.100"></a-entity>
-      <a-entity light="type: point; color: #1fd8cc; intensity: 0.6; distance: 2.5; decay: 2" position="0.401 2.959 1.738"></a-entity>
-      <a-entity light="type: point; color: #1fd8cc; intensity: 0.6; distance: 2.5; decay: 2" position="0.389 2.742 -0.203"></a-entity>
-      <a-entity light="type: point; color: #1fd8cc; intensity: 0.6; distance: 2.5; decay: 2" position="0.810 2.930 -3.101"></a-entity>
-      <a-entity light="type: point; color: #1fd8cc; intensity: 0.6; distance: 2.5; decay: 2" position="0.811 2.651 0.112"></a-entity>
-      <a-entity light="type: point; color: #1fd8cc; intensity: 0.6; distance: 2.5; decay: 2" position="0.513 2.538 -1.377"></a-entity>
-      <a-entity light="type: point; color: #1fd8cc; intensity: 0.6; distance: 2.5; decay: 2" position="0.664 2.593 3.016"></a-entity>
-      <a-entity light="type: point; color: #1fd8cc; intensity: 0.6; distance: 2.5; decay: 2" position="0.395 2.682 1.708"></a-entity>
-      <a-entity light="type: point; color: #1fd8cc; intensity: 0.6; distance: 2.5; decay: 2" position="1.047 2.298 -0.937"></a-entity>
-      <a-entity light="type: point; color: #1fd8cc; intensity: 0.6; distance: 2.5; decay: 2" position="0.904 2.399 -4.130"></a-entity>
+      <!-- Nichos/techo — derecha turquesa/cian, los 30 (uno por nicho) -->
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.841 2.843 2.100"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.425 2.820 -1.414"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="1.323 2.719 -3.256"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.401 2.959 1.738"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.452 2.953 -2.465"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.468 2.641 -4.860"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.389 2.742 -0.203"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.388 2.836 3.767"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.653 2.963 2.982"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.810 2.930 -3.101"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.930 2.632 -0.905"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.632 2.771 0.946"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.811 2.651 0.112"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.774 2.869 -4.115"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.874 2.223 0.182"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.513 2.538 -1.377"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.560 1.976 -4.926"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.965 2.563 -3.089"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.664 2.593 3.016"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.408 2.291 3.956"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="1.003 2.354 2.103"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.395 2.682 1.708"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.742 2.317 0.943"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.389 2.484 -0.171"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="1.047 2.298 -0.937"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.463 2.540 -2.440"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="1.344 2.286 -3.266"></a-entity>
+      <a-entity light="type: point; color: #00e0b0; intensity: 0.7; distance: 2.5; decay: 2" position="0.904 2.399 -4.130"></a-entity>
 
       <!-- Nichos/techo — izquierda morado/lila, todos los detectados (6) -->
       <a-entity light="type: point; color: #8a3ff0; intensity: 0.6; distance: 2.5; decay: 2" position="-1.032 2.631 3.188"></a-entity>
@@ -74,8 +92,8 @@
 
     <!-- Iluminación general: hemisferio suave (crema arriba / tierra cálida
          abajo) en vez de ambient plano, + directional cálida y débil -->
-    <a-entity light="type: hemisphere; color: #fff6e8; groundColor: #b89f7d; intensity: 2.0"></a-entity>
-    <a-entity light="type: directional; intensity: 1.0; color: #fff1dd" position="3 6 3" shadow="cast: true"></a-entity>
+    <a-entity light="type: hemisphere; color: #fff6e8; groundColor: #b89f7d; intensity: 1.8"></a-entity>
+    <a-entity light="type: directional; intensity: 0.9; color: #fff1dd" position="3 6 3" shadow="cast: true"></a-entity>
 
     <!-- Cámara (WASD + look en la misma entidad, igual que bacterias-purpura) -->
     <!-- posición inicial la fija en runtime setup-museum-model al cargar el modelo -->

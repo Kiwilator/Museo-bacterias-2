@@ -34,7 +34,7 @@ AFRAME.registerComponent('setup-museum-model', {
     length: { type: 'number', default: 11 },
     height: { type: 'number', default: 3 },
     wallMargin: { type: 'number', default: 0.4 },
-    eyeHeight: { type: 'number', default: 1.0 }
+    eyeHeight: { type: 'number', default: 0.5 }
   },
   init() {
     this.el.addEventListener('model-loaded', () => this.onLoaded());
@@ -161,11 +161,23 @@ AFRAME.registerComponent('clamp-to-bounds', {
 });
 
 /*
-  Fake glow/halo on the CINTA_Peana_Mesh_* LED strips (confirmed good on a
-  2-strip test, now replicated to all 10). Clones each strip's geometry,
-  renders it unlit + additive + very low opacity slightly larger than the
-  original, to fake a bloom halo since there's no real bloom post-process.
-  Cheap: 10 extra unlit transparent draw calls, no extra lights.
+  Fixes the emissive LED strips (CINTA_Peana_Mesh_* on the peanas, and
+  CONTORNO_Nicho_Mesh_* on the niche rims — 23-50 turquoise, 51 purple) and
+  adds a fake glow/halo:
+
+  1. MATERIAL FIX: the baked material's emissiveFactor for the turquoise
+     strips is ~(0.03, 1.0, 0.95) — two channels almost maxed. Under
+     ACESFilmic tone mapping that reads as near-white regardless of scene
+     lighting, which is why the niches showed no visible color at all.
+     Fix: give each strip its own black-albedo material with a hand-picked
+     saturated emissive color and `toneMapped = false`, so it renders that
+     exact color always, independent of the room's general brightness —
+     this is also what lets "iluminación general" and "neón visible" stop
+     fighting each other.
+  2. FAKE GLOW: clones the strip's geometry, slightly larger, unlit +
+     additive + low opacity, to fake a bloom halo since there's no real
+     bloom post-process. Cheap: ~39 extra unlit transparent draw calls,
+     no extra lights.
 */
 AFRAME.registerComponent('fake-glow-test', {
   init() {
@@ -176,7 +188,7 @@ AFRAME.registerComponent('fake-glow-test', {
     if (!mesh) return;
 
     const purple = 0x8a3ff0;
-    const turquoise = 0x1fd8cc;
+    const turquoise = 0x00e0b0;
     const targets = [
       { name: 'CINTA_Peana_Mesh_0', color: purple },
       { name: 'CINTA_Peana_Mesh_1', color: purple },
@@ -189,6 +201,8 @@ AFRAME.registerComponent('fake-glow-test', {
       { name: 'CINTA_Peana_Mesh_20', color: turquoise },
       { name: 'CINTA_Peana_Mesh_21', color: turquoise }
     ];
+    for (let i = 23; i <= 50; i++) targets.push({ name: `CONTORNO_Nicho_Mesh_${i}`, color: turquoise });
+    targets.push({ name: 'CONTORNO_Nicho_Mesh_51', color: purple });
 
     targets.forEach(({ name, color }) => {
       const strip = mesh.getObjectByName(name);
@@ -197,13 +211,22 @@ AFRAME.registerComponent('fake-glow-test', {
         return;
       }
 
+      // 1) material fix — saturated, tone-mapping-proof emissive
+      strip.material = strip.material.clone();
+      strip.material.color.setHex(0x000000);
+      strip.material.emissive.setHex(color);
+      strip.material.emissiveIntensity = 1.0;
+      strip.material.toneMapped = false;
+      strip.material.needsUpdate = true;
+
+      // 2) fake glow halo
       const geo = strip.geometry.clone();
       geo.computeBoundingBox();
       const center = new THREE.Vector3();
       geo.boundingBox.getCenter(center);
       geo.translate(-center.x, -center.y, -center.z);
 
-      const mat = new THREE.MeshBasicMaterial({
+      const glowMat = new THREE.MeshBasicMaterial({
         color,
         transparent: true,
         opacity: 0.28,
@@ -212,7 +235,7 @@ AFRAME.registerComponent('fake-glow-test', {
         side: THREE.DoubleSide
       });
 
-      const glow = new THREE.Mesh(geo, mat);
+      const glow = new THREE.Mesh(geo, glowMat);
       glow.name = name + '_glow_TEST';
       glow.position.copy(strip.position).add(
         center.clone().applyQuaternion(strip.quaternion).multiply(strip.scale)
@@ -222,8 +245,8 @@ AFRAME.registerComponent('fake-glow-test', {
       glow.renderOrder = 1;
 
       strip.parent.add(glow);
-      console.log(`[fake-glow-test] added glow halo for ${name}`);
     });
+    console.log(`[fake-glow-test] fixed material + glow on ${targets.length} strips`);
   }
 });
 
