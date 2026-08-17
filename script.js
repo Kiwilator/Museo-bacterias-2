@@ -34,7 +34,7 @@ AFRAME.registerComponent('setup-museum-model', {
     length: { type: 'number', default: 11 },
     height: { type: 'number', default: 3 },
     wallMargin: { type: 'number', default: 0.4 },
-    eyeHeight: { type: 'number', default: 1.5 }
+    eyeHeight: { type: 'number', default: 1.0 }
   },
   init() {
     this.el.addEventListener('model-loaded', () => this.onLoaded());
