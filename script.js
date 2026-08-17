@@ -47,8 +47,15 @@ AFRAME.registerComponent('museum-movement', {
     this.moveVector.set(right - left, 0, backward - forward);
     if (this.moveVector.lengthSq() > 0) this.moveVector.normalize();
 
-    const yaw = this.cameraEl ? this.cameraEl.object3D.rotation.y : 0;
-    this.moveVector.applyAxisAngle(this.up, yaw);
+    // BUG FIX: this only read the camera's own local yaw (from mouse look),
+    // ignoring the rig's own yaw (set once at spawn, to face the exhibition
+    // — see setup-museum-model). Since those two rotations combine to make
+    // up what the player actually sees, using only one made "forward" point
+    // ~84° off from the real view direction — reported as arrow-up walking
+    // left instead of forward.
+    const rigYaw = this.el.object3D.rotation.y;
+    const cameraYaw = this.cameraEl ? this.cameraEl.object3D.rotation.y : 0;
+    this.moveVector.applyAxisAngle(this.up, rigYaw + cameraYaw);
     this.targetVelocity.copy(this.moveVector).multiplyScalar(this.data.speed);
 
     this.velocity.lerp(this.targetVelocity, Math.min(1, this.data.acceleration * dt));
@@ -378,7 +385,7 @@ AFRAME.registerComponent('neon-strips-fix', {
       { name: 'CINTA_Peana_Mesh_21', color: turquoise }
     ];
     for (let i = 23; i <= 50; i++) targets.push({ name: `CONTORNO_Nicho_Mesh_${i}`, color: turquoise });
-    targets.push({ name: 'CONTORNO_Nicho_Mesh_51', color: purple, intensity: 2.5, glowOpacity: 0.4 });
+    targets.push({ name: 'CONTORNO_Nicho_Mesh_51', color: purple, intensity: 3.2, glowOpacity: 0.5 });
 
     let fixed = 0;
     targets.forEach(({ name, color, intensity, glowOpacity }) => {
@@ -388,7 +395,10 @@ AFRAME.registerComponent('neon-strips-fix', {
       strip.material = strip.material.clone();
       strip.material.color.setHex(0x000000);
       strip.material.emissive.setHex(color);
-      strip.material.emissiveIntensity = intensity || 1.0;
+      // boosted from 1.0: at the previous value the strips read fine up
+      // close but got lost at any distance next to the (now brighter)
+      // general lighting.
+      strip.material.emissiveIntensity = intensity || 1.6;
       strip.material.toneMapped = false;
       strip.material.needsUpdate = true;
       strip.userData.museoType = 'neon-strip';
@@ -400,14 +410,16 @@ AFRAME.registerComponent('neon-strips-fix', {
       geo.translate(-c.x, -c.y, -c.z);
 
       const glowMat = new THREE.MeshBasicMaterial({
-        color, transparent: true, opacity: glowOpacity || 0.28,
+        color, transparent: true, opacity: glowOpacity || 0.42,
         blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
       });
       const glow = new THREE.Mesh(geo, glowMat);
       glow.name = name + '_glow';
       glow.position.copy(strip.position).add(c.clone().applyQuaternion(strip.quaternion).multiply(strip.scale));
       glow.quaternion.copy(strip.quaternion);
-      glow.scale.copy(strip.scale).multiplyScalar(1.18);
+      // wider halo (was 1.18x) so the color reads from further away, not
+      // just right up against the strip
+      glow.scale.copy(strip.scale).multiplyScalar(1.4);
       glow.renderOrder = 1;
       strip.parent.add(glow);
       fixed++;
@@ -434,23 +446,23 @@ AFRAME.registerComponent('neon-support-lights', {
     const turquoise = 0x00e0b0;
     const configs = [
       // peanas — izquierda morada (suelo, alcance corto)
-      { color: purple, intensity: 1.0, distance: 2.2, pos: [-0.920, 0.050, -3.683] },
-      { color: purple, intensity: 1.0, distance: 2.2, pos: [-0.676, 0.050, -0.337] },
-      { color: purple, intensity: 1.0, distance: 2.2, pos: [-2.130, 0.050, 3.013] },
+      { color: purple, intensity: 1.5, distance: 2.6, pos: [-0.920, 0.050, -3.683] },
+      { color: purple, intensity: 1.5, distance: 2.6, pos: [-0.676, 0.050, -0.337] },
+      { color: purple, intensity: 1.5, distance: 2.6, pos: [-2.130, 0.050, 3.013] },
       // peanas — derecha turquesa (suelo, alcance corto)
-      { color: turquoise, intensity: 1.0, distance: 2.2, pos: [0.705, 0.050, 2.387] },
-      { color: turquoise, intensity: 1.0, distance: 2.2, pos: [0.722, 0.050, -3.598] },
+      { color: turquoise, intensity: 1.5, distance: 2.6, pos: [0.705, 0.050, 2.387] },
+      { color: turquoise, intensity: 1.5, distance: 2.6, pos: [0.722, 0.050, -3.598] },
       // nichos — derecha turquesa (rebote suave en pared)
-      { color: turquoise, intensity: 0.7, distance: 2.5, pos: [0.560, 1.976, -4.926] },
-      { color: turquoise, intensity: 0.7, distance: 2.5, pos: [0.389, 2.742, -0.203] },
-      { color: turquoise, intensity: 0.7, distance: 2.5, pos: [0.408, 2.291, 3.956] },
+      { color: turquoise, intensity: 1.1, distance: 2.9, pos: [0.560, 1.976, -4.926] },
+      { color: turquoise, intensity: 1.1, distance: 2.9, pos: [0.389, 2.742, -0.203] },
+      { color: turquoise, intensity: 1.1, distance: 2.9, pos: [0.408, 2.291, 3.956] },
       // nichos — izquierda morada (rebote suave en pared)
-      { color: purple, intensity: 0.7, distance: 2.5, pos: [-1.032, 2.631, 3.188] },
-      { color: purple, intensity: 0.7, distance: 2.5, pos: [-1.317, 2.438, -4.453] },
+      { color: purple, intensity: 1.1, distance: 2.9, pos: [-1.032, 2.631, 3.188] },
+      { color: purple, intensity: 1.1, distance: 2.9, pos: [-1.317, 2.438, -4.453] },
       // tira larga del techo (CONTORNO_Nicho_Mesh_51) — un par de puntos de
       // rebote a lo largo de su recorrido de ~8m
-      { color: purple, intensity: 1.0, distance: 3.0, pos: [-0.9, 1.98, -2.0] },
-      { color: purple, intensity: 1.0, distance: 3.0, pos: [-0.9, 1.98, 2.0] }
+      { color: purple, intensity: 1.5, distance: 3.4, pos: [-0.9, 1.98, -2.0] },
+      { color: purple, intensity: 1.5, distance: 3.4, pos: [-0.9, 1.98, 2.0] }
     ];
 
     configs.forEach(({ color, intensity, distance, pos }) => {
