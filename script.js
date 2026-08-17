@@ -82,9 +82,36 @@ AFRAME.registerComponent('setup-museum-model', {
       minZ: box.min.z + m, maxZ: box.max.z - m
     };
 
+    // 4) detect free-standing "blocks" (peanas, vitrinas...) to collide with:
+    // any individual mesh whose own footprint/height looks like furniture
+    // resting on the floor, as opposed to the walls/floor/ceiling shell
+    // (which are one big continuous mesh spanning most of the room).
+    const obstacles = [];
+    const floorY = box.min.y;
+    const objBox = new THREE.Box3();
+    const objSize = new THREE.Vector3();
+    mesh.traverse((o) => {
+      if (!o.isMesh) return;
+      objBox.setFromObject(o);
+      objBox.getSize(objSize);
+      const footprint = Math.max(objSize.x, objSize.z);
+      const restsOnFloor = (objBox.min.y - floorY) < 0.6;
+      const looksLikeFurniture = footprint >= 0.3 && footprint <= 3 &&
+        objSize.y >= 0.15 && objSize.y <= 2.2;
+      if (restsOnFloor && looksLikeFurniture) {
+        obstacles.push({
+          minX: objBox.min.x - this.data.wallMargin, maxX: objBox.max.x + this.data.wallMargin,
+          minZ: objBox.min.z - this.data.wallMargin, maxZ: objBox.max.z + this.data.wallMargin,
+          name: o.name
+        });
+      }
+    });
+    window.MUSEO_OBSTACLES = obstacles;
+
     console.log('[setup-museum-model] world bbox', box.min, box.max,
       '-> spawn at', rig ? rig.object3D.position : null,
-      '-> bounds', window.MUSEO_BOUNDS);
+      '-> bounds', window.MUSEO_BOUNDS,
+      `-> ${obstacles.length} obstacles`, obstacles.map(o => o.name));
   }
 });
 
@@ -104,10 +131,32 @@ AFRAME.registerComponent('clamp-to-bounds', {
     if (!b) return;
     const obj = this.el.object3D;
     obj.getWorldPosition(this.worldPos);
-    const clampedX = THREE.MathUtils.clamp(this.worldPos.x, b.minX, b.maxX);
-    const clampedZ = THREE.MathUtils.clamp(this.worldPos.z, b.minZ, b.maxZ);
-    if (clampedX !== this.worldPos.x) obj.position.x += (clampedX - this.worldPos.x);
-    if (clampedZ !== this.worldPos.z) obj.position.z += (clampedZ - this.worldPos.z);
+    let x = this.worldPos.x;
+    let z = this.worldPos.z;
+
+    // outer walls
+    x = THREE.MathUtils.clamp(x, b.minX, b.maxX);
+    z = THREE.MathUtils.clamp(z, b.minZ, b.maxZ);
+
+    // individual blocks (peanas, vitrinas...) — push back out to the
+    // nearest edge if we ended up inside one
+    const obstacles = window.MUSEO_OBSTACLES;
+    if (obstacles) {
+      for (let i = 0; i < obstacles.length; i++) {
+        const o = obstacles[i];
+        if (x < o.minX || x > o.maxX || z < o.minZ || z > o.maxZ) continue;
+        const dLeft = x - o.minX, dRight = o.maxX - x;
+        const dBack = z - o.minZ, dFront = o.maxZ - z;
+        const min = Math.min(dLeft, dRight, dBack, dFront);
+        if (min === dLeft) x = o.minX;
+        else if (min === dRight) x = o.maxX;
+        else if (min === dBack) z = o.minZ;
+        else z = o.maxZ;
+      }
+    }
+
+    if (x !== this.worldPos.x) obj.position.x += (x - this.worldPos.x);
+    if (z !== this.worldPos.z) obj.position.z += (z - this.worldPos.z);
   }
 });
 
