@@ -1,4 +1,80 @@
 /*
+  Look: click-and-drag to look around, release to stop — not pointer lock.
+  Pointer lock (look-controls' pointerLockEnabled) captures the cursor on
+  click and needs ESC to let go, which read as "stuck"/uncomfortable.
+  This never captures the cursor at all: hold the left mouse button (or one
+  finger on touch) and drag, release and looking stops, cursor free the
+  whole time. No ESC, nothing to "get out of".
+*/
+AFRAME.registerComponent('drag-look-controls', {
+  schema: {
+    sensitivity: { type: 'number', default: 0.2 } // degrees per pixel of drag
+  },
+  init() {
+    this.dragging = false;
+    this.lastX = 0;
+    this.lastY = 0;
+    this.pitch = this.el.object3D.rotation.x;
+    this.yaw = this.el.object3D.rotation.y;
+    const maxPitch = Math.PI / 2 - 0.05;
+
+    const start = (x, y) => {
+      this.dragging = true;
+      this.lastX = x;
+      this.lastY = y;
+      canvas.style.cursor = 'grabbing';
+    };
+    const move = (x, y) => {
+      if (!this.dragging) return;
+      const dx = x - this.lastX;
+      const dy = y - this.lastY;
+      this.lastX = x;
+      this.lastY = y;
+      this.yaw -= dx * this.data.sensitivity * (Math.PI / 180);
+      this.pitch -= dy * this.data.sensitivity * (Math.PI / 180);
+      this.pitch = THREE.MathUtils.clamp(this.pitch, -maxPitch, maxPitch);
+      this.el.object3D.rotation.set(this.pitch, this.yaw, 0);
+    };
+    const end = () => {
+      this.dragging = false;
+      canvas.style.cursor = 'grab';
+    };
+
+    this.onMouseDown = (e) => { if (e.button === 0) start(e.clientX, e.clientY); };
+    this.onMouseMove = (e) => move(e.clientX, e.clientY);
+    this.onMouseUp = () => end();
+    this.onTouchStart = (e) => { if (e.touches.length === 1) start(e.touches[0].clientX, e.touches[0].clientY); };
+    this.onTouchMove = (e) => { if (e.touches.length === 1) { move(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault(); } };
+    this.onTouchEnd = () => end();
+
+    const canvas = this.el.sceneEl.canvas;
+    const attach = () => {
+      const c = this.el.sceneEl.canvas;
+      c.style.cursor = 'grab';
+      c.addEventListener('mousedown', this.onMouseDown);
+      window.addEventListener('mousemove', this.onMouseMove);
+      window.addEventListener('mouseup', this.onMouseUp);
+      c.addEventListener('touchstart', this.onTouchStart, { passive: true });
+      window.addEventListener('touchmove', this.onTouchMove, { passive: false });
+      window.addEventListener('touchend', this.onTouchEnd);
+    };
+    if (canvas) attach();
+    else this.el.sceneEl.addEventListener('render-target-loaded', attach, { once: true });
+  },
+  remove() {
+    const c = this.el.sceneEl.canvas;
+    if (c) {
+      c.removeEventListener('mousedown', this.onMouseDown);
+      c.removeEventListener('touchstart', this.onTouchStart);
+    }
+    window.removeEventListener('mousemove', this.onMouseMove);
+    window.removeEventListener('mouseup', this.onMouseUp);
+    window.removeEventListener('touchmove', this.onTouchMove);
+    window.removeEventListener('touchend', this.onTouchEnd);
+  }
+});
+
+/*
   Movement: WASD + arrow keys, smooth acceleration (no abrupt start/stop),
   moderate walking pace, relative to where the camera is looking, no fly
   (Y is never touched here). Custom instead of aframe-extras'
@@ -345,22 +421,27 @@ AFRAME.registerComponent('respawn-guard', {
 
 /*
   Fixes the emissive LED strips (CINTA_Peana_Mesh_* on the peanas, and
-  CONTORNO_Nicho_Mesh_* on the niche rims — 23-50 turquoise, 51 purple —
-  the latter is one continuous ~8m strip along the ceiling, not a small
-  ring, so it gets a stronger boost to read at the same visual weight) and
-  adds a fake glow/halo:
+  CONTORNO_Nicho_Mesh_* on the niche rims — 23-50 turquoise, 51 purple, the
+  latter a continuous ~8m strip along the ceiling rather than a small ring).
 
-  1. MATERIAL FIX: the baked material's emissiveFactor for the turquoise
-     strips is ~(0.03, 1.0, 0.95) — two channels almost maxed. Under
-     ACESFilmic tone mapping that reads as near-white regardless of scene
-     lighting. Fix: black albedo + a hand-picked saturated emissive color +
-     `toneMapped = false`, so it renders that exact color always,
-     independent of the room's general brightness — this is what lets
-     "iluminación general" and "neón visible" stop fighting each other.
-  2. FAKE GLOW: clones the strip's geometry, slightly larger, unlit +
-     additive + low opacity, to fake a bloom halo since there's no real
-     bloom post-process. Validated first on one purple + one turquoise
-     strip, then replicated to the rest once confirmed.
+  COLOR > BRIGHTNESS: the baked material's emissiveFactor for the turquoise
+  strips is ~(0.03, 1.0, 0.95) — two channels already maxed — so under
+  ACESFilmic tone mapping (or any emissiveIntensity pushed past 1.0, which
+  just clips channels at the framebuffer regardless of tone mapping) it
+  reads as near-white. The earlier pass fixed the tone-mapping half of that
+  (toneMapped=false + custom color) but then re-broke it a different way by
+  pushing emissiveIntensity up to 1.6-3.2 to "read better at a distance",
+  which clips the same way. Fixed here by keeping intensity near 1.0 and
+  doing the "read from further away" job with the halo layers instead, so
+  the core color never approaches white.
+
+  Four SHARED materials (not one clone per strip) carry every strip:
+  purple core / cyan core / purple halo / cyan halo — reused across all
+  matching meshes rather than duplicated per-instance.
+
+  Two-layer glow: halo 1 sits close to the strip and is fairly opaque, halo
+  2 is wider and much softer — both the exact core color, so it blends into
+  one glow instead of reading as separate colored bands.
 */
 AFRAME.registerComponent('neon-strips-fix', {
   init() {
@@ -370,61 +451,85 @@ AFRAME.registerComponent('neon-strips-fix', {
     const mesh = this.el.getObject3D('mesh');
     if (!mesh) return;
 
-    const purple = 0x8a3ff0;
-    const turquoise = 0x00e0b0;
+    const PURPLE = 0x9b5cff;
+    const CYAN = 0x28d7e5;
+    const CORE_INTENSITY = 1.05; // kept close to 1.0 on purpose — see comment above
+
+    const coreMat = {
+      [PURPLE]: new THREE.MeshStandardMaterial({
+        color: 0x000000, emissive: PURPLE, emissiveIntensity: CORE_INTENSITY,
+        toneMapped: false, roughness: 0.4
+      }),
+      [CYAN]: new THREE.MeshStandardMaterial({
+        color: 0x000000, emissive: CYAN, emissiveIntensity: CORE_INTENSITY,
+        toneMapped: false, roughness: 0.4
+      })
+    };
+    const halo1Mat = {
+      [PURPLE]: new THREE.MeshBasicMaterial({
+        color: PURPLE, transparent: true, opacity: 0.55,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+      }),
+      [CYAN]: new THREE.MeshBasicMaterial({
+        color: CYAN, transparent: true, opacity: 0.55,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+      })
+    };
+    const halo2Mat = {
+      [PURPLE]: new THREE.MeshBasicMaterial({
+        color: PURPLE, transparent: true, opacity: 0.16,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+      }),
+      [CYAN]: new THREE.MeshBasicMaterial({
+        color: CYAN, transparent: true, opacity: 0.16,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+      })
+    };
+
     const targets = [
-      { name: 'CINTA_Peana_Mesh_0', color: purple },
-      { name: 'CINTA_Peana_Mesh_1', color: purple },
-      { name: 'CINTA_Peana_Mesh_2', color: purple },
-      { name: 'CINTA_Peana_Mesh_3', color: purple },
-      { name: 'CINTA_Peana_Mesh_4', color: purple },
-      { name: 'CINTA_Peana_Mesh_5', color: purple },
-      { name: 'CINTA_Peana_Mesh_6', color: purple },
-      { name: 'CINTA_Peana_Mesh_7', color: purple },
-      { name: 'CINTA_Peana_Mesh_20', color: turquoise },
-      { name: 'CINTA_Peana_Mesh_21', color: turquoise }
+      { name: 'CINTA_Peana_Mesh_0', color: PURPLE },
+      { name: 'CINTA_Peana_Mesh_1', color: PURPLE },
+      { name: 'CINTA_Peana_Mesh_2', color: PURPLE },
+      { name: 'CINTA_Peana_Mesh_3', color: PURPLE },
+      { name: 'CINTA_Peana_Mesh_4', color: PURPLE },
+      { name: 'CINTA_Peana_Mesh_5', color: PURPLE },
+      { name: 'CINTA_Peana_Mesh_6', color: PURPLE },
+      { name: 'CINTA_Peana_Mesh_7', color: PURPLE },
+      { name: 'CINTA_Peana_Mesh_20', color: CYAN },
+      { name: 'CINTA_Peana_Mesh_21', color: CYAN }
     ];
-    for (let i = 23; i <= 50; i++) targets.push({ name: `CONTORNO_Nicho_Mesh_${i}`, color: turquoise });
-    targets.push({ name: 'CONTORNO_Nicho_Mesh_51', color: purple, intensity: 3.2, glowOpacity: 0.5 });
+    for (let i = 23; i <= 50; i++) targets.push({ name: `CONTORNO_Nicho_Mesh_${i}`, color: CYAN });
+    targets.push({ name: 'CONTORNO_Nicho_Mesh_51', color: PURPLE });
 
-    let fixed = 0;
-    targets.forEach(({ name, color, intensity, glowOpacity }) => {
-      const strip = mesh.getObjectByName(name);
-      if (!strip || !strip.isMesh) return;
-
-      strip.material = strip.material.clone();
-      strip.material.color.setHex(0x000000);
-      strip.material.emissive.setHex(color);
-      // boosted from 1.0: at the previous value the strips read fine up
-      // close but got lost at any distance next to the (now brighter)
-      // general lighting.
-      strip.material.emissiveIntensity = intensity || 1.6;
-      strip.material.toneMapped = false;
-      strip.material.needsUpdate = true;
-      strip.userData.museoType = 'neon-strip';
-
+    const addHaloLayer = (strip, color, mat, scale, suffix) => {
       const geo = strip.geometry.clone();
       geo.computeBoundingBox();
       const c = new THREE.Vector3();
       geo.boundingBox.getCenter(c);
       geo.translate(-c.x, -c.y, -c.z);
 
-      const glowMat = new THREE.MeshBasicMaterial({
-        color, transparent: true, opacity: glowOpacity || 0.42,
-        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
-      });
-      const glow = new THREE.Mesh(geo, glowMat);
-      glow.name = name + '_glow';
-      glow.position.copy(strip.position).add(c.clone().applyQuaternion(strip.quaternion).multiply(strip.scale));
-      glow.quaternion.copy(strip.quaternion);
-      // wider halo (was 1.18x) so the color reads from further away, not
-      // just right up against the strip
-      glow.scale.copy(strip.scale).multiplyScalar(1.4);
-      glow.renderOrder = 1;
-      strip.parent.add(glow);
+      const halo = new THREE.Mesh(geo, mat[color]);
+      halo.name = strip.name + suffix;
+      halo.position.copy(strip.position).add(c.clone().applyQuaternion(strip.quaternion).multiply(strip.scale));
+      halo.quaternion.copy(strip.quaternion);
+      halo.scale.copy(strip.scale).multiplyScalar(scale);
+      halo.renderOrder = 1;
+      strip.parent.add(halo);
+    };
+
+    let fixed = 0;
+    targets.forEach(({ name, color }) => {
+      const strip = mesh.getObjectByName(name);
+      if (!strip || !strip.isMesh) return;
+
+      strip.material = coreMat[color];
+      strip.userData.museoType = 'neon-strip';
+
+      addHaloLayer(strip, color, halo1Mat, 1.15, '_halo1'); // close, more intense
+      addHaloLayer(strip, color, halo2Mat, 1.6, '_halo2');  // wide, very soft
       fixed++;
     });
-    console.log(`[neon-strips-fix] fixed material + glow on ${fixed} strips`);
+    console.log(`[neon-strips-fix] fixed material + 2-layer glow on ${fixed} strips (shared materials, not cloned)`);
   }
 });
 
@@ -442,8 +547,8 @@ AFRAME.registerComponent('neon-support-lights', {
     this.el.addEventListener('model-loaded', () => this.onLoaded());
   },
   onLoaded() {
-    const purple = 0x8a3ff0;
-    const turquoise = 0x00e0b0;
+    const purple = 0x9b5cff;
+    const turquoise = 0x28d7e5;
     const configs = [
       // peanas — izquierda morada (suelo, alcance corto)
       { color: purple, intensity: 1.5, distance: 2.6, pos: [-0.920, 0.050, -3.683] },

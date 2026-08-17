@@ -16,8 +16,7 @@
 
   <div id="controls-help">
     <span><b>WASD</b> Moverse</span>
-    <span><b>Ratón</b> Mirar</span>
-    <span><b>ESC</b> Liberar cursor</span>
+    <span><b>Arrastrar</b> Mirar</span>
   </div>
 
   <a-scene
@@ -70,7 +69,7 @@
       <a-entity
         id="camera"
         camera="near: 0.05"
-        look-controls="pointerLockEnabled: true"
+        drag-look-controls
         position="0 0.5 0"
       ></a-entity>
     </a-entity>
