@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Museo Nascere 3D</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  </head>
+  <body style="margin:0">
+    <a-scene>
+      <a-assets>
+        <a-asset-item id="museo" src="museo_nascere_test.glb"></a-asset-item>
+      </a-assets>
+
+      <a-entity
+        gltf-model="#museo"
+        position="0 0 -3"
+        scale="1 1 1"
+        rotation="0 0 0"
+        animation="property: rotation; to: 0 360 0; loop: true; dur: 20000; easing: linear"
+      ></a-entity>
+
+      <a-entity light="type: ambient; intensity: 0.8"></a-entity>
+      <a-entity light="type: directional; intensity: 0.6" position="1 2 1"></a-entity>
+
+      <a-sky color="#ECECEC"></a-sky>
+      <a-entity camera look-controls wasd-controls position="0 1.6 0"></a-entity>
+    </a-scene>
+  </body>
+</html>
