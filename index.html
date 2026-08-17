@@ -19,25 +19,24 @@
       <a-asset-item id="museo" src="./museo_nascere_test.glb"></a-asset-item>
     </a-assets>
 
-    <!-- Modelo: reescalado en tiempo real a 11m de largo x 3m de alto, -->
-    <!-- sea cual sea la unidad con la que se exportó desde Blender -->
+    <!-- Modelo: reescalado en tiempo real a 11m de largo x 3m de alto, quita las
+         luces horneadas de Blender, y al cargar coloca la cámara dentro del
+         espacio (en su suelo real) y guarda los límites para no poder salir -->
     <a-entity
       id="modelo"
       gltf-model="#museo"
-      scale-to-real-size="length: 11; height: 3"
-      strip-embedded-lights
-      position="0 0 -6"
+      setup-museum-model="length: 11; height: 3; wallMargin: 0.4"
+      position="0 0 0"
       shadow="cast: true; receive: true"
     ></a-entity>
 
     <a-entity light="type: ambient; intensity: 0.8; color: #fff"></a-entity>
     <a-entity light="type: directional; intensity: 0.6" position="3 6 3" shadow="cast: true"></a-entity>
 
-    <a-plane rotation="-90 0 0" width="40" height="40" color="#8b8f94" shadow="receive: true"></a-plane>
-
     <!-- Cámara (WASD + look en la misma entidad, igual que bacterias-purpura) -->
-    <a-entity id="" position="0 1.6 10" rotation="0 0 0">
-      <a-entity id="camera" camera look-controls wasd-controls="acceleration: 50; fly: false" cursor="rayOrigin: mouse"></a-entity>
+    <!-- posición inicial la fija en runtime setup-museum-model al cargar el modelo -->
+    <a-entity id="rig" position="0 1.6 0" rotation="0 0 0">
+      <a-entity id="camera" camera look-controls wasd-controls="acceleration: 50; fly: false" cursor="rayOrigin: mouse" clamp-to-bounds></a-entity>
     </a-entity>
   </a-scene>
 
