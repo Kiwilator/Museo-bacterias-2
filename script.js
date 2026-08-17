@@ -34,7 +34,7 @@ AFRAME.registerComponent('setup-museum-model', {
     length: { type: 'number', default: 11 },
     height: { type: 'number', default: 3 },
     wallMargin: { type: 'number', default: 0.4 },
-    eyeHeight: { type: 'number', default: 1.6 }
+    eyeHeight: { type: 'number', default: 1.5 }
   },
   init() {
     this.el.addEventListener('model-loaded', () => this.onLoaded());
@@ -157,6 +157,65 @@ AFRAME.registerComponent('clamp-to-bounds', {
 
     if (x !== this.worldPos.x) obj.position.x += (x - this.worldPos.x);
     if (z !== this.worldPos.z) obj.position.z += (z - this.worldPos.z);
+  }
+});
+
+/*
+  TEST ONLY (per spec) — fake glow/halo on exactly two LED strips
+  (one purple, one turquoise) to see if it reads better than the flat
+  emissive material alone, since there's no real bloom post-process here.
+  Clones the strip's geometry, nudges it out slightly along its own
+  normals-ish (simple uniform scale about its bbox center) and renders it
+  unlit + additive + very low opacity behind/around the real strip.
+  Do NOT replicate to the other 8 strips until this is confirmed to look right.
+*/
+AFRAME.registerComponent('fake-glow-test', {
+  init() {
+    this.el.addEventListener('model-loaded', () => this.onLoaded());
+  },
+  onLoaded() {
+    const mesh = this.el.getObject3D('mesh');
+    if (!mesh) return;
+
+    const targets = [
+      { name: 'CINTA_Peana_Mesh_0', color: 0x8a3ff0 },   // morado/lila
+      { name: 'CINTA_Peana_Mesh_20', color: 0x1fd8cc }   // turquesa/cian
+    ];
+
+    targets.forEach(({ name, color }) => {
+      const strip = mesh.getObjectByName(name);
+      if (!strip || !strip.isMesh) {
+        console.warn(`[fake-glow-test] strip not found: ${name}`);
+        return;
+      }
+
+      const geo = strip.geometry.clone();
+      geo.computeBoundingBox();
+      const center = new THREE.Vector3();
+      geo.boundingBox.getCenter(center);
+      geo.translate(-center.x, -center.y, -center.z);
+
+      const mat = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.28,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      });
+
+      const glow = new THREE.Mesh(geo, mat);
+      glow.name = name + '_glow_TEST';
+      glow.position.copy(strip.position).add(
+        center.clone().applyQuaternion(strip.quaternion).multiply(strip.scale)
+      );
+      glow.quaternion.copy(strip.quaternion);
+      glow.scale.copy(strip.scale).multiplyScalar(1.18);
+      glow.renderOrder = 1;
+
+      strip.parent.add(glow);
+      console.log(`[fake-glow-test] added glow halo for ${name}`);
+    });
   }
 });
 

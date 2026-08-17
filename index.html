@@ -11,7 +11,7 @@
 <body>
 
   <a-scene
-    renderer="colorManagement: true; physicallyCorrectLights: true; toneMapping: ACESFilmic; exposure: 0.9; shadowMap: true;"
+    renderer="colorManagement: true; physicallyCorrectLights: true; toneMapping: ACESFilmic; exposure: 0.95; shadowMap: true;"
     background="color: #9aa7b3"
     fog="type: exponential; color: #7a8793; density: 0.06"
   >
@@ -20,18 +20,44 @@
     </a-assets>
 
     <!-- Modelo: reescalado en tiempo real a 11m de largo x 3m de alto, quita las
-         luces horneadas de Blender, y al cargar coloca la cámara dentro del
-         espacio (en su suelo real) y guarda los límites para no poder salir -->
+         luces horneadas de Blender (mal calibradas), y al cargar coloca la
+         cámara dentro del espacio (en su suelo real) y guarda los límites
+         para no poder salir. fake-glow-test añade un halo de prueba a UNA
+         peana morada y UNA turquesa (ver script.js, no replicar aún). -->
     <a-entity
       id="modelo"
       gltf-model="#museo"
       setup-museum-model="length: 11; height: 3; wallMargin: 0.4"
+      fake-glow-test
       position="0 0 0"
       shadow="cast: true; receive: true"
-    ></a-entity>
+    >
+      <!-- Luces de apoyo de neón: posiciones reales tomadas de las luces
+           originales de Blender (LUZ_Peana_Mesh_*, REBOTE_Nicho_Mesh_*),
+           recalibradas a intensidad razonable, alcance corto, sin sombra.
+           Pocas luces, no una por tira de LED. -->
 
-    <a-entity light="type: ambient; intensity: 0.85; color: #fff"></a-entity>
-    <a-entity light="type: directional; intensity: 0.65" position="3 6 3" shadow="cast: true"></a-entity>
+      <!-- Peanas — izquierda morado/lila (suelo) -->
+      <a-entity light="type: point; color: #8a3ff0; intensity: 0.8; distance: 2.2; decay: 2" position="-0.920 0.050 -3.683"></a-entity>
+      <a-entity light="type: point; color: #8a3ff0; intensity: 0.8; distance: 2.2; decay: 2" position="-2.130 0.050 3.013"></a-entity>
+
+      <!-- Peanas — derecha turquesa/cian (suelo) -->
+      <a-entity light="type: point; color: #1fd8cc; intensity: 0.8; distance: 2.2; decay: 2" position="0.705 0.050 2.387"></a-entity>
+      <a-entity light="type: point; color: #1fd8cc; intensity: 0.8; distance: 2.2; decay: 2" position="0.722 0.050 -3.598"></a-entity>
+
+      <!-- Nichos/techo — derecha turquesa/cian (rebote suave) -->
+      <a-entity light="type: point; color: #1fd8cc; intensity: 0.5; distance: 2.5; decay: 2" position="0.468 2.641 -4.860"></a-entity>
+      <a-entity light="type: point; color: #1fd8cc; intensity: 0.5; distance: 2.5; decay: 2" position="0.408 2.291 3.956"></a-entity>
+
+      <!-- Nichos/techo — izquierda morado/lila (rebote suave) -->
+      <a-entity light="type: point; color: #8a3ff0; intensity: 0.5; distance: 2.5; decay: 2" position="-1.032 2.631 3.188"></a-entity>
+      <a-entity light="type: point; color: #8a3ff0; intensity: 0.5; distance: 2.5; decay: 2" position="-1.317 2.438 -4.453"></a-entity>
+    </a-entity>
+
+    <!-- Iluminación general: hemisferio suave (crema arriba / tierra cálida
+         abajo) en vez de ambient plano, + directional cálida y débil -->
+    <a-entity light="type: hemisphere; color: #fff6e8; groundColor: #b89f7d; intensity: 1.0"></a-entity>
+    <a-entity light="type: directional; intensity: 0.6; color: #fff1dd" position="3 6 3" shadow="cast: true"></a-entity>
 
     <!-- Cámara (WASD + look en la misma entidad, igual que bacterias-purpura) -->
     <!-- posición inicial la fija en runtime setup-museum-model al cargar el modelo -->
