@@ -620,24 +620,11 @@ AFRAME.registerComponent('web-fixes', {
       }
     });
 
-    if (suelo) {
-      // El suelo es una malla aplastada a grosor cero, asi que su matriz de
-      // normales es singular: three no puede calcular sombreado y salia
-      // completamente negro (con la textura, las UVs y las luces correctas).
-      // Ningun ajuste de normales lo arregla porque no hay direccion valida
-      // que derivar. Se usa un material plano con la misma textura horneada,
-      // tintado en calido para que case con la luz de la sala. Mantiene la
-      // niebla y el tone mapping, y se ve exactamente como debe.
-      const base = suelo.material;
-      const plano = new THREE.MeshBasicMaterial({
-        map: base.map,
-        color: new THREE.Color(0xdccbb0),
-        side: THREE.DoubleSide,
-        fog: true
-      });
-      plano.name = 'Suelo_Plano';
-      suelo.material = plano;
-    }
+    // El suelo ya no necesita apaño: la malla siempre tuvo sus 0,52 m de
+    // grosor, lo que estaba a cero era la escala Z del objeto en Blender.
+    // Restaurada y reexportada, vuelve a tener volumen real, se sombrea con
+    // las luces de la escena y se puede intersecar, asi que ni el material
+    // plano ni el DoubleSide hacen falta.
 
     // un unico material blanco compartido por todos los aros de vitrina
     let blanco = null;
