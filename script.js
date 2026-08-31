@@ -232,7 +232,29 @@ AFRAME.registerComponent('setup-museum-model', {
     box = new THREE.Box3().setFromObject(mesh);
     const center = new THREE.Vector3();
     box.getCenter(center);
-    const floorY = box.min.y;
+
+    // Real floor meshes (children of the 'suelo' node): the walking
+    // surface is their TOP face, not the lowest point of the whole model
+    // (box.min.y). The floor mesh has real thickness (~0.5m slab), so
+    // box.min.y lands at its underside -- using that as the rig's Y put
+    // the camera embedded inside the floor slab instead of standing on
+    // top of it (near-plane clipping through solid geometry, screen full
+    // of fog/background). floorMeshes is also reused below for the
+    // ground-collision raycast.
+    const floorRoot = mesh.getObjectByName('suelo');
+    const floorMeshes = [];
+    if (floorRoot) {
+      floorRoot.traverse((o) => { if (o.isMesh) floorMeshes.push(o); });
+    }
+    let floorY;
+    if (floorMeshes.length) {
+      const floorBox = new THREE.Box3();
+      floorMeshes.forEach((o) => floorBox.expandByObject(o));
+      floorY = floorBox.max.y;
+    } else {
+      console.warn('[setup-museum-model] no floor mesh found under "suelo" — falling back to whole-model box.min.y for spawn height (may land below the real walking surface)');
+      floorY = box.min.y;
+    }
 
     // 4) detect free-standing "blocks" (peanas) to collide with + tag them
     const obstacles = [];
@@ -271,22 +293,15 @@ AFRAME.registerComponent('setup-museum-model', {
       minZ: box.min.z + m, maxZ: box.max.z - m
     };
 
-    // 4b) real floor meshes (children of the 'suelo' node), for an actual
-    // ground-collision check. This room's outer wall is a curved/organic
-    // shape, not a rectangle, so MUSEO_BOUNDS above is only a coarse outer
-    // limit — plenty of points inside that rectangle are past the real
-    // wall, over nothing. clamp-to-bounds raycasts against these meshes to
-    // catch that (see isGrounded below) instead of letting the player walk
-    // off the edge of the model into empty space.
-    const floorRoot = mesh.getObjectByName('suelo');
-    const floorMeshes = [];
-    if (floorRoot) {
-      floorRoot.traverse((o) => { if (o.isMesh) floorMeshes.push(o); });
-    }
+    // 4b) MUSEO_FLOOR_MESHES for the ground-collision check (isGrounded
+    // below). This room's outer wall is a curved/organic shape, not a
+    // rectangle, so MUSEO_BOUNDS above is only a coarse outer limit —
+    // plenty of points inside that rectangle are past the real wall, over
+    // nothing. clamp-to-bounds raycasts against these meshes to catch
+    // that instead of letting the player walk off the edge of the model
+    // into empty space. (floorMeshes/floorRoot computed above, in step 3,
+    // where floorY also needs them.)
     window.MUSEO_FLOOR_MESHES = floorMeshes;
-    if (!floorMeshes.length) {
-      console.warn('[setup-museum-model] no floor mesh found under "suelo" — ground-collision check disabled, falling back to rectangle bounds only');
-    }
 
     // registry for future interactivity hooks (peanas, nichos, screens...)
     window.MUSEO_INTERACTIVE = window.MUSEO_INTERACTIVE || {};
