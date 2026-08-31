@@ -1153,7 +1153,10 @@ AFRAME.registerComponent('image-windows', {
       const b = new THREE.Box3().setFromObject(o);
       const s = b.getSize(new THREE.Vector3());
       const c = b.getCenter(new THREE.Vector3());
-      if (c.x < 1.2 || s.y < 0.9) return;           // pegado a la pared y de altura de ventana
+      // pegado a la pared, de altura de ventana y de tamaño de nicho: los arcos
+      // grandes del techo cumplian las dos primeras condiciones y hacian que el
+      // hueco resultante creciera hasta varios metros
+      if (c.x < 1.2 || s.y < 0.9 || s.y > 2.6 || Math.max(s.x, s.z) > 1.6) return;
       marcos.push({ c, s });
     });
     // agrupar los marcos que comparten hueco y quedarse con los tres mayores
@@ -1171,9 +1174,10 @@ AFRAME.registerComponent('image-windows', {
       if (!h) return;
       const tex = it.data.image ? new THREE.TextureLoader().load(it.data.image) : this.lamina(it.data);
       const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.94,
-                                                side: THREE.DoubleSide, toneMapped: true });
-      const ancho = Math.max(h.s.z, 0.5) * 0.8;
-      const alto = h.s.y * 0.66;
+                                                side: THREE.FrontSide, toneMapped: true });
+      // acotado: una lamina de museo, nunca un panel de varios metros
+      const ancho = Math.min(Math.max(h.s.z, 0.5) * 0.8, 1.1);
+      const alto = Math.min(h.s.y * 0.66, 0.85);
       const plano = new THREE.Mesh(new THREE.PlaneGeometry(ancho, alto), mat);
       const p = h.c.clone();
       p.x -= 0.04;                                   // ligeramente por detras del plano del marco
