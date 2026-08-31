@@ -5,7 +5,7 @@
   <title>Purple Bacteries</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <link rel="stylesheet" href="./style.css?v=e7912d5">
+  <link rel="stylesheet" href="./style.css?v=2f5f5ec">
 </head>
 <body>
 
@@ -23,13 +23,13 @@
     renderer="colorManagement: true; toneMapping: ACESFilmic; exposure: 0.95"
     shadow="type: pcfsoft"
     background="color: #bda98f"
-    fog="type: exponential; color: #cdb99b; density: 0.058"
+    fog="type: linear; color: #cbb89f; near: 4; far: 15.5"
   >
     <a-assets timeout="15000">
-      <a-asset-item id="museo" src="./museo_bacterias.glb?v=e7912d5"></a-asset-item>
+      <a-asset-item id="museo" src="./museo_bacterias.glb?v=2f5f5ec"></a-asset-item>
     </a-assets>
 
-    <!-- Modelo (museo_bacterias.glb?v=e7912d5"tira de techo" que cruzaba la
+    <!-- Modelo (museo_bacterias.glb?v=2f5f5ec"tira de techo" que cruzaba la
          sala como una curva flotante. El resto de neones sí está pegado a
          bordes reales (ventana, nicho, peana, junta) y se exporta intacto.
          Suelo y pared llevan ahora textura horneada (antes eran nodos
@@ -45,6 +45,8 @@
       web-fixes
       exhibit-info
       exhibit-lighting
+      feature-glass
+      image-windows
       position="0 0 0"
       shadow="cast: true; receive: true"
     ></a-entity>
@@ -93,24 +95,27 @@
     <span><b>WASD</b> — MOVE &nbsp;&nbsp; <b>DRAG</b> — LOOK</span>
   </div>
 
+  <!-- Grafismo de sala: una sola pieza, muy tenue, como señaletica de museo -->
+  <svg id="wall-graphic" viewBox="0 0 200 200" aria-hidden="true">
+    <circle cx="100" cy="100" r="72"/><circle cx="100" cy="100" r="46"/>
+    <circle cx="100" cy="100" r="22"/><circle cx="82" cy="78" r="7"/>
+    <circle cx="126" cy="118" r="10"/><circle cx="112" cy="70" r="4"/>
+    <path d="M28 100h144M100 28v144"/>
+  </svg>
+
   <button id="exhibit-prompt" type="button">EXPLORE +</button>
 
   <aside id="exhibit-panel" role="dialog" aria-modal="false">
     <button class="panel-close" type="button" aria-label="Close">&times;</button>
     <span class="panel-section">01</span>
+    <span class="panel-icon"></span>
     <h2 class="panel-title"></h2>
+    <p class="panel-lead"></p>
     <p class="panel-body"></p>
+    <span class="panel-tags"></span>
   </aside>
 
-  <figure id="exhibit-caption">
-    <img class="cap-img" alt="" />
-    <figcaption>
-      <span class="cap-num"></span>
-      <span class="cap-title"></span>
-      <span class="cap-text"></span>
-    </figcaption>
-  </figure>
 
-  <script src="./script.js?v=e7912d5"></script>
+  <script src="./script.js?v=2f5f5ec"></script>
 </body>
 </html>

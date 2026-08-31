@@ -718,46 +718,55 @@ AFRAME.registerComponent('web-fixes', {
 
 const museumContent = {
   bacteriaLarge01: {
+    lead: 'FORMS THAT EXIST BELOW THE THRESHOLD OF SIGHT', tags: ['MICROSCOPIC', 'OBSERVATION', 'SCALE'], icon: 'cell',
     tier: 'primary', anchor: 'BACTERIA_MASTER',
     section: '01', title: 'INVISIBLE LIFE', label: 'EXPLORE +',
     body: 'An invisible world surrounds us. Microorganisms form complex structures, surfaces and patterns that are normally hidden from the human eye. Enlarged beyond their natural scale, these forms become a new visual landscape and a starting point for observation, experimentation and design.'
   },
   bacteriaSmall01: {
+    lead: 'SILHOUETTE AS A DESIGN VOCABULARY', tags: ['CONTOUR', 'VOLUME'], icon: 'form',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_base',
     title: 'FORM', label: 'VIEW +',
     body: 'Simple biological volumes can produce surprisingly complex silhouettes. Curves, extensions and irregular contours become a vocabulary of forms that can later be translated into objects and jewellery.'
   },
   bacteriaSmall02: {
+    lead: 'TEXTURE CARRIES VISUAL IDENTITY', tags: ['MEMBRANE', 'RELIEF'], icon: 'surface',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_10',
     title: 'SURFACE', label: 'VIEW +',
     body: 'At microscopic scale, a surface is never completely neutral. Texture, membrane, pattern and small irregularities create a visual identity that can inspire material finishes, reliefs and detailed geometries.'
   },
   bacteriaSmall03: {
+    lead: 'A LANGUAGE BUILT ON MOTION, NOT ON FIXED GEOMETRY', tags: ['OSCILLATION', 'ORIENTATION'], icon: 'wave',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_12',
     title: 'MOVEMENT', label: 'VIEW +',
     body: 'Biological form is not entirely static. Subtle oscillations, extensions and changes in orientation suggest a design language based on movement rather than on fixed geometry.'
   },
   bacteriaLarge02: {
+    lead: 'SELECT, SIMPLIFY, REINTERPRET', tags: ['TRANSLATION', 'PROPORTION', 'STRUCTURE'], icon: 'transform',
     tier: 'primary', anchor: 'Exhibit_Mesh0_Capsule',
     section: '02', title: 'FROM BIOLOGY TO FORM', label: 'EXPLORE +',
     body: 'Observation becomes design when biological characteristics are selected, simplified and reinterpreted. The aim is not to reproduce a microorganism literally, but to transform its visual logic into new proportions, structures and relationships.'
   },
   bacteriaSmall04: {
+    lead: 'ONE DETAIL BECOMES A MODULE', tags: ['MODULE', 'PATTERN'], icon: 'grid',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_14',
     title: 'REPETITION', label: 'VIEW +',
     body: 'Repeated units can generate rhythm and structure. A small biological detail can become a module, multiplied to construct larger patterns, surfaces or ornamental systems.'
   },
   bacteriaSmall05: {
+    lead: 'PERCEPTION CHANGES WITH SCALE', tags: ['ENLARGEMENT', 'ABSTRACTION'], icon: 'scale',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_16',
     title: 'SCALE', label: 'VIEW +',
     body: 'Changing scale changes perception. A microscopic detail enlarged many times can stop being recognisable as biology and become an abstract form suitable for experimentation and design.'
   },
   bacteriaSmall06: {
+    lead: 'EXAGGERATE, SIMPLIFY, RECOMBINE', tags: ['METHOD', 'GEOMETRY'], icon: 'transform',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_18',
     title: 'TRANSFORMATION', label: 'VIEW +',
     body: 'Design begins with transformation: selecting a characteristic, exaggerating it, simplifying it and combining it with new geometries until the biological reference becomes something new.'
   },
   reactor01: {
+    lead: 'FROM BIOLOGICAL CULTIVATION TO MATERIAL EXPERIMENTATION', tags: ['MODULAR', 'ACTIVE PROCESS', 'EXPERIMENTAL'], icon: 'reactor',
     tier: 'primary', anchor: 'PEANA_Bioreactor',
     section: '03', title: 'THE PROCESS', label: 'VIEW PROCESS +',
     body: 'This experimental device represents the transition between biological observation and material experimentation. The animated liquid and bubbles introduce the idea of an active process: matter is not presented as something fixed, but as something that can evolve, react and be transformed.'
@@ -765,16 +774,28 @@ const museumContent = {
 
   /* Ventanas de imagen de la pared opuesta. Contenido pasivo: no abren panel.
      Para poner las imagenes basta con rellenar `image` con una ruta. */
-  window01: { tier: 'tertiary', windowIndex: 0, number: '01', title: 'MICROSCOPY',
+  window01: { display: true, tier: 'tertiary', windowIndex: 0, number: '01', title: 'MICROSCOPY',
     image: '', caption: 'Observation reveals structures that remain invisible at human scale.' },
-  window02: { tier: 'tertiary', windowIndex: 1, number: '02', title: 'ABSTRACTION',
+  window02: { display: true, tier: 'tertiary', windowIndex: 1, number: '02', title: 'ABSTRACTION',
     image: '', caption: 'Biological information is reduced to lines, volumes, textures and patterns.' },
-  window03: { tier: 'tertiary', windowIndex: 2, number: '03', title: 'FORM',
+  window03: { display: true, tier: 'tertiary', windowIndex: 2, number: '03', title: 'FORM',
     image: '', caption: 'Selected characteristics become a new three-dimensional design vocabulary.' },
-  window04: { tier: 'tertiary', windowIndex: 3, number: '04', title: 'DIGITAL MODEL',
+  window04: { display: false, tier: 'tertiary', windowIndex: 3, number: '04', title: 'DIGITAL MODEL',
     image: '', caption: 'The abstracted form is developed and tested within a digital design process.' },
-  window05: { tier: 'tertiary', windowIndex: 4, number: '05', title: 'JEWELLERY',
+  window05: { display: false, tier: 'tertiary', windowIndex: 4, number: '05', title: 'JEWELLERY',
     image: '', caption: 'Biological inspiration is finally translated into scale, material and wearable form.' }
+};
+
+/* Iconos monolinea de las fichas. SVG inline, sin dependencias ni peticiones. */
+const PANEL_ICONS = {
+  cell:      '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="13"/><circle cx="20" cy="20" r="6"/><circle cx="16" cy="15" r="1.6"/></svg>',
+  form:      '<svg viewBox="0 0 40 40"><path d="M8 26c0-9 6-14 12-14s12 4 12 11c0 5-5 7-10 7S8 30 8 26z"/></svg>',
+  surface:   '<svg viewBox="0 0 40 40"><path d="M6 14h28M6 20h28M6 26h28"/><circle cx="14" cy="14" r="2.4"/><circle cx="26" cy="26" r="2.4"/></svg>',
+  wave:      '<svg viewBox="0 0 40 40"><path d="M5 24c5-10 10 10 15 0s10 10 15 0"/></svg>',
+  grid:      '<svg viewBox="0 0 40 40"><circle cx="13" cy="13" r="4"/><circle cx="27" cy="13" r="4"/><circle cx="13" cy="27" r="4"/><circle cx="27" cy="27" r="4"/></svg>',
+  scale:     '<svg viewBox="0 0 40 40"><circle cx="14" cy="26" r="4"/><circle cx="27" cy="16" r="10"/></svg>',
+  transform: '<svg viewBox="0 0 40 40"><circle cx="12" cy="20" r="7"/><path d="M22 20h9M27 16l4 4-4 4"/><rect x="31" y="14" width="0.1" height="0.1"/></svg>',
+  reactor:   '<svg viewBox="0 0 40 40"><rect x="13" y="10" width="14" height="21" rx="3"/><path d="M13 17h14"/><circle cx="20" cy="24" r="2"/><path d="M20 10V6"/></svg>'
 };
 
 AFRAME.registerComponent('exhibit-info', {
@@ -811,9 +832,8 @@ AFRAME.registerComponent('exhibit-info', {
     if (this.ui) return true;
     this.prompt  = document.getElementById('exhibit-prompt');
     this.panel   = document.getElementById('exhibit-panel');
-    this.caption = document.getElementById('exhibit-caption');
     this.intro   = document.getElementById('intro-msg');
-    if (!this.prompt || !this.panel || !this.caption) return false;
+    if (!this.prompt || !this.panel) return false;
 
     this.onPromptClick = () => this.open(this.active && this.active.id);
     this.prompt.addEventListener('click', this.onPromptClick);
@@ -874,12 +894,11 @@ AFRAME.registerComponent('exhibit-info', {
     if (!rig) return;
     const p = rig.object3D.getWorldPosition(this.tmp);
 
-    let mejor = null, mejorD = Infinity, mejorTer = null, mejorTerD = Infinity;
+    let mejor = null, mejorD = Infinity;
     this.items.forEach((it) => {
+      if (it.data.tier === 'tertiary') return;   // las ventanas no abren panel
       const d = Math.hypot(it.pos.x - p.x, it.pos.z - p.z);
-      if (it.data.tier === 'tertiary') {
-        if (d < mejorTerD) { mejorTerD = d; mejorTer = it; }
-      } else if (d < mejorD) { mejorD = d; mejor = it; }
+      if (d < mejorD) { mejorD = d; mejor = it; }
     });
 
     // aviso de interaccion
@@ -900,23 +919,6 @@ AFRAME.registerComponent('exhibit-info', {
       if (abierto && Math.hypot(abierto.pos.x - p.x, abierto.pos.z - p.z) > this.data.close) this.close();
     }
 
-    // ventanas: contenido pasivo, sin panel ni boton
-    if (mejorTer && mejorTerD <= this.data.show + 0.6) {
-      if (this.captionId !== mejorTer.id) {
-        this.captionId = mejorTer.id;
-        const d = mejorTer.data;
-        this.caption.querySelector('.cap-num').textContent = d.number;
-        this.caption.querySelector('.cap-title').textContent = d.title;
-        this.caption.querySelector('.cap-text').textContent = d.caption;
-        const img = this.caption.querySelector('.cap-img');
-        if (d.image) { img.src = d.image; img.style.display = 'block'; }
-        else { img.removeAttribute('src'); img.style.display = 'none'; }
-        this.caption.classList.add('visible');
-      }
-    } else if (this.captionId) {
-      this.captionId = null;
-      this.caption.classList.remove('visible');
-    }
   },
 
   open(id) {
@@ -926,8 +928,15 @@ AFRAME.registerComponent('exhibit-info', {
     const d = it.data;
     this.panel.querySelector('.panel-section').textContent = d.section || '';
     this.panel.querySelector('.panel-section').style.display = d.section ? 'block' : 'none';
+    this.panel.querySelector('.panel-icon').innerHTML = PANEL_ICONS[d.icon] || '';
     this.panel.querySelector('.panel-title').textContent = d.title;
+    const lead = this.panel.querySelector('.panel-lead');
+    lead.textContent = d.lead || '';
+    lead.style.display = d.lead ? 'block' : 'none';
     this.panel.querySelector('.panel-body').textContent = d.body;
+    const tags = this.panel.querySelector('.panel-tags');
+    tags.textContent = (d.tags || []).join(' · ');
+    tags.style.display = (d.tags && d.tags.length) ? 'block' : 'none';
     this.panel.classList.toggle('secondary', d.tier === 'secondary');
     this.panel.classList.add('visible');
     this.openId = id;
@@ -968,6 +977,169 @@ AFRAME.registerComponent('exhibit-info', {
   Las posiciones se leen de las propias piezas del modelo ya cargado, asi que
   siguen siendo correctas aunque el modelo se reescale en tiempo real.
 */
+/*
+  Cristal protagonista. Se aplica sobre la campana de la bacteria grande, que
+  es el mayor vidrio que ya existe en el modelo (1,04 m2): no se crea ninguna
+  geometria. El degradado es una CanvasTexture generada en memoria, asi que no
+  hay peticiones ni archivos.
+
+  Sigue siendo cristal: opacidad baja, rugosidad alta, sin reflejo especular
+  marcado y sin color plano. El movimiento es un desplazamiento minimo de la
+  textura con periodo de 24 s -- a esa velocidad no se percibe como animacion,
+  solo como material vivo.
+*/
+AFRAME.registerComponent('feature-glass', {
+  init() { this.el.addEventListener('model-loaded', () => this.onLoaded()); },
+
+  gradiente() {
+    const c = document.createElement('canvas');
+    c.width = 64; c.height = 256;
+    const ctx = c.getContext('2d');
+    const g = ctx.createLinearGradient(0, 0, 0, 256);
+    // violeta -> purpura -> magenta contenido -> transicion fria al final
+    g.addColorStop(0.00, '#3a1258');
+    g.addColorStop(0.28, '#7b2fb5');
+    g.addColorStop(0.52, '#a63ad0');
+    g.addColorStop(0.72, '#b8489e');
+    g.addColorStop(0.90, '#4a5fb0');
+    g.addColorStop(1.00, '#2f7f9e');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 64, 256);
+    // veteado suave, para que no sea un degradado perfecto de software
+    ctx.globalAlpha = 0.10;
+    for (let i = 0; i < 90; i++) {
+      ctx.beginPath();
+      ctx.ellipse(Math.random()*64, Math.random()*256, 6+Math.random()*16, 3+Math.random()*8, Math.random()*3, 0, 6.28);
+      ctx.fillStyle = Math.random() > 0.5 ? '#ffffff' : '#1b0b2a';
+      ctx.fill();
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  },
+
+  onLoaded() {
+    const mesh = this.el.getObject3D('mesh');
+    const campana = mesh && mesh.getObjectByName('VITRINA_Campana_Bacteria');
+    if (!campana) return;
+
+    this.tex = this.gradiente();
+    const mat = campana.material.clone();
+    mat.name = 'Vidrio_Vitral';
+    mat.map = this.tex;
+    mat.color = new THREE.Color(0xffffff);
+    mat.transparent = true;
+    mat.opacity = 0.34;              // sigue siendo cristal, no color plano
+    mat.roughness = 0.85;            // difuso, sin reflejo de espejo
+    mat.metalness = 0.0;
+    mat.transmission = 0.0;          // la transmision daba negro dentro de la campana
+    mat.emissive = new THREE.Color(0x2a1040);
+    mat.emissiveIntensity = 0.55;    // luminosidad propia, para que se lea especial
+    mat.side = THREE.DoubleSide;
+    mat.depthWrite = false;
+    campana.material = mat;
+
+    // una sola luz de contaminacion violeta, muy baja, sobre la superficie vecina
+    const c = new THREE.Box3().setFromObject(campana).getCenter(new THREE.Vector3());
+    this.el.object3D.worldToLocal(c);
+    const luz = new THREE.PointLight(0x9a4fd6, 1.6, 3.2, 2);
+    luz.position.set(c.x, c.y, c.z);
+    luz.castShadow = false;
+    this.el.object3D.add(luz);
+  },
+
+  tick(time) {
+    if (!this.tex) return;
+    // ciclo de 24 s; el recorrido es de una sola altura de textura
+    this.tex.offset.y = (time / 24000) % 1;
+  }
+});
+
+/*
+  Ventanas-imagen. Tres de los cinco nichos altos se convierten en lightbox de
+  museo: un plano finisimo dentro del hueco con una textura generada que ya
+  incluye el numero, el titulo y el pie. Asi el contenido queda embebido en la
+  arquitectura en lugar de ser una tarjeta blanca flotando delante.
+
+  El marco iluminado lo pone la propia arquitectura (el neon del nicho), asi que
+  aqui no se dibuja ningun borde. Si algun dia se rellena `image` en
+  museumContent con una ruta, la foto se usa de fondo en lugar del patron.
+*/
+AFRAME.registerComponent('image-windows', {
+  init() { this.el.addEventListener('model-loaded', () => this.onLoaded()); },
+
+  lamina(d) {
+    const W = 512, H = 360;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d');
+
+    // fondo oscuro tintado: lectura de vitrina retroiluminada, no de monitor
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#161320'); g.addColorStop(1, '#241d2c');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+    // patron celular: circulos concentricos tenues, lenguaje de microscopia
+    ctx.lineWidth = 1.1;
+    for (let i = 0; i < 26; i++) {
+      const x = 40 + Math.random()*(W-80), y = 30 + Math.random()*(H-120);
+      const r = 8 + Math.random()*34;
+      ctx.strokeStyle = 'rgba(214,196,235,' + (0.10 + Math.random()*0.22).toFixed(2) + ')';
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 6.28); ctx.stroke();
+      if (r > 20) { ctx.beginPath(); ctx.arc(x, y, r*0.42, 0, 6.28); ctx.stroke(); }
+    }
+    // velo inferior para que el texto siempre se lea
+    const v = ctx.createLinearGradient(0, H*0.45, 0, H);
+    v.addColorStop(0, 'rgba(12,10,18,0)'); v.addColorStop(1, 'rgba(12,10,18,0.92)');
+    ctx.fillStyle = v; ctx.fillRect(0, H*0.45, W, H*0.55);
+
+    ctx.fillStyle = '#c79bf0';
+    ctx.font = '600 20px Helvetica, Arial, sans-serif';
+    ctx.fillText(d.number, 34, H - 92);
+    ctx.fillStyle = '#f6f1ea';
+    ctx.font = '600 34px Helvetica, Arial, sans-serif';
+    ctx.fillText(d.title, 34, H - 56);
+    ctx.fillStyle = 'rgba(246,241,234,0.62)';
+    ctx.font = '17px Helvetica, Arial, sans-serif';
+    // el pie se parte en dos lineas si hace falta
+    const palabras = d.caption.split(' ');
+    let linea = '', y = H - 28;
+    palabras.forEach((w) => {
+      if (ctx.measureText(linea + w).width > W - 68) { ctx.fillText(linea, 34, y); linea = ''; y += 21; }
+      linea += w + ' ';
+    });
+    ctx.fillText(linea.trim(), 34, y);
+
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  },
+
+  onLoaded() {
+    const comp = this.el.components['exhibit-info'];
+    if (!comp || !comp.items.length) { setTimeout(() => this.onLoaded(), 300); return; }
+    const raiz = this.el.object3D;
+    let puestas = 0;
+    comp.items.forEach((it) => {
+      if (it.data.tier !== 'tertiary' || !it.data.display) return;
+      const tex = it.data.image ? new THREE.TextureLoader().load(it.data.image) : this.lamina(it.data);
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.94,
+                                                side: THREE.DoubleSide, toneMapped: true });
+      const plano = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.44), mat);
+      const p = it.pos.clone();
+      raiz.worldToLocal(p);
+      plano.position.copy(p);
+      plano.renderOrder = 1;
+      raiz.add(plano);
+      // orientar hacia el centro de la sala (los nichos estan en la pared +X)
+      const mirar = p.clone(); mirar.x -= 3;
+      plano.lookAt(mirar);
+      puestas++;
+    });
+    console.log(`[image-windows] ${puestas} vitrinas de imagen`);
+  }
+});
+
 AFRAME.registerComponent('exhibit-lighting', {
   init() {
     this.el.addEventListener('model-loaded', () => this.onLoaded());
@@ -977,16 +1149,12 @@ AFRAME.registerComponent('exhibit-lighting', {
     if (!mesh) return;
 
     // piezas principales (mas presencia) y secundarias (acento discreto)
+    // Maximo tres luces, muy suaves. Son luces de museo, no simulacion de neon:
+    // el visitante debe notar que las piezas tienen volumen, no ver las lamparas.
     const focos = [
-      { anchor: 'BACTERIA_MASTER',       intensidad: 3.2, alcance: 7, angulo: 0.55, color: 0xfff0dc },
-      { anchor: 'Exhibit_Mesh0_Capsule', intensidad: 2.6, alcance: 6, angulo: 0.55, color: 0xfff0dc },
-      { anchor: 'PEANA_Bioreactor',      intensidad: 3.0, alcance: 7, angulo: 0.5,  color: 0xf2f6ff },
-      { anchor: 'VITRINA_Campana_1',     intensidad: 1.3, alcance: 4, angulo: 0.45, color: 0xfff2e0 },
-      { anchor: 'VITRINA_Campana_2',     intensidad: 1.3, alcance: 4, angulo: 0.45, color: 0xfff2e0 },
-      { anchor: 'VITRINA_Campana_3',     intensidad: 1.3, alcance: 4, angulo: 0.45, color: 0xfff2e0 },
-      { anchor: 'VITRINA_Campana_4',     intensidad: 1.3, alcance: 4, angulo: 0.45, color: 0xfff2e0 },
-      { anchor: 'VITRINA_Campana_5',     intensidad: 1.3, alcance: 4, angulo: 0.45, color: 0xfff2e0 },
-      { anchor: 'VITRINA_Campana_6',     intensidad: 1.3, alcance: 4, angulo: 0.45, color: 0xfff2e0 }
+      { anchor: 'BACTERIA_MASTER',  intensidad: 3.4, alcance: 7.5, angulo: 0.62, color: 0xfff0dc },
+      { anchor: 'PEANA_Bioreactor', intensidad: 3.0, alcance: 7.0, angulo: 0.60, color: 0xe8f2ff },
+      { anchor: 'PEANA_Bacteria',   intensidad: 1.1, alcance: 9.0, angulo: 0.95, color: 0xfff4e4 }
     ];
 
     const raiz = this.el.object3D;

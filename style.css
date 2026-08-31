@@ -190,3 +190,33 @@ html, body {
   #exhibit-caption { left: 12px; right: 12px; width: auto; bottom: 96px; }
   #intro-msg { left: 12px; right: 12px; transform: none; }
 }
+
+/* --- jerarquia dentro de la ficha: icono, frase destacada y etiquetas --- */
+#exhibit-panel .panel-icon {
+  display: block; width: 34px; height: 34px; margin: 0 0 14px;
+}
+#exhibit-panel .panel-icon svg {
+  width: 100%; height: 100%; fill: none;
+  stroke: var(--mus-morado); stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round; opacity: 0.85;
+}
+#exhibit-panel .panel-lead {
+  margin: 0 0 14px; font-size: 12px; line-height: 1.5;
+  letter-spacing: 0.09em; font-weight: 600; color: var(--mus-morado);
+}
+#exhibit-panel .panel-tags {
+  display: block; margin-top: 18px; padding-top: 14px;
+  border-top: 1px solid var(--mus-borde);
+  font-size: 10px; letter-spacing: 0.16em; font-weight: 600;
+  color: var(--mus-tinta); opacity: 0.45;
+}
+#exhibit-panel.secondary .panel-icon { width: 28px; height: 28px; margin-bottom: 12px; }
+#exhibit-panel.secondary .panel-lead { font-size: 11px; margin-bottom: 12px; }
+
+/* --- grafismo de sala --- */
+#wall-graphic {
+  position: fixed; left: 26px; top: 26px; width: 132px; height: 132px;
+  z-index: 5; pointer-events: none; opacity: 0.13;
+  fill: none; stroke: #6b4b8a; stroke-width: 1.1;
+}
+@media (max-width: 640px) { #wall-graphic { width: 84px; height: 84px; left: 14px; top: 14px; } }
