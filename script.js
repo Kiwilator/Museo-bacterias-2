@@ -1042,7 +1042,7 @@ AFRAME.registerComponent('feature-glass', {
     // una sola luz de contaminacion violeta, muy baja, sobre la superficie vecina
     const c = new THREE.Box3().setFromObject(campana).getCenter(new THREE.Vector3());
     this.el.object3D.worldToLocal(c);
-    const luz = new THREE.PointLight(0x9a4fd6, 1.6, 3.2, 2);
+    const luz = new THREE.PointLight(0x9a4fd6, 0.7, 2.0, 2);
     luz.position.set(c.x, c.y, c.z);
     luz.castShadow = false;
     this.el.object3D.add(luz);
@@ -1118,21 +1118,51 @@ AFRAME.registerComponent('image-windows', {
   onLoaded() {
     const comp = this.el.components['exhibit-info'];
     if (!comp || !comp.items.length) { setTimeout(() => this.onLoaded(), 300); return; }
+    const mesh = this.el.getObject3D('mesh');
     const raiz = this.el.object3D;
+
+    /*
+      Los nichos de verdad son los marcos verticales de neon turquesa pegados a
+      la pared del lado laboratorio. El primer intento se anclaba a grupos de
+      neon altos, que resultaron ser los arcos del techo: las laminas salian
+      diminutas y casi de perfil. Aqui se buscan marcos altos y pegados a la
+      pared, y cada lamina se dimensiona y orienta segun su propio hueco.
+    */
+    const marcos = [];
+    mesh.traverse((o) => {
+      if (!o.isMesh || !o.material || o.material.name !== 'Neon_Turquoise') return;
+      const b = new THREE.Box3().setFromObject(o);
+      const s = b.getSize(new THREE.Vector3());
+      const c = b.getCenter(new THREE.Vector3());
+      if (c.x < 1.2 || s.y < 0.9) return;           // pegado a la pared y de altura de ventana
+      marcos.push({ c, s });
+    });
+    // agrupar los marcos que comparten hueco y quedarse con los tres mayores
+    const huecos = [];
+    marcos.forEach((m) => {
+      const h = huecos.find((h) => Math.abs(h.c.z - m.c.z) < 0.6);
+      if (h) { h.s.max(m.s); } else { huecos.push({ c: m.c.clone(), s: m.s.clone() }); }
+    });
+    huecos.sort((a, b) => (b.s.y * Math.max(b.s.x, b.s.z)) - (a.s.y * Math.max(a.s.x, a.s.z)));
+
+    const contenidos = comp.items.filter((i) => i.data.tier === 'tertiary' && i.data.display);
     let puestas = 0;
-    comp.items.forEach((it) => {
-      if (it.data.tier !== 'tertiary' || !it.data.display) return;
+    contenidos.forEach((it, i) => {
+      const h = huecos[i];
+      if (!h) return;
       const tex = it.data.image ? new THREE.TextureLoader().load(it.data.image) : this.lamina(it.data);
       const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.94,
                                                 side: THREE.DoubleSide, toneMapped: true });
-      const plano = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.44), mat);
-      const p = it.pos.clone();
+      const ancho = Math.max(h.s.z, 0.5) * 0.8;
+      const alto = h.s.y * 0.66;
+      const plano = new THREE.Mesh(new THREE.PlaneGeometry(ancho, alto), mat);
+      const p = h.c.clone();
+      p.x -= 0.04;                                   // ligeramente por detras del plano del marco
       raiz.worldToLocal(p);
       plano.position.copy(p);
       plano.renderOrder = 1;
       raiz.add(plano);
-      // orientar hacia el centro de la sala (los nichos estan en la pared +X)
-      const mirar = p.clone(); mirar.x -= 3;
+      const mirar = p.clone(); mirar.x -= 3;         // de cara al centro de la sala
       plano.lookAt(mirar);
       puestas++;
     });
