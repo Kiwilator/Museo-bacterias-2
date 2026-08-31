@@ -6,6 +6,12 @@
   finger on touch) and drag, release and looking stops, cursor free the
   whole time. No ESC, nothing to "get out of".
 */
+// Un desplazamiento del puntero por debajo de este umbral (en pixeles) se
+// trata como CLICK/TAP sobre la escena; por encima, como arrastre de camara.
+// Ver trySelect() mas abajo: es lo unico que distingue seleccionar una pieza
+// de simplemente mirar alrededor.
+const CLICK_MAX_MOVE_PX = 6;
+
 AFRAME.registerComponent('drag-look-controls', {
   schema: {
     sensitivity: { type: 'number', default: 0.2 } // degrees per pixel of drag
@@ -14,6 +20,8 @@ AFRAME.registerComponent('drag-look-controls', {
     this.dragging = false;
     this.lastX = 0;
     this.lastY = 0;
+    this.downX = 0;
+    this.downY = 0;
     /*
       Orden de rotacion YXZ (yaw y luego pitch). Con el orden por defecto XYZ
       el pitch se aplica ANTES que el yaw, y al combinar ambos aparece un
@@ -29,6 +37,8 @@ AFRAME.registerComponent('drag-look-controls', {
 
     const start = (x, y) => {
       this.dragging = true;
+      this.downX = x;
+      this.downY = y;
       this.lastX = x;
       this.lastY = y;
       canvas.style.cursor = 'grabbing';
@@ -47,6 +57,11 @@ AFRAME.registerComponent('drag-look-controls', {
     const end = () => {
       this.dragging = false;
       canvas.style.cursor = 'grab';
+      // Mismo gesto (mousedown/touchstart -> mouseup/touchend) que el drag-look,
+      // pero si el puntero apenas se movio se interpreta como click/tap sobre
+      // una pieza en vez de arrastre de camara -- ver CLICK_MAX_MOVE_PX arriba.
+      const moved = Math.hypot(this.lastX - this.downX, this.lastY - this.downY);
+      if (moved < CLICK_MAX_MOVE_PX) this.trySelect(this.lastX, this.lastY);
     };
 
     this.onMouseDown = (e) => { if (e.button === 0) start(e.clientX, e.clientY); };
@@ -69,6 +84,36 @@ AFRAME.registerComponent('drag-look-controls', {
     };
     if (canvas) attach();
     else this.el.sceneEl.addEventListener('render-target-loaded', attach, { once: true });
+  },
+  /*
+    Seleccion directa por click/tap: lanza un rayo desde la camara hacia el
+    punto de pantalla donde se solto el puntero y, si toca una de las mallas
+    que exhibit-info marco como pieza informativa (userData.museoExhibitId),
+    abre la misma ficha que abriria la proximidad. Solo se comprueba contra
+    esa lista corta de mallas (bacterias, reactor...), nunca contra paredes,
+    suelo o neones, y solo se llama cuando el gesto no fue un arrastre.
+  */
+  trySelect(x, y) {
+    const sceneEl = this.el.sceneEl;
+    const canvas = sceneEl && sceneEl.canvas;
+    const modelo = document.querySelector('#modelo');
+    const info = modelo && modelo.components && modelo.components['exhibit-info'];
+    if (!canvas || !info || !info.selectableMeshes || !info.selectableMeshes.length) return;
+
+    const rect = canvas.getBoundingClientRect();
+    if (!this._ndc) this._ndc = new THREE.Vector2();
+    this._ndc.set(
+      ((x - rect.left) / rect.width) * 2 - 1,
+      -((y - rect.top) / rect.height) * 2 + 1
+    );
+    const camera = sceneEl.camera;
+    if (!camera) return;
+    if (!this._raycaster) this._raycaster = new THREE.Raycaster();
+    this._raycaster.setFromCamera(this._ndc, camera);
+    const hits = this._raycaster.intersectObjects(info.selectableMeshes, false);
+    if (!hits.length) return;
+    const id = hits[0].object.userData.museoExhibitId;
+    if (id) info.open(id);
   },
   remove() {
     const c = this.el.sceneEl.canvas;
@@ -337,6 +382,16 @@ AFRAME.registerComponent('setup-museum-model', {
     // where floorY also needs them.)
     window.MUSEO_FLOOR_MESHES = floorMeshes;
 
+    // 4c) MUSEO_WALL_MESHES: the real curved perimeter wall (node
+    // 'PAREDES_Sala' in museum_walls.glb), used by clamp-to-bounds as a
+    // lightweight horizontal-raycast collision proxy so the visitor can't
+    // step through the curved wall — no separate invisible collision box,
+    // just the wall geometry that already ships in the modular GLB.
+    const wallRoot = mesh.getObjectByName('PAREDES_Sala');
+    const wallMeshes = [];
+    if (wallRoot) wallRoot.traverse((o) => { if (o.isMesh) wallMeshes.push(o); });
+    window.MUSEO_WALL_MESHES = wallMeshes;
+
     // registry for future interactivity hooks (peanas, nichos, screens...)
     window.MUSEO_INTERACTIVE = window.MUSEO_INTERACTIVE || {};
     window.MUSEO_INTERACTIVE.peanas = obstacles.map((o) => ({ id: o.id, meshName: o.meshName, position: o.center }));
@@ -462,6 +517,30 @@ function rayHitsFloor(x, z, floorMeshes, refY) {
   no sirve como referencia y se cae a los limites rectangulares, que ya
   existen y son suficientes para no salirse de la sala.
 */
+/*
+  Horizontal raycast against the real wall mesh (window.MUSEO_WALL_MESHES,
+  set in setup-museum-model): fired from the last known-good position toward
+  the candidate position, chest-height. If it hits the wall before reaching
+  the candidate, the move would cross the curved perimeter -- used by
+  clamp-to-bounds to hold the player back instead of letting the rectangle-
+  shaped MUSEO_BOUNDS (a coarse outer limit only) allow walking through the
+  curve between two rectangle corners.
+*/
+const wallRaycaster = new THREE.Raycaster();
+const wallRayOrigin = new THREE.Vector3();
+const wallRayDir = new THREE.Vector3();
+function crossesWall(fromX, fromZ, toX, toZ, wallMeshes, refY) {
+  if (!wallMeshes || !wallMeshes.length) return false;
+  const dx = toX - fromX, dz = toZ - fromZ;
+  const dist = Math.hypot(dx, dz);
+  if (dist < 1e-4) return false;
+  wallRayOrigin.set(fromX, refY + 1.0, fromZ);
+  wallRayDir.set(dx, 0, dz).normalize();
+  wallRaycaster.set(wallRayOrigin, wallRayDir);
+  wallRaycaster.far = dist + 0.05;
+  return wallRaycaster.intersectObjects(wallMeshes, false).length > 0;
+}
+
 function isGrounded(x, z, floorMeshes, refY) {
   if (!floorMeshes || !floorMeshes.length) return true;
   if (groundProbe === null) {
@@ -523,7 +602,14 @@ AFRAME.registerComponent('clamp-to-bounds', {
 
     const spawn = window.MUSEO_SPAWN;
     const refY = spawn ? spawn.y : obj.position.y;
-    if (isGrounded(clamped.x, clamped.z, window.MUSEO_FLOOR_MESHES, refY)) {
+    const wallHit = crossesWall(this.lastGood.x, this.lastGood.z, clamped.x, clamped.z, window.MUSEO_WALL_MESHES, refY);
+    if (wallHit) {
+      // the move would cross the real curved wall mesh before reaching the
+      // candidate point -- hold at the last position instead of stepping
+      // through it (this is the actual perimeter, not the coarse rectangle).
+      clamped.x = this.lastGood.x;
+      clamped.z = this.lastGood.z;
+    } else if (isGrounded(clamped.x, clamped.z, window.MUSEO_FLOOR_MESHES, refY)) {
       this.lastGood.x = clamped.x;
       this.lastGood.z = clamped.z;
     } else {
@@ -792,12 +878,16 @@ const museumContent = {
   },
 
   /* Ventanas de imagen de la pared opuesta. Contenido pasivo: no abren panel.
-     Para poner las imagenes basta con rellenar `image` con una ruta. */
-  window01: { display: true, tier: 'tertiary', windowIndex: 0, number: '01', title: 'MICROSCOPY',
+     display:false en las cinco: los graficos generados por IA (MICROSCOPY,
+     ABSTRACTION, FORM, DIGITAL MODEL, JEWELLERY) se han retirado y los nichos
+     quedan limpios a proposito -- el contenido grafico final se disenara
+     aparte. Para reactivar una vitrina de imagen real basta con poner
+     display:true y rellenar `image` con una ruta. */
+  window01: { display: false, tier: 'tertiary', windowIndex: 0, number: '01', title: 'MICROSCOPY',
     image: '', caption: 'Observation reveals structures that remain invisible at human scale.' },
-  window02: { display: true, tier: 'tertiary', windowIndex: 1, number: '02', title: 'ABSTRACTION',
+  window02: { display: false, tier: 'tertiary', windowIndex: 1, number: '02', title: 'ABSTRACTION',
     image: '', caption: 'Biological information is reduced to lines, volumes, textures and patterns.' },
-  window03: { display: true, tier: 'tertiary', windowIndex: 2, number: '03', title: 'FORM',
+  window03: { display: false, tier: 'tertiary', windowIndex: 2, number: '03', title: 'FORM',
     image: '', caption: 'Selected characteristics become a new three-dimensional design vocabulary.' },
   window04: { display: false, tier: 'tertiary', windowIndex: 3, number: '04', title: 'DIGITAL MODEL',
     image: '', caption: 'The abstracted form is developed and tested within a digital design process.' },
@@ -896,12 +986,22 @@ AFRAME.registerComponent('exhibit-info', {
         if (h) pos = h.p.clone();
       } else {
         const o = byName[data.anchor];
-        if (o) pos = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3());
+        if (o) {
+          pos = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3());
+          // Marca cada malla de esta pieza para la seleccion directa por
+          // click/tap (ver drag-look-controls.trySelect): asi el raycaster
+          // solo puede tocar piezas con ficha real, nunca paredes/suelo/neon.
+          o.traverse((n) => { if (n.isMesh) n.userData.museoExhibitId = id; });
+        }
       }
       if (pos) this.items.push({ id, data, pos });
       else console.warn('[exhibit-info] sin ancla:', id, data.anchor || 'ventana');
     });
-    console.log(`[exhibit-info] ${this.items.length} piezas activas`);
+
+    this.selectableMeshes = [];
+    mesh.traverse((o) => { if (o.isMesh && o.userData.museoExhibitId) this.selectableMeshes.push(o); });
+
+    console.log(`[exhibit-info] ${this.items.length} piezas activas, ${this.selectableMeshes.length} mallas seleccionables por click/tap`);
   },
 
   tick(time) {
@@ -997,15 +1097,25 @@ AFRAME.registerComponent('exhibit-info', {
   siguen siendo correctas aunque el modelo se reescale en tiempo real.
 */
 /*
-  Cristal protagonista. Se aplica sobre la campana de la bacteria grande, que
-  es el mayor vidrio que ya existe en el modelo (1,04 m2): no se crea ninguna
-  geometria. El degradado es una CanvasTexture generada en memoria, asi que no
-  hay peticiones ni archivos.
+  Vitral arquitectonico. UNA sola ventana de la sala (lado bacterias) recibe
+  un cristal con degradado violeta/magenta -- "coloured architectural glass /
+  scientific membrane", nunca un objeto flotando delante de una pieza.
 
-  Sigue siendo cristal: opacidad baja, rugosidad alta, sin reflejo especular
-  marcado y sin color plano. El movimiento es un desplazamiento minimo de la
-  textura con periodo de 24 s -- a esa velocidad no se percibe como animacion,
-  solo como material vivo.
+  NOTA: una version anterior aplicaba este mismo degradado sobre la campana
+  de vidrio de la bacteria grande (VITRINA_Campana_Bacteria). Al ser una
+  cupula cerrada, con emissive y una luz puntual dentro, se leia como una
+  burbuja/esfera morada envolviendo la bacteria -- exactamente lo que no se
+  queria. Se ha retirado por completo: la campana ya no se toca aqui y se ve
+  con su vidrio original, tal cual viene del modulo. El vitral se instala en
+  su lugar en un hueco de ventana real de la arquitectura (mismo criterio
+  geometrico que web-fixes usa para localizar esas ventanas: marco vertical,
+  lado bacterias, entre el suelo y ~1 m), como una lamina fina flush con el
+  marco -- no invade la zona de paso.
+
+  El degradado es una CanvasTexture generada en memoria (sin peticiones ni
+  archivos). El movimiento es un desplazamiento minimo de la textura con
+  periodo de 24 s -- a esa velocidad no se percibe como animacion, solo como
+  material vivo.
 */
 AFRAME.registerComponent('feature-glass', {
   init() { this.el.addEventListener('museo-modules-loaded', () => this.onLoaded()); },
@@ -1037,34 +1147,93 @@ AFRAME.registerComponent('feature-glass', {
     return t;
   },
 
+  /*
+    Localiza los marcos de ventana del lado de las bacterias por geometria,
+    igual que web-fixes (posicion x<0, marco vertical >1m de alto, arranca
+    cerca del suelo) -- no por nombre de material, porque web-fixes puede
+    haber corrido antes y ya haberlos renombrado a 'Neon_Blanco_Ventana'.
+    Agrupa los marcos que comparten hueco (mismo Z, como en image-windows) y
+    devuelve el hueco de mayor superficie: ESA es la ventana protagonista.
+  */
+  buscarVentana(mesh) {
+    const marcos = [];
+    mesh.traverse((o) => {
+      if (!o.isMesh || !o.material) return;
+      const n = o.material.name;
+      if (n !== 'Neon_Purple' && n !== 'Neon_Blanco_Ventana') return;
+      const b = new THREE.Box3().setFromObject(o);
+      const c = b.getCenter(new THREE.Vector3());
+      if (c.x >= 0) return;                              // solo lado bacterias
+      const s = b.getSize(new THREE.Vector3());
+      if (s.y < 1.0 || b.min.y > 1.0) return;             // ni aros de peana ni arcos de techo
+      marcos.push({ box: b, center: c, size: s });
+    });
+    if (!marcos.length) return null;
+
+    const huecos = [];
+    marcos.forEach((m) => {
+      const h = huecos.find((h) => Math.abs(h.center.z - m.center.z) < 0.6);
+      if (h) {
+        h.box.union(m.box);
+        h.box.getCenter(h.center);
+        h.box.getSize(h.size);
+      } else {
+        huecos.push({ box: m.box.clone(), center: m.center.clone(), size: m.size.clone() });
+      }
+    });
+    huecos.sort((a, b) => (b.size.y * Math.max(b.size.x, b.size.z)) - (a.size.y * Math.max(a.size.x, a.size.z)));
+    return huecos[0];
+  },
+
   onLoaded() {
     const mesh = this.el.object3D;
-    const campana = mesh && mesh.getObjectByName('VITRINA_Campana_Bacteria');
-    if (!campana) return;
+    const raiz = this.el.object3D;
+    if (!mesh) return;
+
+    const hueco = this.buscarVentana(mesh);
+    if (!hueco) { console.warn('[feature-glass] no se encontro ninguna ventana del lado de las bacterias'); return; }
 
     this.tex = this.gradiente();
-    const mat = campana.material.clone();
-    mat.name = 'Vidrio_Vitral';
-    mat.map = this.tex;
-    mat.color = new THREE.Color(0xffffff);
-    mat.transparent = true;
-    mat.opacity = 0.34;              // sigue siendo cristal, no color plano
-    mat.roughness = 0.85;            // difuso, sin reflejo de espejo
-    mat.metalness = 0.0;
-    mat.transmission = 0.0;          // la transmision daba negro dentro de la campana
-    mat.emissive = new THREE.Color(0x2a1040);
-    mat.emissiveIntensity = 0.55;    // luminosidad propia, para que se lea especial
-    mat.side = THREE.DoubleSide;
-    mat.depthWrite = false;
-    campana.material = mat;
 
-    // una sola luz de contaminacion violeta, muy baja, sobre la superficie vecina
-    const c = new THREE.Box3().setFromObject(campana).getCenter(new THREE.Vector3());
-    this.el.object3D.worldToLocal(c);
-    const luz = new THREE.PointLight(0x9a4fd6, 0.7, 2.0, 2);
-    luz.position.set(c.x, c.y, c.z);
+    // ancho = a lo largo del marco (el eje horizontal mas grande del hueco);
+    // acotado al 82% del hueco para quedar dentro del marco, nunca sobre el muro.
+    const anchoHueco = Math.max(hueco.size.x, hueco.size.z);
+    const ancho = anchoHueco * 0.82;
+    const alto = hueco.size.y * 0.82;
+
+    const mat = new THREE.MeshStandardMaterial({
+      map: this.tex,
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.30,                 // translucido: la arquitectura de detras se sigue leyendo
+      roughness: 0.85,
+      metalness: 0.0,
+      emissive: new THREE.Color(0x2a1040),
+      emissiveIntensity: 0.4,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+    const plano = new THREE.Mesh(new THREE.PlaneGeometry(ancho, alto), mat);
+    plano.renderOrder = 1;
+
+    const p = hueco.center.clone();
+    raiz.worldToLocal(p);
+    plano.position.copy(p);
+    // el hueco es mas ancho en X que en Z (marco encastrado en la pared curva):
+    // el plano por defecto mira a +Z, asi que se gira 90 grados para quedar
+    // en el mismo plano que el marco en vez de atravesarlo hacia la sala.
+    if (hueco.size.x >= hueco.size.z) plano.rotation.y = Math.PI / 2;
+    raiz.add(plano);
+    this.plano = plano;
+
+    // una sola luz de contaminacion violeta, muy baja, junto al vitral -- sin
+    // geometria visible, sin esfera, sin varios focos de neon falsos.
+    const luz = new THREE.PointLight(0x9a4fd6, 0.5, 1.8, 2);
+    luz.position.copy(p);
     luz.castShadow = false;
-    this.el.object3D.add(luz);
+    raiz.add(luz);
+
+    console.log('[feature-glass] vitral instalado en la ventana protagonista', hueco.center);
   },
 
   tick(time) {
