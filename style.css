@@ -125,6 +125,8 @@ html, body {
   top: 50%;
   width: 410px;
   max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
   transform: translate(0, calc(-50% + 10px));
   padding: 30px 32px 32px;
   background: var(--mus-crema);
@@ -149,7 +151,7 @@ html, body {
 #exhibit-panel .panel-title {
   margin: 0 0 16px; font-size: 21px; letter-spacing: 0.06em; font-weight: 600;
 }
-#exhibit-panel .panel-body { margin: 0; font-size: 14.5px; line-height: 1.72; opacity: 0.85; }
+#exhibit-panel .panel-body { margin: 0; font-size: 14.5px; line-height: 1.72; opacity: 0.85; white-space: pre-line; }
 /* las piezas secundarias se leen mas rapido */
 #exhibit-panel.secondary { width: 360px; padding: 26px 28px 28px; }
 #exhibit-panel.secondary .panel-title { font-size: 18px; }

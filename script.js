@@ -822,53 +822,61 @@ AFRAME.registerComponent('web-fixes', {
    ========================================================================== */
 
 const museumContent = {
+  /* Sala 1 (Purple Phototrophic Bacteria). Introduccion general + las 8 cepas
+     avanzan de lo general a lo especifico. Solo hay 8 anclas fisicas en esta
+     sala (2 piezas "large" + 6 "small"), asi que la introduccion general y la
+     cepa 01 (Rhodospirillum rubrum) comparten la primera ficha -- el propio
+     texto de la introduccion termina anunciando las ocho cepas, asi que el
+     salto a la cepa 01 en la misma ficha es la continuacion natural. El resto
+     de cepas (02-08) sigue el mismo orden de recorrido que ya tenian las
+     piezas de la sala. */
   bacteriaLarge01: {
-    lead: 'FORMS THAT EXIST BELOW THE THRESHOLD OF SIGHT', tags: ['MICROSCOPIC', 'OBSERVATION', 'SCALE'], icon: 'cell',
+    lead: 'Much more than photosynthesis', tags: ['PHOTOSYNTHESIS', 'METABOLIC DIVERSITY', 'PHA'], icon: 'cell',
     tier: 'primary', anchor: 'BACTERIA_MASTER',
-    section: '01', title: 'INVISIBLE LIFE', label: 'EXPLORE +',
-    body: 'An invisible world surrounds us. Microorganisms form complex structures, surfaces and patterns that are normally hidden from the human eye. Enlarged beyond their natural scale, these forms become a new visual landscape and a starting point for observation, experimentation and design.'
+    section: '01', title: 'PURPLE PHOTOTROPHIC BACTERIA', label: 'EXPLORE +',
+    body: 'Purple phototrophic bacteria (PPB) are a diverse group of microorganisms capable of using light as a source of energy. What makes them particularly interesting, however, is not only their photosynthetic ability, but also the extraordinary variety of metabolic strategies they can develop.\n\nDepending on the species and environmental conditions, these bacteria can modify their metabolism, fix nitrogen, transform organic compounds, use certain gases, exchange electrons with minerals or electrodes, and store carbon in the form of PHA (biopolymers with potential applications in the production of bio-based plastics). Some strains are also particularly efficient at producing hydrogen, while the biomass obtained from their cultivation is being investigated for food and feed applications.\n\nThis diversity makes purple phototrophic bacteria important both for understanding fundamental biological processes (such as the conversion of light into energy and cellular adaptation to environmental conditions) and for investigating more sustainable biotechnological processes. Their cultivation opens possibilities related to hydrogen production, bioplastics, biomass and bioelectrochemical systems.\n\nBut they do not all behave in the same way.\n\nFrom this point onwards, the exhibition focuses on eight specific strains, revealing the characteristics and capabilities that distinguish each one.\n\n01. RHODOSPIRILLUM RUBRUM\nA key bacterium for understanding photosynthesis\n\nRhodospirillum rubrum has played an important role in the history of bacterial photosynthesis research. Its relatively simple photosynthetic apparatus made it one of the first model organisms used to investigate how energy from light is transformed, through electron transfer, into energy that the cell can use.\n\nIts study has also helped researchers understand the relationship between energy production, nitrogen fixation and carbon metabolism, showing how a bacterium can coordinate different processes depending on its needs and environmental conditions.\n\nIts relevance is not limited to fundamental research. R. rubrum can accumulate PHA in the form of intracellular granules. These compounds act as carbon reserves for the bacterium and can be used in the production of bio-based and biodegradable materials. The species is also currently being investigated as a potential nutritious ingredient for food and feed applications.'
   },
   bacteriaSmall01: {
-    lead: 'SILHOUETTE AS A DESIGN VOCABULARY', tags: ['CONTOUR', 'VOLUME'], icon: 'form',
+    lead: 'The machinery that converts light into energy', tags: ['REACTION CENTER', 'NOBEL PRIZE'], icon: 'form',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_base',
-    title: 'FORM', label: 'VIEW +',
-    body: 'Simple biological volumes can produce surprisingly complex silhouettes. Curves, extensions and irregular contours become a vocabulary of forms that can later be translated into objects and jewellery.'
+    section: '02', title: 'BLASTOCHLORIS VIRIDIS', label: 'VIEW +',
+    body: 'Inside photosynthetic bacteria, specialized structures capture light energy and begin its conversion into chemical energy. The photosynthetic reaction center of Blastochloris viridis occupies a particularly important place in the history of science.\n\nIt was the first membrane protein complex whose structure was resolved at atomic resolution. Observing its organization at this level of detail made it possible to better understand one of the essential processes of photosynthesis (the initial conversion of light energy into chemical energy).\n\nThis discovery went far beyond the study of a single bacterium. It opened new possibilities for investigating the structure of membrane proteins and contributed to the research recognized by the 1988 Nobel Prize in Chemistry.'
   },
   bacteriaSmall02: {
-    lead: 'TEXTURE CARRIES VISUAL IDENTITY', tags: ['MEMBRANE', 'RELIEF'], icon: 'surface',
+    lead: 'Changing from within to adapt', tags: ['CHROMATOPHORES', 'ADAPTATION'], icon: 'surface',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_10',
-    title: 'SURFACE', label: 'VIEW +',
-    body: 'At microscopic scale, a surface is never completely neutral. Texture, membrane, pattern and small irregularities create a visual identity that can inspire material finishes, reliefs and detailed geometries.'
+    section: '03', title: 'CEREIBACTER SPHAEROIDES', label: 'VIEW +',
+    body: 'Bacteria are not static organisms. Some can modify their own cellular architecture in response to the conditions around them.\n\nCereibacter sphaeroides (formerly known as Rhodobacter sphaeroides) is one of the most extensively studied photosynthetic microorganisms and provides a particularly clear example of this ability to adapt.\n\nWhen oxygen availability decreases, the bacterium develops extensive intracellular membranes known as chromatophores. These membranes contain the machinery required for photosynthesis. As environmental conditions change, the internal organization of the cell changes as well.\n\nResearch on C. sphaeroides has helped scientists understand both the molecular mechanisms of electron transfer during photosynthesis and the way microorganisms regulate and reorganize their metabolism in response to changing environments.'
   },
   bacteriaSmall03: {
-    lead: 'A LANGUAGE BUILT ON MOTION, NOT ON FIXED GEOMETRY', tags: ['OSCILLATION', 'ORIENTATION'], icon: 'wave',
+    lead: 'Coordinating light, nitrogen and energy', tags: ['NITROGEN FIXATION', 'REDOX BALANCE'], icon: 'wave',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_12',
-    title: 'MOVEMENT', label: 'VIEW +',
-    body: 'Biological form is not entirely static. Subtle oscillations, extensions and changes in orientation suggest a design language based on movement rather than on fixed geometry.'
+    section: '04', title: 'RHODOBACTER CAPSULATUS', label: 'VIEW +',
+    body: 'A cell must coordinate many processes at the same time. Rhodobacter capsulatus has become an important model organism for studying how a photosynthetic bacterium maintains this balance.\n\nResearch on this species has revealed important connections between photosynthesis, nitrogen fixation and cellular redox balance. These processes are interconnected and form part of the regulatory networks controlling how the cell obtains and uses energy.\n\nMore recently, structural studies have revealed an unusually compact architecture in its light-harvesting and reaction-center complex.\n\nIts study demonstrates that even within purple phototrophic bacteria, different biological solutions exist for capturing light, managing energy and responding to changing environmental conditions.'
   },
   bacteriaLarge02: {
-    lead: 'SELECT, SIMPLIFY, REINTERPRET', tags: ['TRANSLATION', 'PROPORTION', 'STRUCTURE'], icon: 'transform',
+    lead: 'A different way to reproduce', tags: ['HYPHAE', 'BUDDING', 'LIFE CYCLE'], icon: 'transform',
     tier: 'primary', anchor: 'Exhibit_Mesh0_Capsule',
-    section: '02', title: 'FROM BIOLOGY TO FORM', label: 'EXPLORE +',
-    body: 'Observation becomes design when biological characteristics are selected, simplified and reinterpreted. The aim is not to reproduce a microorganism literally, but to transform its visual logic into new proportions, structures and relationships.'
+    section: '05', title: 'RHODOMICROBIUM VANNIELII', label: 'EXPLORE +',
+    body: 'We often imagine bacteria reproducing through a simple division in which one cell produces two almost identical cells. Rhodomicrobium vannielii shows that bacterial reproduction can be considerably more complex.\n\nThis bacterium develops filamentous extensions known as hyphae. New cells are formed by budding from the tips of these structures. A small bud appears, gradually grows and eventually separates to form a new cell.\n\nThis life cycle includes processes of cellular differentiation and unusual multicellular stages, making R. vannielii an important organism for studying the evolution of complex bacterial life cycles.\n\nIts distinctive morphology also provides a striking example of the extraordinary diversity found among photosynthetic bacteria.'
   },
   bacteriaSmall04: {
-    lead: 'ONE DETAIL BECOMES A MODULE', tags: ['MODULE', 'PATTERN'], icon: 'grid',
+    lead: 'Bacteria connected to electricity', tags: ['ELECTROACTIVITY', 'BIOELECTROCHEMISTRY'], icon: 'grid',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_14',
-    title: 'REPETITION', label: 'VIEW +',
-    body: 'Repeated units can generate rhythm and structure. A small biological detail can become a module, multiplied to construct larger patterns, surfaces or ornamental systems.'
+    section: '06', title: 'RHODOVULUM', label: 'VIEW +',
+    body: 'Some purple phototrophic bacteria have a particularly remarkable ability (they are electroactive). This means that they can exchange electrons with elements outside the cell.\n\nSpecies of Rhodovulum (including Rhodovulum sulfidophilum and Rhodovulum visakhapatnamense) can obtain electrons from hydrogen, iron or even directly from an electrode.\n\nThese processes allow us to understand the bacterium not as an isolated organism, but as part of a system in which biological matter and conductive materials can exchange electrical charges.\n\nThe mechanisms responsible for this electroactivity are still not completely understood. For this reason, these bacteria remain an active field of research and provide new opportunities to investigate interactions between microorganisms, minerals and bioelectrochemical systems.'
   },
   bacteriaSmall05: {
-    lead: 'PERCEPTION CHANGES WITH SCALE', tags: ['ENLARGEMENT', 'ABSTRACTION'], icon: 'scale',
+    lead: 'Living from a toxic gas', tags: ['CARBON MONOXIDE', 'BIOHYDROGEN'], icon: 'scale',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_16',
-    title: 'SCALE', label: 'VIEW +',
-    body: 'Changing scale changes perception. A microscopic detail enlarged many times can stop being recognisable as biology and become an abstract form suitable for experimentation and design.'
+    section: '07', title: 'RUBRIVIVAX GELATINOSUS', label: 'VIEW +',
+    body: 'Carbon monoxide (CO) is toxic to many organisms. Rubrivivax gelatinosus, however, is able to use it as an energy source.\n\nUnder anaerobic conditions (in the absence of oxygen), some purple phototrophic bacteria can oxidize CO using specialized enzyme systems. In R. gelatinosus, this metabolism can also be linked to hydrogen production.\n\nThis ability has made the species an important model for studying both the biological conversion of carbon monoxide and potential processes for biohydrogen production.\n\nIts case illustrates one of the key ideas running throughout this room (the remarkable metabolic flexibility of purple phototrophic bacteria and their ability to exploit substances and environmental conditions that would be unfavorable for many other organisms).'
   },
   bacteriaSmall06: {
-    lead: 'EXAGGERATE, SIMPLIFY, RECOMBINE', tags: ['METHOD', 'GEOMETRY'], icon: 'transform',
+    lead: 'When a biological capability becomes an opportunity', tags: ['PHOTOFERMENTATION', 'ELECTROACTIVITY'], icon: 'transform',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_18',
-    title: 'TRANSFORMATION', label: 'VIEW +',
-    body: 'Design begins with transformation: selecting a characteristic, exaggerating it, simplifying it and combining it with new geometries until the biological reference becomes something new.'
+    section: '08', title: 'RHODOPSEUDOMONAS PALUSTRIS', label: 'VIEW +',
+    body: 'Rhodopseudomonas palustris brings together several of the capabilities explored throughout the exhibition.\n\nIt can use light to support the anaerobic degradation of aromatic compounds derived from plants, contributing to the recycling of complex organic matter and to processes associated with the carbon cycle.\n\nIt is also particularly effective at producing hydrogen through photofermentation. Among the purple phototrophic bacteria studied for this process, certain strains of R. palustris (such as strain 42OL) have achieved especially high hydrogen productivity.\n\nIt has another important characteristic as well (electroactivity). Some strains can exchange electrons with electrodes and, by combining electricity and light, use these processes to generate valuable products such as PHA and certain biofuels.\n\nAt this point, we have finished looking closely at the bacteria themselves. The next step is to understand how they can be cultivated and how these capabilities can be used at a larger scale.'
   },
   reactor01: {
     lead: 'FROM BIOLOGICAL CULTIVATION TO MATERIAL EXPERIMENTATION', tags: ['MODULAR', 'ACTIVE PROCESS', 'EXPERIMENTAL'], icon: 'reactor',
