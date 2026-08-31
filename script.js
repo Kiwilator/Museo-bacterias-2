@@ -256,6 +256,23 @@ AFRAME.registerComponent('setup-museum-model', {
       minZ: box.min.z + m, maxZ: box.max.z - m
     };
 
+    // 4b) real floor meshes (children of the 'suelo' node), for an actual
+    // ground-collision check. This room's outer wall is a curved/organic
+    // shape, not a rectangle, so MUSEO_BOUNDS above is only a coarse outer
+    // limit — plenty of points inside that rectangle are past the real
+    // wall, over nothing. clamp-to-bounds raycasts against these meshes to
+    // catch that (see isGrounded below) instead of letting the player walk
+    // off the edge of the model into empty space.
+    const floorRoot = mesh.getObjectByName('suelo');
+    const floorMeshes = [];
+    if (floorRoot) {
+      floorRoot.traverse((o) => { if (o.isMesh) floorMeshes.push(o); });
+    }
+    window.MUSEO_FLOOR_MESHES = floorMeshes;
+    if (!floorMeshes.length) {
+      console.warn('[setup-museum-model] no floor mesh found under "suelo" — ground-collision check disabled, falling back to rectangle bounds only');
+    }
+
     // registry for future interactivity hooks (peanas, nichos, screens...)
     window.MUSEO_INTERACTIVE = window.MUSEO_INTERACTIVE || {};
     window.MUSEO_INTERACTIVE.peanas = obstacles.map((o) => ({ id: o.id, meshName: o.meshName, position: o.center }));
@@ -276,7 +293,7 @@ AFRAME.registerComponent('setup-museum-model', {
     // a single push-out isn't enough to land somewhere fully free — so
     // find a genuinely free spot with a ring search outward from center,
     // instead of trusting the center point at all.
-    const spawnXZ = findSafeSpawn(center.x, center.z, window.MUSEO_BOUNDS, obstacles);
+    const spawnXZ = findSafeSpawn(center.x, center.z, window.MUSEO_BOUNDS, obstacles, floorMeshes, floorY);
 
     if (rig) {
       rig.object3D.position.set(spawnXZ.x, floorY, spawnXZ.z);
@@ -349,6 +366,25 @@ function isFreeOfObstacles(x, z, obstacles, extraMargin) {
 }
 
 /*
+  Ground check: casts a ray straight down at (x, z) against the real floor
+  meshes (window.MUSEO_FLOOR_MESHES, set in setup-museum-model) and reports
+  whether it actually hits floor. Cheap (one ray against ~450 triangles) —
+  fine to run every tick. If no floor meshes were found at all, doesn't
+  block movement (falls back to the rectangle-only bounds instead of
+  trapping the player at spawn).
+*/
+const groundRaycaster = new THREE.Raycaster();
+const groundRayOrigin = new THREE.Vector3();
+const groundRayDir = new THREE.Vector3(0, -1, 0);
+function isGrounded(x, z, floorMeshes, refY) {
+  if (!floorMeshes || !floorMeshes.length) return true;
+  groundRayOrigin.set(x, refY + 5, z);
+  groundRaycaster.set(groundRayOrigin, groundRayDir);
+  groundRaycaster.far = 10;
+  return groundRaycaster.intersectObjects(floorMeshes, false).length > 0;
+}
+
+/*
   Finds a spawn point guaranteed to be inside bounds and outside every
   peana, with some breathing room (not just technically-not-inside) so the
   first thing you see isn't a pedestal filling the screen: tries the room
@@ -357,30 +393,57 @@ function isFreeOfObstacles(x, z, obstacles, extraMargin) {
   isn't enough. Falls back to a smaller margin, then none, if a spot with
   full breathing room can't be found (dense layouts).
 */
-function findSafeSpawn(centerX, centerZ, bounds, obstacles) {
+function findSafeSpawn(centerX, centerZ, bounds, obstacles, floorMeshes, floorY) {
+  const ok = (x, z, margin) =>
+    isFreeOfObstacles(x, z, obstacles, margin) && isGrounded(x, z, floorMeshes, floorY);
+
   const candidate = clampToWalkable(centerX, centerZ, bounds, obstacles);
 
   for (const margin of [1.0, 0.5, 0]) {
-    if (isFreeOfObstacles(candidate.x, candidate.z, obstacles, margin)) return candidate;
+    if (ok(candidate.x, candidate.z, margin)) return candidate;
     for (let radius = 0.5; radius <= 4; radius += 0.5) {
       for (let angleDeg = 0; angleDeg < 360; angleDeg += 30) {
         const angle = THREE.MathUtils.degToRad(angleDeg);
         const x = THREE.MathUtils.clamp(centerX + radius * Math.cos(angle), bounds.minX, bounds.maxX);
         const z = THREE.MathUtils.clamp(centerZ + radius * Math.sin(angle), bounds.minZ, bounds.maxZ);
-        if (isFreeOfObstacles(x, z, obstacles, margin)) return { x, z };
+        if (ok(x, z, margin)) return { x, z };
       }
     }
   }
-  console.warn('[findSafeSpawn] no fully free spot found, using best-effort clamp');
+  console.warn('[findSafeSpawn] no fully free (and grounded) spot found, using best-effort clamp');
   return candidate;
 }
 
 AFRAME.registerComponent('clamp-to-bounds', {
+  init() {
+    this.lastGood = null; // lazily set from MUSEO_SPAWN on first tick (see below)
+  },
   tick() {
     const b = window.MUSEO_BOUNDS;
     if (!b) return;
     const obj = this.el.object3D;
+
+    if (!this.lastGood) {
+      const spawn = window.MUSEO_SPAWN;
+      this.lastGood = spawn ? { x: spawn.x, z: spawn.z } : { x: obj.position.x, z: obj.position.z };
+    }
+
     const clamped = clampToWalkable(obj.position.x, obj.position.z, b, window.MUSEO_OBSTACLES);
+
+    const spawn = window.MUSEO_SPAWN;
+    const refY = spawn ? spawn.y : obj.position.y;
+    if (isGrounded(clamped.x, clamped.z, window.MUSEO_FLOOR_MESHES, refY)) {
+      this.lastGood.x = clamped.x;
+      this.lastGood.z = clamped.z;
+    } else {
+      // the rectangle-minus-obstacles pass let this point through, but
+      // there's no floor mesh under it — this room's real wall curves in
+      // here, past the rectangle's edge. Hold at the last position that
+      // was actually over the floor instead of stepping into empty space.
+      clamped.x = this.lastGood.x;
+      clamped.z = this.lastGood.z;
+    }
+
     obj.position.x = clamped.x;
     obj.position.z = clamped.z;
   }
@@ -453,7 +516,6 @@ AFRAME.registerComponent('neon-strips-fix', {
 
     const PURPLE = 0x9b5cff;
     const CYAN = 0x28d7e5;
-    const WHITE = 0xfff0d9; // warm white — matches the "Neon_White" window strips on this model
     const CORE_INTENSITY = 1.05; // kept close to 1.0 on purpose — see comment above
 
     const coreMat = {
@@ -464,10 +526,6 @@ AFRAME.registerComponent('neon-strips-fix', {
       [CYAN]: new THREE.MeshStandardMaterial({
         color: 0x000000, emissive: CYAN, emissiveIntensity: CORE_INTENSITY,
         toneMapped: false, roughness: 0.4
-      }),
-      [WHITE]: new THREE.MeshStandardMaterial({
-        color: 0x000000, emissive: WHITE, emissiveIntensity: CORE_INTENSITY,
-        toneMapped: false, roughness: 0.4
       })
     };
     const halo1Mat = {
@@ -477,10 +535,6 @@ AFRAME.registerComponent('neon-strips-fix', {
       }),
       [CYAN]: new THREE.MeshBasicMaterial({
         color: CYAN, transparent: true, opacity: 0.65,
-        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
-      }),
-      [WHITE]: new THREE.MeshBasicMaterial({
-        color: WHITE, transparent: true, opacity: 0.65,
         blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
       })
     };
@@ -496,10 +550,6 @@ AFRAME.registerComponent('neon-strips-fix', {
       [CYAN]: new THREE.MeshBasicMaterial({
         color: CYAN, transparent: true, opacity: 0.3,
         blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
-      }),
-      [WHITE]: new THREE.MeshBasicMaterial({
-        color: WHITE, transparent: true, opacity: 0.3,
-        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
       })
     };
 
@@ -508,11 +558,16 @@ AFRAME.registerComponent('neon-strips-fix', {
       CINTA_Peana_Mesh_* / CONTORNO_Nicho_Mesh_* names from the old test
       model, which don't exist here. Same role, new names:
         - Neon_Ring_Mesh_* — floor ring under each peana (was CINTA_Peana_Mesh_*)
-        - Neon_Window_* — nicho/window rim trim (was CONTORNO_Nicho_Mesh_*),
-          split across two build "batches" (Batch2, Extra) plus a handful of
-          one-off meshes and the long ceiling strip. Colors read straight off
-          each mesh's actual Blender material (Neon_Purple / Neon_Turquoise /
-          Neon_White), not guessed.
+        - Neon_Window_Batch2_* / Neon_Window_Extra_* — nicho/window rim trim
+          tied to an actual specimen placement (was CONTORNO_Nicho_Mesh_*).
+        - Neon_Window_CeilingWindow — the long ~8m ceiling strip.
+
+      Deliberately NOT included: Neon_Window_Mesh_1..7/20/21. These looked
+      like more rim trim by name, but they're a single ~500-point curve each
+      wound back and forth inside a ~1-2m box (not a simple outline like the
+      niche trims above) — lighting them the same way as a clean rim strip
+      produced a dense tangle of glowing threads covering the view, not a
+      subtle accent. Left as unlit geometry.
     */
     const targets = [
       { name: 'Neon_Ring_Mesh_0', color: PURPLE },
@@ -525,11 +580,8 @@ AFRAME.registerComponent('neon-strips-fix', {
       { name: 'Neon_Ring_Mesh_7', color: PURPLE },
       { name: 'Neon_Ring_Mesh_20', color: CYAN },
       { name: 'Neon_Ring_Mesh_21', color: CYAN },
-      { name: 'Neon_Window_CeilingWindow', color: PURPLE }, // long ~8m ceiling strip
-      { name: 'Neon_Window_Mesh_20', color: CYAN },
-      { name: 'Neon_Window_Mesh_21', color: CYAN }
+      { name: 'Neon_Window_CeilingWindow', color: PURPLE } // long ~8m ceiling strip
     ];
-    [1, 2, 3, 4, 5, 6, 7].forEach((n) => targets.push({ name: `Neon_Window_Mesh_${n}`, color: WHITE }));
     [9, 10, 13, 15, 22, 23, 24, 74, 92, 102, 106, 108, 112, 114, 119, 120, 123, 124, 125, 126, 128, 130]
       .forEach((n) => targets.push({ name: `Neon_Window_Batch2_${n}`, color: CYAN }));
     [20, 25, 28, 29, 31, 64, 77, 111, 116]
@@ -571,13 +623,12 @@ AFRAME.registerComponent('neon-strips-fix', {
   A handful of short-range, no-shadow point lights near the LED strips, so
   the emissive geometry (the real "light source") lightly contaminates the
   floor / peana base / nearby wall instead of glowing in isolation.
-  Deliberately restrained (17, not 50+, even though this model has 51 neon
-  strips vs. the old test model's ~39): the emissive strips themselves carry
-  the visual read, these are just a soft supporting bounce. Positions are
-  the real bounding-box centers of the matching Neon_Ring_Mesh_* /
-  Neon_Window_* meshes in museo_bacterias.glb (measured directly from the
-  exported glTF, not eyeballed), so they land on the actual geometry, not
-  the old test model's floor plan.
+  Deliberately restrained (16, not 40+): the emissive strips themselves
+  carry the visual read, these are just a soft supporting bounce. Positions
+  are the real bounding-box centers of the matching Neon_Ring_Mesh and
+  Neon_Window_Batch2 / Neon_Window_Extra meshes in museo_bacterias.glb
+  (measured directly from the exported glTF, not eyeballed), so they land
+  on the actual geometry, not the old test model's floor plan.
   Generated from one array (not duplicated per-light HTML) so the count/
   values are easy to retune from a single place.
 */
@@ -588,7 +639,6 @@ AFRAME.registerComponent('neon-support-lights', {
   onLoaded() {
     const purple = 0x9b5cff;
     const turquoise = 0x28d7e5;
-    const white = 0xfff0d9;
     const configs = [
       // anillos de suelo bajo cada peana — morados (alcance corto)
       { color: purple, intensity: 2.1, distance: 2.9, pos: [-0.920, 0.050, -3.683] },
@@ -607,8 +657,6 @@ AFRAME.registerComponent('neon-support-lights', {
       { color: turquoise, intensity: 1.7, distance: 3.2, pos: [0.798, 5.305, 3.080] },
       { color: turquoise, intensity: 1.7, distance: 3.2, pos: [1.538, 1.363, 1.241] },
       { color: turquoise, intensity: 1.7, distance: 3.2, pos: [2.250, 1.288, -3.618] },
-      // nicho — blanco cálido (pared opuesta, variedad de tono)
-      { color: white, intensity: 1.7, distance: 3.2, pos: [-1.441, 1.610, -0.309] },
       // tira larga del techo (Neon_Window_CeilingWindow, ~8m) — un par de
       // puntos de rebote a lo largo de su recorrido
       { color: purple, intensity: 2.1, distance: 3.8, pos: [-0.868, 3.865, -3.090] },
