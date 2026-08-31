@@ -517,6 +517,42 @@ AFRAME.registerComponent('respawn-guard', {
    should read as light sources. A-Frame just displays the model as
    exported -- no extra JS-created point lights simulating the neon. */
 
+/*
+  Reproduce las animaciones que vienen dentro del GLB (cuerpos de las
+  bacterias, puntas de los pelitos como morph targets, y las pompas del
+  reactor). A-Frame no las arranca solo: hay que crear un
+  THREE.AnimationMixer sobre el modelo cargado y avanzarlo en cada tick.
+  Se reproducen TODAS las clips a la vez y en bucle infinito, que es como
+  estan authored en Blender (cada objeto lleva su propio desfase, asi que
+  no van sincronizadas entre si).
+*/
+AFRAME.registerComponent('gltf-animations', {
+  init() {
+    this.mixer = null;
+    this.el.addEventListener('model-loaded', () => this.onLoaded());
+  },
+  onLoaded() {
+    const mesh = this.el.getObject3D('mesh');
+    if (!mesh) return;
+    const clips = mesh.animations || [];
+    if (!clips.length) {
+      console.warn('[gltf-animations] el GLB no trae animaciones');
+      return;
+    }
+    if (this.mixer) this.mixer.stopAllAction();
+    this.mixer = new THREE.AnimationMixer(mesh);
+    clips.forEach((clip) => {
+      const action = this.mixer.clipAction(clip);
+      action.setLoop(THREE.LoopRepeat, Infinity);
+      action.play();
+    });
+    console.log(`[gltf-animations] reproduciendo ${clips.length} animaciones en bucle`);
+  },
+  tick(time, timeDelta) {
+    if (this.mixer && timeDelta) this.mixer.update(timeDelta / 1000);
+  }
+});
+
 /* Attach debug logging to gltf-model entities */
 AFRAME.scenes[0]?.addEventListener('loaded', () => {
   document.querySelectorAll('[gltf-model]').forEach((el) => {
