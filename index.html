@@ -5,7 +5,7 @@
   <title>Purple Bacteries</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./style.css?v=f989f92">
 </head>
 <body>
 
@@ -26,10 +26,10 @@
     fog="type: exponential; color: #c9b79c; density: 0.045"
   >
     <a-assets timeout="15000">
-      <a-asset-item id="museo" src="./museo_bacterias.glb?v=8fc72a1"></a-asset-item>
+      <a-asset-item id="museo" src="./museo_bacterias.glb?v=f989f92"></a-asset-item>
     </a-assets>
 
-    <!-- Modelo (museo_bacterias.glb): esta es ahora la ÚNICA fuente de verdad
+    <!-- Modelo (museo_bacterias.glb?v=f989f92): esta es ahora la ÚNICA fuente de verdad
          del museo -- geometría, neones, materiales emisivos y texturas de
          suelo/pared vienen todos de Blender, exportados tal cual. A-Frame no
          crea ni recolorea neones ni geometría propia; solo reescala el modelo
@@ -119,6 +119,6 @@
     </figcaption>
   </figure>
 
-  <script src="./script.js"></script>
+  <script src="./script.js?v=f989f92"></script>
 </body>
 </html>
