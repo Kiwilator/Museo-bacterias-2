@@ -952,6 +952,99 @@ AFRAME.registerComponent('face-camera', {
   }
 });
 
+/*
+  Datos crudos (sin escalar) de los 6 circulos de video de la sala violeta,
+  medidos directamente sobre la malla visible de cada circulo de Blender
+  (centroide y normal reales de sus vertices en espacio de mundo de
+  Blender/glTF, NUNCA el origen del objeto -- los 6 objetos tienen su
+  origen en 0,0,0 y toda su geometria horneada en los vertices, asi que el
+  origen no sirve como referencia de posicion). Exportados directamente
+  desde Blender a glTF (misma tuberia/conversion de ejes que el resto de
+  modulos) y verificados con SVD sobre la nube de puntos: centroid = centro
+  geometrico real; normal = normal del plano ajustado por PCA, con el signo
+  corregido para que apunte hacia el interior de la sala; u_axis = un eje
+  tangente del propio plano del circulo, ortogonal a la normal. radius = la
+  distancia real maxima de un vertice al centroide, en las mismas unidades
+  crudas. place-ppb-circle (mas abajo) aplica la escala real del museo a
+  estos valores en tiempo de ejecucion.
+*/
+const PPB_CIRCLES = {
+  PPB_VIDEO_01: { centroid: [-1.94093, 1.40719, 2.99479], normal: [0.92215, -0.38567, 0.02998], u: [0.37767, 0.88082, -0.28553], radius: 0.1904 },
+  PPB_VIDEO_02: { centroid: [-1.84054, 1.39784, 2.26459], normal: [0.89861, -0.39303, 0.19501], u: [0.43474, 0.73765, -0.5166], radius: 0.1975 },
+  PPB_VIDEO_03: { centroid: [-1.66489, 1.39732, 1.51321], normal: [0.89418, -0.40005, 0.20102], u: [0.4463, 0.76082, -0.47114], radius: 0.1955 },
+  PPB_VIDEO_04: { centroid: [-1.97822, 1.39696, -2.11191], normal: [0.86051, -0.43998, -0.25679], u: [-0.50805, -0.70407, -0.49615], radius: 0.2058 },
+  PPB_VIDEO_05: { centroid: [-2.18675, 1.40212, -2.87555], normal: [0.87692, -0.43359, -0.20738], u: [-0.48008, -0.76949, -0.42119], radius: 0.1942 },
+  PPB_VIDEO_06: { centroid: [-2.30118, 1.40707, -3.61543], normal: [0.90425, -0.4241, -0.04974], u: [-0.4165, -0.85032, -0.32169], radius: 0.1944 }
+};
+
+/*
+  Coloca un <a-circle> de la sala violeta usando la transformacion de mundo
+  REAL del museo ya cargado (no valores fijos calculados a mano). El
+  circulo NO va anidado dentro de #modelo a proposito: setup-museum-model
+  aplica una escala NO uniforme (scaleXZ para ancho/fondo, scaleY aparte
+  para la altura), y una rotacion combinada con una escala no uniforme del
+  padre deja el circulo torcido/mal orientado aunque la rotacion en si sea
+  correcta -- por eso este componente calcula el resultado final ya
+  corregido y lo aplica directamente en espacio de escena (sin padre que
+  vuelva a escalar nada por encima):
+    - posicion: el centroide crudo se escala eje a eje (igual que cualquier
+      vertice del museo).
+    - normal: bajo escala no uniforme una normal se transforma con la
+      inversa-traspuesta de la escala (1/sx, 1/sy, 1/sz), no con la escala
+      directa, o la orientacion queda sesgada.
+    - eje tangente (u): un vector CONTENIDO en la superficie si se
+      transforma con la escala directa; se reortogonaliza contra la normal
+      ya corregida.
+    - radio: se promedia el factor de escala real a lo largo de las dos
+      direcciones propias del plano del circulo (u y v), que es la longitud
+      que de verdad cubre el hueco -- un a-circle no puede representar una
+      elipse, así que un unico radio es la mejor aproximacion posible.
+*/
+AFRAME.registerComponent('place-ppb-circle', {
+  schema: { id: { type: 'string' } },
+  init() {
+    const modelo = document.querySelector('#modelo');
+    if (!modelo) return;
+    modelo.addEventListener('museo-modules-loaded', () => this.place());
+  },
+  place() {
+    const data = PPB_CIRCLES[this.data.id];
+    const modelo = document.querySelector('#modelo');
+    if (!data || !modelo) return;
+    const scale = modelo.object3D.scale;
+
+    const c = new THREE.Vector3(data.centroid[0], data.centroid[1], data.centroid[2]);
+    const nRaw = new THREE.Vector3(data.normal[0], data.normal[1], data.normal[2]);
+    const uRaw = new THREE.Vector3(data.u[0], data.u[1], data.u[2]);
+    const vRaw = new THREE.Vector3().crossVectors(nRaw, uRaw).normalize();
+
+    const worldPos = new THREE.Vector3(c.x * scale.x, c.y * scale.y, c.z * scale.z);
+
+    const worldNormal = new THREE.Vector3(nRaw.x / scale.x, nRaw.y / scale.y, nRaw.z / scale.z).normalize();
+
+    const uScaled = new THREE.Vector3(uRaw.x * scale.x, uRaw.y * scale.y, uRaw.z * scale.z);
+    const uScaleFactor = uScaled.length();
+    const worldU = uScaled.clone().addScaledVector(worldNormal, -uScaled.dot(worldNormal)).normalize();
+
+    const vScaled = new THREE.Vector3(vRaw.x * scale.x, vRaw.y * scale.y, vRaw.z * scale.z);
+    const vScaleFactor = vScaled.length();
+
+    let worldV = new THREE.Vector3().crossVectors(worldNormal, worldU).normalize();
+    let finalU = worldU;
+    if (worldV.y < 0) { finalU = worldU.clone().negate(); worldV = worldV.clone().negate(); }
+
+    const rotMatrix = new THREE.Matrix4().makeBasis(finalU, worldV, worldNormal);
+    const quat = new THREE.Quaternion().setFromRotationMatrix(rotMatrix);
+
+    const worldRadius = data.radius * (uScaleFactor + vScaleFactor) / 2;
+    const forwardOffset = 0.015; // metros, ya en espacio de mundo escalado
+
+    this.el.object3D.position.copy(worldPos).addScaledVector(worldNormal, forwardOffset);
+    this.el.object3D.quaternion.copy(quat);
+    this.el.setAttribute('radius', worldRadius);
+  }
+});
+
 AFRAME.registerComponent('exhibit-info', {
   schema: {
     show:  { type: 'number', default: 2.0 },   // distancia a la que aparece el aviso

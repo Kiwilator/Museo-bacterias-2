@@ -5,7 +5,7 @@
   <title>PURPLE BACTERIA</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <link rel="stylesheet" href="./style.css?v=9b42dda">
+  <link rel="stylesheet" href="./style.css?v=b3ccc57">
 </head>
 <body>
 
@@ -26,22 +26,22 @@
     fog="type: linear; color: #c9b79a; near: 3; far: 12"
   >
     <a-assets timeout="60000">
-      <a-asset-item id="museum_floor" src="./modulos/museum_floor.glb?v=9b42dda"></a-asset-item>
-      <a-asset-item id="museum_walls" src="./modulos/museum_walls.glb?v=9b42dda"></a-asset-item>
-      <a-asset-item id="museum_neons" src="./modulos/museum_neons.glb?v=9b42dda"></a-asset-item>
-      <a-asset-item id="bacteria_large_01" src="./modulos/bacteria_large_01.glb?v=9b42dda"></a-asset-item>
-      <a-asset-item id="bacteria_large_02" src="./modulos/bacteria_large_02.glb?v=9b42dda"></a-asset-item>
-      <a-asset-item id="bacteria_small_01" src="./modulos/bacteria_small_01.glb?v=9b42dda"></a-asset-item>
-      <a-asset-item id="bacteria_small_02" src="./modulos/bacteria_small_02.glb?v=9b42dda"></a-asset-item>
-      <a-asset-item id="bacteria_small_03" src="./modulos/bacteria_small_03.glb?v=9b42dda"></a-asset-item>
-      <a-asset-item id="bacteria_small_04" src="./modulos/bacteria_small_04.glb?v=9b42dda"></a-asset-item>
-      <a-asset-item id="bacteria_small_05" src="./modulos/bacteria_small_05.glb?v=9b42dda"></a-asset-item>
-      <a-asset-item id="bacteria_small_06" src="./modulos/bacteria_small_06.glb?v=9b42dda"></a-asset-item>
-      <a-asset-item id="bioreactor" src="./modulos/bioreactor.glb?v=9b42dda"></a-asset-item>
+      <a-asset-item id="museum_floor" src="./modulos/museum_floor.glb?v=b3ccc57"></a-asset-item>
+      <a-asset-item id="museum_walls" src="./modulos/museum_walls.glb?v=b3ccc57"></a-asset-item>
+      <a-asset-item id="museum_neons" src="./modulos/museum_neons.glb?v=b3ccc57"></a-asset-item>
+      <a-asset-item id="bacteria_large_01" src="./modulos/bacteria_large_01.glb?v=b3ccc57"></a-asset-item>
+      <a-asset-item id="bacteria_large_02" src="./modulos/bacteria_large_02.glb?v=b3ccc57"></a-asset-item>
+      <a-asset-item id="bacteria_small_01" src="./modulos/bacteria_small_01.glb?v=b3ccc57"></a-asset-item>
+      <a-asset-item id="bacteria_small_02" src="./modulos/bacteria_small_02.glb?v=b3ccc57"></a-asset-item>
+      <a-asset-item id="bacteria_small_03" src="./modulos/bacteria_small_03.glb?v=b3ccc57"></a-asset-item>
+      <a-asset-item id="bacteria_small_04" src="./modulos/bacteria_small_04.glb?v=b3ccc57"></a-asset-item>
+      <a-asset-item id="bacteria_small_05" src="./modulos/bacteria_small_05.glb?v=b3ccc57"></a-asset-item>
+      <a-asset-item id="bacteria_small_06" src="./modulos/bacteria_small_06.glb?v=b3ccc57"></a-asset-item>
+      <a-asset-item id="bioreactor" src="./modulos/bioreactor.glb?v=b3ccc57"></a-asset-item>
       <video id="ppb-video-01" src="./assets/videos/rhodospirillum-rubrum-pha.mp4" autoplay loop muted playsinline crossorigin="anonymous"></video>
     </a-assets>
 
-    <!-- Modelo (museo_bacterias.glb?v=9b42dda"tira de techo" que cruzaba la
+    <!-- Modelo (museo_bacterias.glb?v=b3ccc57"tira de techo" que cruzaba la
          sala como una curva flotante. El resto de neones sí está pegado a
          bordes reales (ventana, nicho, peana, junta) y se exporta intacto.
          Suelo y pared llevan ahora textura horneada (antes eran nodos
@@ -78,26 +78,26 @@
       <a-entity gltf-model="#bacteria_small_05" gltf-animations></a-entity>
       <a-entity gltf-model="#bacteria_small_06" gltf-animations></a-entity>
       <a-entity gltf-model="#bioreactor" gltf-animations></a-entity>
-
-      <!-- Pantallas circulares (sala violeta): 6 circulos independientes,
-           colocados en las posiciones/orientaciones reales extraidas de los
-           circulos de Blender (PPB_VIDEO_01..06). Posicion, radio y rotacion
-           se recalcularon exportando esos 6 objetos a glTF directamente desde
-           Blender (misma tuberia que el resto de modulos, conversion de ejes
-           de fabrica) en vez de a mano: el primer intento tenia mal el giro
-           en su propio eje (Z) de las seis piezas y el signo de la normal de
-           PPB_VIDEO_04. Cada rotacion se valido reconstruyendo su matriz y
-           comprobando que el eje Z local vuelve a apuntar hacia el interior
-           de la sala. Solo el primer circulo lleva video por ahora; los
-           otros cinco llevan un material provisional oscuro/violeta hasta
-           que se confirme que el primero funciona. -->
-      <a-circle id="PPB_VIDEO_01" position="-1.927 1.401 2.995" rotation="85.56 67.24 -12.50" radius="0.19" material="src: #ppb-video-01; shader: flat; side: double"></a-circle>
-      <a-circle id="PPB_VIDEO_02" position="-1.827 1.392 2.268" rotation="63.61 63.98 -7.75" radius="0.197" material="color: #1c0f2b; shader: flat; side: double"></a-circle>
-      <a-circle id="PPB_VIDEO_03" position="-1.651 1.391 1.516" rotation="63.32 63.40 -4.55" radius="0.195" material="color: #1c0f2b; shader: flat; side: double"></a-circle>
-      <a-circle id="PPB_VIDEO_04" position="-1.965 1.390 -2.116" rotation="120.27 59.37 -175.78" radius="0.206" material="color: #1c0f2b; shader: flat; side: double"></a-circle>
-      <a-circle id="PPB_VIDEO_05" position="-2.174 1.396 -2.879" rotation="115.56 61.27 -177.25" radius="0.194" material="color: #1c0f2b; shader: flat; side: double"></a-circle>
-      <a-circle id="PPB_VIDEO_06" position="-2.288 1.401 -3.616" rotation="96.69 64.72 -167.26" radius="0.194" material="color: #1c0f2b; shader: flat; side: double"></a-circle>
     </a-entity>
+
+    <!-- Pantallas circulares (sala violeta): 6 circulos independientes. Sus
+         valores de posicion/normal/radio (en placeholder abajo) son crudos,
+         sin escalar, tal y como se miden en el propio circulo de Blender
+         (centro y normal reales de la malla visible, nunca el origen del
+         objeto, que esta en 0,0,0). NO van anidados dentro de #modelo: el
+         componente place-ppb-circle (script.js) espera a museo-modules-
+         loaded, lee ahi la escala real ya aplicada al museo (no uniforme:
+         X/Z y altura se calculan por separado) y coloca cada circulo con esa
+         transformacion de mundo real -- anidarlos bajo #modelo combinaba mal
+         la rotacion con esa escala no uniforme y los dejaba mal orientados.
+         Solo el primer circulo lleva video por ahora; los otros cinco llevan
+         un material provisional oscuro/violeta. -->
+    <a-circle id="PPB_VIDEO_01" place-ppb-circle="id: PPB_VIDEO_01" radius="0.01" material="src: #ppb-video-01; shader: flat; side: double"></a-circle>
+    <a-circle id="PPB_VIDEO_02" place-ppb-circle="id: PPB_VIDEO_02" radius="0.01" material="color: #1c0f2b; shader: flat; side: double"></a-circle>
+    <a-circle id="PPB_VIDEO_03" place-ppb-circle="id: PPB_VIDEO_03" radius="0.01" material="color: #1c0f2b; shader: flat; side: double"></a-circle>
+    <a-circle id="PPB_VIDEO_04" place-ppb-circle="id: PPB_VIDEO_04" radius="0.01" material="color: #1c0f2b; shader: flat; side: double"></a-circle>
+    <a-circle id="PPB_VIDEO_05" place-ppb-circle="id: PPB_VIDEO_05" radius="0.01" material="color: #1c0f2b; shader: flat; side: double"></a-circle>
+    <a-circle id="PPB_VIDEO_06" place-ppb-circle="id: PPB_VIDEO_06" radius="0.01" material="color: #1c0f2b; shader: flat; side: double"></a-circle>
 
     <!-- Iluminación general: hemisferio cálido (crema arriba / tierra cálida
          abajo), bajado a 0.20 para que deje de aplanar la sala -- el volumen
@@ -163,6 +163,6 @@
   </aside>
 
 
-  <script src="./script.js?v=9b42dda"></script>
+  <script src="./script.js?v=b3ccc57"></script>
 </body>
 </html>
