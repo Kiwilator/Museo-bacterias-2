@@ -26,18 +26,20 @@
     fog="type: exponential; color: #7a8793; density: 0.06"
   >
     <a-assets timeout="15000">
-      <a-asset-item id="museo" src="./museo_nascere_test.glb"></a-asset-item>
+      <a-asset-item id="museo" src="./museo_bacterias.glb"></a-asset-item>
     </a-assets>
 
-    <!-- Modelo: reescalado en tiempo real a 11m de largo x 3m de alto, quita las
-         luces horneadas de Blender (mal calibradas), arregla las tiras LED
-         (color saturado inmune al tone-mapping + halo falso), coloca el rig
-         del jugador dentro del espacio orientado a la exposición, y calcula
-         los límites/huecos de navegación (ver script.js). -->
+    <!-- Modelo (museo_bacterias.glb, sustituye a museo_nascere_test.glb): reescalado
+         en tiempo real a 10.7m de largo x 8m de alto (proporción real del modelo —
+         es un espacio bastante más vertical que el de prueba, con nichos repartidos
+         en varios niveles de pared), quita las luces horneadas de Blender (mal
+         calibradas), arregla las tiras LED (color saturado inmune al tone-mapping +
+         halo falso), coloca el rig del jugador dentro del espacio orientado a la
+         exposición, y calcula los límites/huecos de navegación (ver script.js). -->
     <a-entity
       id="modelo"
       gltf-model="#museo"
-      setup-museum-model="length: 11; height: 3; wallMargin: 0.4; eyeHeight: 0.5"
+      setup-museum-model="length: 10.7; height: 8; wallMargin: 0.4; eyeHeight: 0.5"
       neon-strips-fix
       neon-support-lights
       position="0 0 0"

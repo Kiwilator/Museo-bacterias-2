@@ -453,6 +453,7 @@ AFRAME.registerComponent('neon-strips-fix', {
 
     const PURPLE = 0x9b5cff;
     const CYAN = 0x28d7e5;
+    const WHITE = 0xfff0d9; // warm white — matches the "Neon_White" window strips on this model
     const CORE_INTENSITY = 1.05; // kept close to 1.0 on purpose — see comment above
 
     const coreMat = {
@@ -463,6 +464,10 @@ AFRAME.registerComponent('neon-strips-fix', {
       [CYAN]: new THREE.MeshStandardMaterial({
         color: 0x000000, emissive: CYAN, emissiveIntensity: CORE_INTENSITY,
         toneMapped: false, roughness: 0.4
+      }),
+      [WHITE]: new THREE.MeshStandardMaterial({
+        color: 0x000000, emissive: WHITE, emissiveIntensity: CORE_INTENSITY,
+        toneMapped: false, roughness: 0.4
       })
     };
     const halo1Mat = {
@@ -472,6 +477,10 @@ AFRAME.registerComponent('neon-strips-fix', {
       }),
       [CYAN]: new THREE.MeshBasicMaterial({
         color: CYAN, transparent: true, opacity: 0.65,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+      }),
+      [WHITE]: new THREE.MeshBasicMaterial({
+        color: WHITE, transparent: true, opacity: 0.65,
         blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
       })
     };
@@ -487,23 +496,44 @@ AFRAME.registerComponent('neon-strips-fix', {
       [CYAN]: new THREE.MeshBasicMaterial({
         color: CYAN, transparent: true, opacity: 0.3,
         blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+      }),
+      [WHITE]: new THREE.MeshBasicMaterial({
+        color: WHITE, transparent: true, opacity: 0.3,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
       })
     };
 
+    /*
+      Target mesh names for this model (museo_bacterias.glb) — replaces the
+      CINTA_Peana_Mesh_* / CONTORNO_Nicho_Mesh_* names from the old test
+      model, which don't exist here. Same role, new names:
+        - Neon_Ring_Mesh_* — floor ring under each peana (was CINTA_Peana_Mesh_*)
+        - Neon_Window_* — nicho/window rim trim (was CONTORNO_Nicho_Mesh_*),
+          split across two build "batches" (Batch2, Extra) plus a handful of
+          one-off meshes and the long ceiling strip. Colors read straight off
+          each mesh's actual Blender material (Neon_Purple / Neon_Turquoise /
+          Neon_White), not guessed.
+    */
     const targets = [
-      { name: 'CINTA_Peana_Mesh_0', color: PURPLE },
-      { name: 'CINTA_Peana_Mesh_1', color: PURPLE },
-      { name: 'CINTA_Peana_Mesh_2', color: PURPLE },
-      { name: 'CINTA_Peana_Mesh_3', color: PURPLE },
-      { name: 'CINTA_Peana_Mesh_4', color: PURPLE },
-      { name: 'CINTA_Peana_Mesh_5', color: PURPLE },
-      { name: 'CINTA_Peana_Mesh_6', color: PURPLE },
-      { name: 'CINTA_Peana_Mesh_7', color: PURPLE },
-      { name: 'CINTA_Peana_Mesh_20', color: CYAN },
-      { name: 'CINTA_Peana_Mesh_21', color: CYAN }
+      { name: 'Neon_Ring_Mesh_0', color: PURPLE },
+      { name: 'Neon_Ring_Mesh_1', color: PURPLE },
+      { name: 'Neon_Ring_Mesh_2', color: PURPLE },
+      { name: 'Neon_Ring_Mesh_3', color: PURPLE },
+      { name: 'Neon_Ring_Mesh_4', color: PURPLE },
+      { name: 'Neon_Ring_Mesh_5', color: PURPLE },
+      { name: 'Neon_Ring_Mesh_6', color: PURPLE },
+      { name: 'Neon_Ring_Mesh_7', color: PURPLE },
+      { name: 'Neon_Ring_Mesh_20', color: CYAN },
+      { name: 'Neon_Ring_Mesh_21', color: CYAN },
+      { name: 'Neon_Window_CeilingWindow', color: PURPLE }, // long ~8m ceiling strip
+      { name: 'Neon_Window_Mesh_20', color: CYAN },
+      { name: 'Neon_Window_Mesh_21', color: CYAN }
     ];
-    for (let i = 23; i <= 50; i++) targets.push({ name: `CONTORNO_Nicho_Mesh_${i}`, color: CYAN });
-    targets.push({ name: 'CONTORNO_Nicho_Mesh_51', color: PURPLE });
+    [1, 2, 3, 4, 5, 6, 7].forEach((n) => targets.push({ name: `Neon_Window_Mesh_${n}`, color: WHITE }));
+    [9, 10, 13, 15, 22, 23, 24, 74, 92, 102, 106, 108, 112, 114, 119, 120, 123, 124, 125, 126, 128, 130]
+      .forEach((n) => targets.push({ name: `Neon_Window_Batch2_${n}`, color: CYAN }));
+    [20, 25, 28, 29, 31, 64, 77, 111, 116]
+      .forEach((n) => targets.push({ name: `Neon_Window_Extra_${n}`, color: CYAN }));
 
     const addHaloLayer = (strip, color, mat, scale, suffix) => {
       const geo = strip.geometry.clone();
@@ -541,8 +571,13 @@ AFRAME.registerComponent('neon-strips-fix', {
   A handful of short-range, no-shadow point lights near the LED strips, so
   the emissive geometry (the real "light source") lightly contaminates the
   floor / peana base / nearby wall instead of glowing in isolation.
-  Deliberately few (12, not 30-40): the emissive strips themselves carry
-  the visual read, these are just a soft supporting bounce.
+  Deliberately restrained (17, not 50+, even though this model has 51 neon
+  strips vs. the old test model's ~39): the emissive strips themselves carry
+  the visual read, these are just a soft supporting bounce. Positions are
+  the real bounding-box centers of the matching Neon_Ring_Mesh_* /
+  Neon_Window_* meshes in museo_bacterias.glb (measured directly from the
+  exported glTF, not eyeballed), so they land on the actual geometry, not
+  the old test model's floor plan.
   Generated from one array (not duplicated per-light HTML) so the count/
   values are easy to retune from a single place.
 */
@@ -553,25 +588,31 @@ AFRAME.registerComponent('neon-support-lights', {
   onLoaded() {
     const purple = 0x9b5cff;
     const turquoise = 0x28d7e5;
+    const white = 0xfff0d9;
     const configs = [
-      // peanas — izquierda morada (suelo, alcance corto)
+      // anillos de suelo bajo cada peana — morados (alcance corto)
       { color: purple, intensity: 2.1, distance: 2.9, pos: [-0.920, 0.050, -3.683] },
       { color: purple, intensity: 2.1, distance: 2.9, pos: [-0.676, 0.050, -0.337] },
+      { color: purple, intensity: 2.1, distance: 2.9, pos: [-2.482, 0.050, -3.626] },
+      { color: purple, intensity: 2.1, distance: 2.9, pos: [-2.403, 0.050, -2.853] },
+      { color: purple, intensity: 2.1, distance: 2.9, pos: [-2.215, 0.050, -2.113] },
+      { color: purple, intensity: 2.1, distance: 2.9, pos: [-1.871, 0.050, 1.498] },
+      { color: purple, intensity: 2.1, distance: 2.9, pos: [-2.057, 0.050, 2.253] },
       { color: purple, intensity: 2.1, distance: 2.9, pos: [-2.130, 0.050, 3.013] },
-      // peanas — derecha turquesa (suelo, alcance corto)
-      { color: turquoise, intensity: 2.1, distance: 2.9, pos: [0.705, 0.050, 2.387] },
+      // anillos de suelo — turquesa (alcance corto)
+      { color: turquoise, intensity: 2.1, distance: 2.9, pos: [0.976, 0.050, -0.835] },
       { color: turquoise, intensity: 2.1, distance: 2.9, pos: [0.722, 0.050, -3.598] },
-      // nichos — derecha turquesa (rebote suave en pared)
-      { color: turquoise, intensity: 1.7, distance: 3.2, pos: [0.560, 1.976, -4.926] },
-      { color: turquoise, intensity: 1.7, distance: 3.2, pos: [0.389, 2.742, -0.203] },
-      { color: turquoise, intensity: 1.7, distance: 3.2, pos: [0.408, 2.291, 3.956] },
-      // nichos — izquierda morada (rebote suave en pared)
-      { color: purple, intensity: 1.7, distance: 3.2, pos: [-1.032, 2.631, 3.188] },
-      { color: purple, intensity: 1.7, distance: 3.2, pos: [-1.317, 2.438, -4.453] },
-      // tira larga del techo (CONTORNO_Nicho_Mesh_51) — un par de puntos de
-      // rebote a lo largo de su recorrido de ~8m
-      { color: purple, intensity: 2.1, distance: 3.8, pos: [-0.9, 1.98, -2.0] },
-      { color: purple, intensity: 2.1, distance: 3.8, pos: [-0.9, 1.98, 2.0] }
+      // nichos repartidos por altura/pared — turquesa (rebote suave)
+      { color: turquoise, intensity: 1.7, distance: 3.2, pos: [0.495, 2.679, -4.973] },
+      { color: turquoise, intensity: 1.7, distance: 3.2, pos: [0.798, 5.305, 3.080] },
+      { color: turquoise, intensity: 1.7, distance: 3.2, pos: [1.538, 1.363, 1.241] },
+      { color: turquoise, intensity: 1.7, distance: 3.2, pos: [2.250, 1.288, -3.618] },
+      // nicho — blanco cálido (pared opuesta, variedad de tono)
+      { color: white, intensity: 1.7, distance: 3.2, pos: [-1.441, 1.610, -0.309] },
+      // tira larga del techo (Neon_Window_CeilingWindow, ~8m) — un par de
+      // puntos de rebote a lo largo de su recorrido
+      { color: purple, intensity: 2.1, distance: 3.8, pos: [-0.868, 3.865, -3.090] },
+      { color: purple, intensity: 2.1, distance: 3.8, pos: [-0.868, 3.865, 1.690] }
     ];
 
     configs.forEach(({ color, intensity, distance, pos }) => {
