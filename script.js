@@ -723,14 +723,7 @@ AFRAME.registerComponent('exhibit-info', {
     this.nextCheck = 0;
     this.tmp = new THREE.Vector3();
 
-    this.prompt  = document.getElementById('exhibit-prompt');
-    this.panel   = document.getElementById('exhibit-panel');
-    this.caption = document.getElementById('exhibit-caption');
-    this.intro   = document.getElementById('intro-msg');
-
-    this.onPromptClick = () => this.open(this.active && this.active.id);
-    this.prompt.addEventListener('click', this.onPromptClick);
-    this.panel.querySelector('.panel-close').addEventListener('click', () => this.close());
+    this.ui = false;
 
     this.onKey = (e) => {
       if (e.key === 'Escape') this.close();
@@ -740,12 +733,34 @@ AFRAME.registerComponent('exhibit-info', {
     window.addEventListener('keydown', this.onKey);
 
     this.el.addEventListener('model-loaded', () => this.onLoaded());
-    if (this.intro) setTimeout(() => this.hideIntro(), 6500);
+  },
+
+  /*
+    El HTML del panel va despues de <a-scene>, asi que cuando A-Frame llama a
+    init() el navegador todavia no lo ha parseado y getElementById devuelve
+    null. Por eso las referencias se resuelven aqui, de forma perezosa, en vez
+    de en init().
+  */
+  wireUI() {
+    if (this.ui) return true;
+    this.prompt  = document.getElementById('exhibit-prompt');
+    this.panel   = document.getElementById('exhibit-panel');
+    this.caption = document.getElementById('exhibit-caption');
+    this.intro   = document.getElementById('intro-msg');
+    if (!this.prompt || !this.panel || !this.caption) return false;
+
+    this.onPromptClick = () => this.open(this.active && this.active.id);
+    this.prompt.addEventListener('click', this.onPromptClick);
+    this.panel.querySelector('.panel-close').addEventListener('click', () => this.close());
+    setTimeout(() => this.hideIntro(), 6500);
+    this.ui = true;
+    return true;
   },
 
   onLoaded() {
     const mesh = this.el.getObject3D('mesh');
     if (!mesh) return;
+    this.wireUI();
     const byName = {};
     const turquesaAlto = [];
     mesh.traverse((o) => {
@@ -787,6 +802,7 @@ AFRAME.registerComponent('exhibit-info', {
   tick(time) {
     if (time < this.nextCheck || !this.items.length) return;
     this.nextCheck = time + 180;
+    if (!this.wireUI()) return;
 
     const rig = document.getElementById('rig');
     if (!rig) return;
@@ -838,7 +854,7 @@ AFRAME.registerComponent('exhibit-info', {
   },
 
   open(id) {
-    if (!id) return;
+    if (!id || !this.wireUI()) return;
     const it = this.items.find((i) => i.id === id);
     if (!it || it.data.tier === 'tertiary') return;
     const d = it.data;
@@ -854,7 +870,7 @@ AFRAME.registerComponent('exhibit-info', {
   },
 
   close() {
-    if (!this.openId) return;
+    if (!this.openId || !this.panel) return;
     this.panel.classList.remove('visible');
     this.openId = null;
   },
@@ -865,7 +881,7 @@ AFRAME.registerComponent('exhibit-info', {
 
   remove() {
     window.removeEventListener('keydown', this.onKey);
-    this.prompt.removeEventListener('click', this.onPromptClick);
+    if (this.prompt) this.prompt.removeEventListener('click', this.onPromptClick);
   }
 });
 
