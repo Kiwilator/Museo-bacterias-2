@@ -497,59 +497,10 @@ AFRAME.registerComponent('respawn-guard', {
   }
 });
 
-/*
-  A handful of short-range, no-shadow point lights near the LED strips, so
-  the emissive geometry (the real "light source") lightly contaminates the
-  floor / peana base / nearby wall instead of glowing in isolation.
-  Deliberately restrained (16, not 40+): the emissive strips themselves
-  carry the visual read, these are just a soft supporting bounce. Positions
-  are the real bounding-box centers of the matching Neon_Ring_Mesh and
-  Neon_Window_Batch2 / Neon_Window_Extra meshes in museo_bacterias.glb
-  (measured directly from the exported glTF, not eyeballed), so they land
-  on the actual geometry, not the old test model's floor plan.
-  Generated from one array (not duplicated per-light HTML) so the count/
-  values are easy to retune from a single place.
-*/
-AFRAME.registerComponent('neon-support-lights', {
-  init() {
-    this.el.addEventListener('model-loaded', () => this.onLoaded());
-  },
-  onLoaded() {
-    const purple = 0x9b5cff;
-    const turquoise = 0x28d7e5;
-    const configs = [
-      // anillos de suelo bajo cada peana — morados (alcance corto)
-      { color: purple, intensity: 2.1, distance: 2.9, pos: [-0.920, 0.050, -3.683] },
-      { color: purple, intensity: 2.1, distance: 2.9, pos: [-0.676, 0.050, -0.337] },
-      { color: purple, intensity: 2.1, distance: 2.9, pos: [-2.482, 0.050, -3.626] },
-      { color: purple, intensity: 2.1, distance: 2.9, pos: [-2.403, 0.050, -2.853] },
-      { color: purple, intensity: 2.1, distance: 2.9, pos: [-2.215, 0.050, -2.113] },
-      { color: purple, intensity: 2.1, distance: 2.9, pos: [-1.871, 0.050, 1.498] },
-      { color: purple, intensity: 2.1, distance: 2.9, pos: [-2.057, 0.050, 2.253] },
-      { color: purple, intensity: 2.1, distance: 2.9, pos: [-2.130, 0.050, 3.013] },
-      // anillos de suelo — turquesa (alcance corto)
-      { color: turquoise, intensity: 2.1, distance: 2.9, pos: [0.976, 0.050, -0.835] },
-      { color: turquoise, intensity: 2.1, distance: 2.9, pos: [0.722, 0.050, -3.598] },
-      // nichos repartidos por altura/pared — turquesa (rebote suave)
-      { color: turquoise, intensity: 1.7, distance: 3.2, pos: [0.495, 2.679, -4.973] },
-      { color: turquoise, intensity: 1.7, distance: 3.2, pos: [0.798, 5.305, 3.080] },
-      { color: turquoise, intensity: 1.7, distance: 3.2, pos: [1.538, 1.363, 1.241] },
-      { color: turquoise, intensity: 1.7, distance: 3.2, pos: [2.250, 1.288, -3.618] },
-      // tira larga del techo (Neon_Window_CeilingWindow, ~8m) — un par de
-      // puntos de rebote a lo largo de su recorrido
-      { color: purple, intensity: 2.1, distance: 3.8, pos: [-0.868, 3.865, -3.090] },
-      { color: purple, intensity: 2.1, distance: 3.8, pos: [-0.868, 3.865, 1.690] }
-    ];
-
-    configs.forEach(({ color, intensity, distance, pos }) => {
-      const light = new THREE.PointLight(color, intensity, distance, 2);
-      light.position.set(pos[0], pos[1], pos[2]);
-      light.castShadow = false;
-      this.el.object3D.add(light);
-    });
-    console.log(`[neon-support-lights] added ${configs.length} support lights`);
-  }
-});
+/* neon-support-lights removed: the GLB's own emissive neon materials
+   (Neon_Purple / Neon_Turquoise / Neon_White, baked in Blender) are what
+   should read as light sources. A-Frame just displays the model as
+   exported -- no extra JS-created point lights simulating the neon. */
 
 /* Attach debug logging to gltf-model entities */
 AFRAME.scenes[0]?.addEventListener('loaded', () => {

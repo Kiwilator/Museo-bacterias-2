@@ -29,23 +29,27 @@
       <a-asset-item id="museo" src="./museo_bacterias.glb"></a-asset-item>
     </a-assets>
 
-    <!-- Modelo (museo_bacterias.glb, sustituye a museo_nascere_test.glb): reescalado
-         en tiempo real a 10.7m de largo x 8m de alto (proporción real del modelo —
-         es un espacio bastante más vertical que el de prueba, con nichos repartidos
-         en varios niveles de pared), quita las luces horneadas de Blender (mal
-         calibradas). Este .glb es una reexportación desde Blender que, además de
-         las probetas (Lab_Batch2_*/Lab_Extra_*), excluye 10 curvas de neón que
-         resultaron ser geometría suelta/mal generada (no seguían ningún borde
-         real: contorno de ventana, nicho o peana) — es lo que se veía como
-         "curvas de luz flotantes" cruzando la sala. El resto de tiras de neón sí
-         está pegado a bordes reales y se deja intacto. Coloca el rig del jugador
-         dentro del espacio orientado a la exposición, y calcula los
+    <!-- Modelo (museo_bacterias.glb): esta es ahora la ÚNICA fuente de verdad
+         del museo -- geometría, neones, materiales emisivos y texturas de
+         suelo/pared vienen todos de Blender, exportados tal cual. A-Frame no
+         crea ni recolorea neones ni geometría propia; solo reescala el modelo
+         en tiempo real a 10.7m x 8m y quita las luces horneadas de Blender
+         (mal calibradas para glTF). La exportación excluye, vía hide_render
+         en el propio .blend (no listas de nombres en el script de export):
+         las probetas de laboratorio (Lab_Batch2_*/Lab_Extra_*) y un puñado
+         de mallas de neón que resultaron ser geometría suelta (no seguían
+         ningún borde real) -- entre ellas la "tira de techo" que cruzaba la
+         sala como una curva flotante. El resto de neones sí está pegado a
+         bordes reales (ventana, nicho, peana, junta) y se exporta intacto.
+         Suelo y pared llevan ahora textura horneada (antes eran nodos
+         procedurales de Blender -- Noise/Bump/ColorRamp -- que glTF no
+         puede leer y se exportaban como color plano). Coloca el rig del
+         jugador dentro del espacio orientado a la exposición, y calcula los
          límites/huecos de navegación (ver script.js). -->
     <a-entity
       id="modelo"
       gltf-model="#museo"
       setup-museum-model="length: 10.7; height: 8; wallMargin: 0.4; eyeHeight: 0.5"
-      neon-support-lights
       position="0 0 0"
       shadow="cast: true; receive: true"
     ></a-entity>
