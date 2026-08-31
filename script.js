@@ -201,6 +201,36 @@ AFRAME.registerComponent('setup-museum-model', {
       if (light.parent) light.parent.remove(light);
     });
 
+    // 1b) fix emissive materials so they show their real, designed color
+    // instead of washing out to near-white. This scene uses ACES filmic
+    // tone mapping (index.html: toneMapping: ACESFilmic), which clips any
+    // material whose emissive channel is bright enough — every neon strip
+    // and the purple bacteria/exhibit materials all hit that, regardless of
+    // which specific color they were painted in Blender. The old approach
+    // was a hand-picked list of mesh names with hand-built replacement
+    // materials (specific hex colors, extra glow-halo geometry) — brittle,
+    // and it only ever covered the strips someone remembered to list, never
+    // the bacteria. This instead walks every mesh once and, for any
+    // material that already has emission, sets toneMapped: false on it —
+    // the material itself is untouched, so whatever color/texture was
+    // actually authored in Blender is what renders.
+    let emissiveFixed = 0;
+    const seenMats = new Set();
+    mesh.traverse((o) => {
+      if (!o.isMesh || !o.material) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach((mat) => {
+        if (seenMats.has(mat.id)) return;
+        seenMats.add(mat.id);
+        const hasEmission = mat.emissive && (mat.emissive.r > 0 || mat.emissive.g > 0 || mat.emissive.b > 0);
+        if (hasEmission) {
+          mat.toneMapped = false;
+          emissiveFixed++;
+        }
+      });
+    });
+    console.log(`[setup-museum-model] ${emissiveFixed} emissive materials set to render true color (tone-mapping bypassed)`);
+
     // 2) scale to real-world size
     let box = new THREE.Box3().setFromObject(mesh);
     const size = new THREE.Vector3();
@@ -479,143 +509,6 @@ AFRAME.registerComponent('respawn-guard', {
       pos.set(spawn.x, spawn.y, spawn.z);
       this.el.object3D.rotation.set(0, THREE.MathUtils.degToRad(spawn.yaw), 0);
     }
-  }
-});
-
-/*
-  Fixes the emissive LED strips (CINTA_Peana_Mesh_* on the peanas, and
-  CONTORNO_Nicho_Mesh_* on the niche rims — 23-50 turquoise, 51 purple, the
-  latter a continuous ~8m strip along the ceiling rather than a small ring).
-
-  COLOR > BRIGHTNESS: the baked material's emissiveFactor for the turquoise
-  strips is ~(0.03, 1.0, 0.95) — two channels already maxed — so under
-  ACESFilmic tone mapping (or any emissiveIntensity pushed past 1.0, which
-  just clips channels at the framebuffer regardless of tone mapping) it
-  reads as near-white. The earlier pass fixed the tone-mapping half of that
-  (toneMapped=false + custom color) but then re-broke it a different way by
-  pushing emissiveIntensity up to 1.6-3.2 to "read better at a distance",
-  which clips the same way. Fixed here by keeping intensity near 1.0 and
-  doing the "read from further away" job with the halo layers instead, so
-  the core color never approaches white.
-
-  Four SHARED materials (not one clone per strip) carry every strip:
-  purple core / cyan core / purple halo / cyan halo — reused across all
-  matching meshes rather than duplicated per-instance.
-
-  Two-layer glow: halo 1 sits close to the strip and is fairly opaque, halo
-  2 is wider and much softer — both the exact core color, so it blends into
-  one glow instead of reading as separate colored bands.
-*/
-AFRAME.registerComponent('neon-strips-fix', {
-  init() {
-    this.el.addEventListener('model-loaded', () => this.onLoaded());
-  },
-  onLoaded() {
-    const mesh = this.el.getObject3D('mesh');
-    if (!mesh) return;
-
-    const PURPLE = 0x9b5cff;
-    const CYAN = 0x28d7e5;
-    const CORE_INTENSITY = 1.05; // kept close to 1.0 on purpose — see comment above
-
-    const coreMat = {
-      [PURPLE]: new THREE.MeshStandardMaterial({
-        color: 0x000000, emissive: PURPLE, emissiveIntensity: CORE_INTENSITY,
-        toneMapped: false, roughness: 0.4
-      }),
-      [CYAN]: new THREE.MeshStandardMaterial({
-        color: 0x000000, emissive: CYAN, emissiveIntensity: CORE_INTENSITY,
-        toneMapped: false, roughness: 0.4
-      })
-    };
-    const halo1Mat = {
-      [PURPLE]: new THREE.MeshBasicMaterial({
-        color: PURPLE, transparent: true, opacity: 0.65,
-        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
-      }),
-      [CYAN]: new THREE.MeshBasicMaterial({
-        color: CYAN, transparent: true, opacity: 0.65,
-        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
-      })
-    };
-    // wider + more opaque than before: against this room's dense tangle of
-    // plain architectural trim lines, a thin halo reads as barely-there —
-    // this one is meant to visibly "stain" the ceiling/wall around the
-    // strip with color, not just edge-light the line itself.
-    const halo2Mat = {
-      [PURPLE]: new THREE.MeshBasicMaterial({
-        color: PURPLE, transparent: true, opacity: 0.3,
-        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
-      }),
-      [CYAN]: new THREE.MeshBasicMaterial({
-        color: CYAN, transparent: true, opacity: 0.3,
-        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
-      })
-    };
-
-    /*
-      Target mesh names for this model (museo_bacterias.glb) — replaces the
-      CINTA_Peana_Mesh_* / CONTORNO_Nicho_Mesh_* names from the old test
-      model, which don't exist here. Same role, new names:
-        - Neon_Ring_Mesh_* — floor ring under each peana (was CINTA_Peana_Mesh_*)
-        - Neon_Window_Batch2_* / Neon_Window_Extra_* — nicho/window rim trim
-          tied to an actual specimen placement (was CONTORNO_Nicho_Mesh_*).
-        - Neon_Window_CeilingWindow — the long ~8m ceiling strip.
-
-      Deliberately NOT included: Neon_Window_Mesh_1..7/20/21. These looked
-      like more rim trim by name, but they're a single ~500-point curve each
-      wound back and forth inside a ~1-2m box (not a simple outline like the
-      niche trims above) — lighting them the same way as a clean rim strip
-      produced a dense tangle of glowing threads covering the view, not a
-      subtle accent. Left as unlit geometry.
-    */
-    const targets = [
-      { name: 'Neon_Ring_Mesh_0', color: PURPLE },
-      { name: 'Neon_Ring_Mesh_1', color: PURPLE },
-      { name: 'Neon_Ring_Mesh_2', color: PURPLE },
-      { name: 'Neon_Ring_Mesh_3', color: PURPLE },
-      { name: 'Neon_Ring_Mesh_4', color: PURPLE },
-      { name: 'Neon_Ring_Mesh_5', color: PURPLE },
-      { name: 'Neon_Ring_Mesh_6', color: PURPLE },
-      { name: 'Neon_Ring_Mesh_7', color: PURPLE },
-      { name: 'Neon_Ring_Mesh_20', color: CYAN },
-      { name: 'Neon_Ring_Mesh_21', color: CYAN },
-      { name: 'Neon_Window_CeilingWindow', color: PURPLE } // long ~8m ceiling strip
-    ];
-    [9, 10, 13, 15, 22, 23, 24, 74, 92, 102, 106, 108, 112, 114, 119, 120, 123, 124, 125, 126, 128, 130]
-      .forEach((n) => targets.push({ name: `Neon_Window_Batch2_${n}`, color: CYAN }));
-    [20, 25, 28, 29, 31, 64, 77, 111, 116]
-      .forEach((n) => targets.push({ name: `Neon_Window_Extra_${n}`, color: CYAN }));
-
-    const addHaloLayer = (strip, color, mat, scale, suffix) => {
-      const geo = strip.geometry.clone();
-      geo.computeBoundingBox();
-      const c = new THREE.Vector3();
-      geo.boundingBox.getCenter(c);
-      geo.translate(-c.x, -c.y, -c.z);
-
-      const halo = new THREE.Mesh(geo, mat[color]);
-      halo.name = strip.name + suffix;
-      halo.position.copy(strip.position).add(c.clone().applyQuaternion(strip.quaternion).multiply(strip.scale));
-      halo.quaternion.copy(strip.quaternion);
-      halo.scale.copy(strip.scale).multiplyScalar(scale);
-      halo.renderOrder = 1;
-      strip.parent.add(halo);
-    };
-
-    let fixed = 0;
-    targets.forEach(({ name, color }) => {
-      const strip = mesh.getObjectByName(name);
-      if (!strip || !strip.isMesh) return;
-
-      strip.material = coreMat[color];
-      strip.userData.museoType = 'neon-strip';
-
-      addHaloLayer(strip, color, halo1Mat, 1.3, '_halo1'); // close, more intense
-      addHaloLayer(strip, color, halo2Mat, 2.4, '_halo2'); // wide colored wash
-      fixed++;
-    });
-    console.log(`[neon-strips-fix] fixed material + 2-layer glow on ${fixed} strips (shared materials, not cloned)`);
   }
 });
 

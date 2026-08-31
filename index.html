@@ -33,14 +33,15 @@
          en tiempo real a 10.7m de largo x 8m de alto (proporción real del modelo —
          es un espacio bastante más vertical que el de prueba, con nichos repartidos
          en varios niveles de pared), quita las luces horneadas de Blender (mal
-         calibradas), arregla las tiras LED (color saturado inmune al tone-mapping +
-         halo falso), coloca el rig del jugador dentro del espacio orientado a la
+         calibradas), corrige que el tone-mapping lave a blanco los materiales
+         emisivos (para que el morado/turquesa diseñados en Blender se vean tal
+         cual, sin recrear el color por código — ver fix-emissive-tonemap en
+         script.js), coloca el rig del jugador dentro del espacio orientado a la
          exposición, y calcula los límites/huecos de navegación (ver script.js). -->
     <a-entity
       id="modelo"
       gltf-model="#museo"
       setup-museum-model="length: 10.7; height: 8; wallMargin: 0.4; eyeHeight: 0.5"
-      neon-strips-fix
       neon-support-lights
       position="0 0 0"
       shadow="cast: true; receive: true"
