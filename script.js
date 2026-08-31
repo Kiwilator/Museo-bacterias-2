@@ -915,6 +915,43 @@ const PANEL_ICONS = {
   reactor:   '<svg viewBox="0 0 40 40"><rect x="13" y="10" width="14" height="21" rx="3"/><path d="M13 17h14"/><circle cx="20" cy="24" r="2"/><path d="M20 10V6"/></svg>'
 };
 
+/*
+  Reasigna `child` a `newParent` conservando su transformacion de MUNDO
+  exacta (misma posicion/rotacion/escala vistas desde fuera, aunque cambien
+  sus valores locales). Se usa para envolver cada pieza informativa en un
+  "pivote" centrado en su propio volumen, de forma que el hover pueda
+  escalarla ligeramente alrededor de su propio centro en vez de alrededor
+  del origen (0,0,0) que comparten todos los modulos del museo -- escalar
+  sobre el origen desplazaria visiblemente la pieza en vez de agrandarla en
+  su sitio.
+*/
+function reparentPreservingWorld(child, newParent) {
+  child.updateWorldMatrix(true, false);
+  const worldMatrix = child.matrixWorld.clone();
+  newParent.add(child);
+  newParent.updateWorldMatrix(true, false);
+  const parentInverse = new THREE.Matrix4().copy(newParent.matrixWorld).invert();
+  const localMatrix = new THREE.Matrix4().multiplyMatrices(parentInverse, worldMatrix);
+  localMatrix.decompose(child.position, child.quaternion, child.scale);
+}
+
+/*
+  Orienta la entidad hacia la camara cada frame. No se usa el componente
+  `look-at` de aframe-extras (esta version no lo trae cargado, ver nota en
+  drag-look-controls sobre por que aframe-extras no se usa en este
+  proyecto): esta version minima solo la necesita la etiqueta flotante
+  "VIEW +" de exhibit-info.
+*/
+AFRAME.registerComponent('face-camera', {
+  init() { this._target = new THREE.Vector3(); },
+  tick() {
+    const camera = this.el.sceneEl && this.el.sceneEl.camera;
+    if (!camera) return;
+    camera.getWorldPosition(this._target);
+    this.el.object3D.lookAt(this._target);
+  }
+});
+
 AFRAME.registerComponent('exhibit-info', {
   schema: {
     show:  { type: 'number', default: 2.0 },   // distancia a la que aparece el aviso
@@ -928,6 +965,17 @@ AFRAME.registerComponent('exhibit-info', {
     this.tmp = new THREE.Vector3();
 
     this.ui = false;
+
+    // Estado del hover (raton): que pieza esta bajo el cursor ahora mismo.
+    // Solo se usa para el lenguaje visual de las 8 cepas (ver setupHover
+    // AffordanceFor / tick) -- no toca seleccion por click, que ya
+    // funciona de forma independiente en drag-look-controls.trySelect.
+    this.hoverId = null;
+    this._hoverNdc = new THREE.Vector2();
+    this._hoverRaycaster = new THREE.Raycaster();
+    this._lastHoverCheck = 0;
+    this.onMouseMove = (e) => this.updateHover(e.clientX, e.clientY);
+    window.addEventListener('mousemove', this.onMouseMove);
 
     this.onKey = (e) => {
       if (e.key === 'Escape') this.close();
@@ -989,37 +1037,219 @@ AFRAME.registerComponent('exhibit-info', {
     Object.keys(museumContent).forEach((id) => {
       const data = museumContent[id];
       let pos = null;
+      let topY = null;
+      let anchorObj = null;
       if (data.tier === 'tertiary') {
         const h = huecos[data.windowIndex];
         if (h) pos = h.p.clone();
       } else {
         const o = byName[data.anchor];
         if (o) {
-          pos = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3());
+          anchorObj = o;
+          const box = new THREE.Box3().setFromObject(o);
+          pos = box.getCenter(new THREE.Vector3());
+          topY = box.max.y;
           // Marca cada malla de esta pieza para la seleccion directa por
           // click/tap (ver drag-look-controls.trySelect): asi el raycaster
           // solo puede tocar piezas con ficha real, nunca paredes/suelo/neon.
           o.traverse((n) => { if (n.isMesh) n.userData.museoExhibitId = id; });
         }
       }
-      if (pos) this.items.push({ id, data, pos });
+      if (pos) this.items.push({ id, data, pos, topY, anchorObj });
       else console.warn('[exhibit-info] sin ancla:', id, data.anchor || 'ventana');
     });
 
     this.selectableMeshes = [];
     mesh.traverse((o) => { if (o.isMesh && o.userData.museoExhibitId) this.selectableMeshes.push(o); });
 
-    console.log(`[exhibit-info] ${this.items.length} piezas activas, ${this.selectableMeshes.length} mallas seleccionables por click/tap`);
+    // Lenguaje visual de interaccion (etiqueta flotante "VIEW +" + hover) en
+    // las 8 cepas de la Sala 1 (ids que empiezan por "bacteria"). No toca el
+    // reactor (Sala 2) ni las ventanas de imagen (pasivas, sin ficha).
+    this.items.forEach((it) => {
+      if (it.data.tier === 'tertiary' || !it.id.startsWith('bacteria')) return;
+      this.setupHoverAffordance(it);
+    });
+
+    console.log(`[exhibit-info] ${this.items.length} piezas activas, ${this.selectableMeshes.length} mallas seleccionables por click/tap, ` +
+      `${this.items.filter((i) => i.pivot).length} con lenguaje visual de hover`);
+  },
+
+  /*
+    Prepara UNA pieza informativa para el nuevo lenguaje visual de
+    interaccion: un "pivote" (THREE.Group) centrado en su propio volumen,
+    del que cuelga la entidad gltf-model que la contiene (nunca el nodo
+    animado en si -- ver nota mas abajo), y una etiqueta flotante "VIEW +"
+    en la escena que se atenua/enciende segun la distancia del visitante.
+
+    Por que un pivote y no escalar la pieza directamente: cada bacteria trae
+    su propia animacion de posicion/rotacion horneada en el propio nodo
+    ancla (BACTERIA_MASTER, Bacteria_GRUPO_*...) -- es la respiracion/
+    balanceo sutil que ya tenian. Si esta funcion tocara ese nodo, el
+    AnimationMixer lo pisaria en el siguiente frame. En su lugar se reasigna
+    la ENTIDAD gltf-model completa (el contenedor que A-Frame crea para el
+    modulo, que la animacion nunca toca) a un pivote situado en el centro
+    real de la pieza, así el hover puede escalar el pivote sin interferir
+    con la animacion existente ni desplazar la pieza de su sitio.
+  */
+  setupHoverAffordance(it) {
+    const anchorObj = it.anchorObj;
+    if (!anchorObj) return;
+    // sube por la jerarquia hasta la entidad A-Frame dueña de este modulo
+    // (el object3D de una <a-entity> siempre lleva `.el`; los nodos internos
+    // del glTF cargado no lo llevan)
+    let p = anchorObj;
+    while (p && !p.el) p = p.parent;
+    const wrapperEl = p && p.el;
+    if (!wrapperEl || !wrapperEl.object3D || !wrapperEl.object3D.parent) return;
+    const wrapperObj = wrapperEl.object3D;
+    const parent = wrapperObj.parent;
+
+    parent.updateWorldMatrix(true, false);
+    const pivot = new THREE.Group();
+    pivot.name = `hover-pivot-${it.id}`;
+    pivot.position.copy(parent.worldToLocal(it.pos.clone()));
+    parent.add(pivot);
+    pivot.updateWorldMatrix(true, false);
+    reparentPreservingWorld(wrapperObj, pivot);
+
+    it.pivot = pivot;
+    it.hoverT = 0;       // 0..1, suavizado (ease) de entrada/salida del hover
+    it.labelOpacity = 0; // 0..1, suavizado de aparicion por proximidad
+
+    // materiales emisivos de esta pieza (brillo violeta de la bacteria/
+    // capsula), para el realce muy sutil al pasar el raton por encima
+    const mats = new Set();
+    const black = new THREE.Color(0, 0, 0);
+    anchorObj.traverse((n) => {
+      if (n.isMesh && n.material && n.material.emissive && !n.material.emissive.equals(black)) {
+        mats.add(n.material);
+      }
+    });
+    it.emissiveMats = Array.from(mats).map((mat) => ({ mat, base: mat.emissiveIntensity }));
+
+    it.label = this.createLabel(it);
+  },
+
+  /* Etiqueta flotante "VIEW +": una placa crema muy tenue + texto violeta,
+     siempre orientada a la camara, hija de la escena (no del pivote, para
+     que el escalado del hover no deforme el texto). Arranca invisible; el
+     tick() la va encendiendo/apagando segun la distancia y el hover. */
+  createLabel(it) {
+    const labelY = (it.topY !== null ? it.topY : it.pos.y + 0.4) + 0.16;
+
+    const wrapper = document.createElement('a-entity');
+    wrapper.setAttribute('face-camera', '');
+    wrapper.object3D.position.set(it.pos.x, labelY, it.pos.z);
+
+    const bg = document.createElement('a-plane');
+    bg.setAttribute('width', 0.4);
+    bg.setAttribute('height', 0.13);
+    bg.setAttribute('material', 'color: #faf6f0; shader: flat; opacity: 0; transparent: true; side: double');
+    wrapper.appendChild(bg);
+
+    const txt = document.createElement('a-text');
+    txt.setAttribute('value', 'VIEW +');
+    txt.setAttribute('align', 'center');
+    txt.setAttribute('baseline', 'center');
+    txt.setAttribute('width', 1.1);
+    txt.setAttribute('letter-spacing', 4);
+    txt.setAttribute('color', '#7d3fa8');
+    txt.setAttribute('opacity', 0);
+    txt.object3D.position.set(0, 0, 0.003);
+    wrapper.appendChild(txt);
+
+    this.el.sceneEl.appendChild(wrapper);
+    return { wrapper, bg, txt };
+  },
+
+  /*
+    Hover por raton: raycast contra las mismas mallas seleccionables que ya
+    usa el click (drag-look-controls.trySelect), pero en cada movimiento del
+    raton en vez de al soltar. Solo cambia this.hoverId + el cursor; el
+    realce visual en si (escala/brillo/etiqueta) se aplica en tick(), donde
+    se anima con suavidad en vez de saltar de golpe.
+  */
+  updateHover(x, y) {
+    const now = (window.performance && performance.now) ? performance.now() : Date.now();
+    if (now - this._lastHoverCheck < 50) return;   // ~20 comprobaciones/seg, de sobra
+    this._lastHoverCheck = now;
+
+    if (!this.selectableMeshes || !this.selectableMeshes.length) return;
+    const sceneEl = this.el.sceneEl;
+    const canvas = sceneEl && sceneEl.canvas;
+    const camera = sceneEl && sceneEl.camera;
+    if (!canvas || !camera) return;
+
+    // mientras se arrastra la camara no hay "hover": evita que la pieza que
+    // queda bajo el cursor al terminar un arrastre largo se ilumine sola
+    const cameraEl = document.getElementById('camera');
+    const drag = cameraEl && cameraEl.components && cameraEl.components['drag-look-controls'];
+    if (drag && drag.dragging) { this.setHover(null); return; }
+
+    const rect = canvas.getBoundingClientRect();
+    this._hoverNdc.set(
+      ((x - rect.left) / rect.width) * 2 - 1,
+      -((y - rect.top) / rect.height) * 2 + 1
+    );
+    this._hoverRaycaster.setFromCamera(this._hoverNdc, camera);
+    const hits = this._hoverRaycaster.intersectObjects(this.selectableMeshes, false);
+    this.setHover(hits.length ? hits[0].object.userData.museoExhibitId : null);
+  },
+
+  setHover(id) {
+    if (id === this.hoverId) return;
+    this.hoverId = id;
+    const canvas = this.el.sceneEl && this.el.sceneEl.canvas;
+    if (canvas) canvas.style.cursor = id ? 'pointer' : 'grab';
   },
 
   tick(time) {
-    if (time < this.nextCheck || !this.items.length) return;
-    this.nextCheck = time + 180;
-    if (!this.wireUI()) return;
+    if (!this.items.length) return;
 
     const rig = document.getElementById('rig');
     if (!rig) return;
     const p = rig.object3D.getWorldPosition(this.tmp);
+
+    // Lenguaje visual de hover/proximidad de las 8 cepas: sin throttle (se
+    // anima cada frame para que el fundido y la respiracion se vean suaves).
+    // Muy barato -- 8 items como mucho, sin raycasts aqui.
+    this.items.forEach((it) => {
+      if (!it.pivot) return;
+      const d = Math.hypot(it.pos.x - p.x, it.pos.z - p.z);
+
+      // 1) fundido de la etiqueta segun distancia: visible dentro de `show`,
+      // oculta a partir de `close`, rampa suave entre medias.
+      const range = Math.max(0.001, this.data.close - this.data.show);
+      const targetOpacity = THREE.MathUtils.clamp((this.data.close - d) / range, 0, 1);
+      it.labelOpacity += (targetOpacity - it.labelOpacity) * 0.12;
+      if (it.labelOpacity < 0.004) it.labelOpacity = 0;
+
+      // 2) hover: entra/sale con una curva lenta (nada de saltos), y con una
+      // respiracion muy leve mientras se mantiene el raton encima.
+      const isHovered = this.hoverId === it.id;
+      it.hoverT += ((isHovered ? 1 : 0) - it.hoverT) * 0.08;
+
+      const breathe = 0.5 + 0.5 * Math.sin(time * 0.0016);
+      const scale = 1 + it.hoverT * (0.015 + 0.015 * breathe);   // ~1.00 -> ~1.03
+      it.pivot.scale.setScalar(scale);
+
+      if (it.emissiveMats.length) {
+        const boost = 1 + it.hoverT * 0.35;
+        it.emissiveMats.forEach(({ mat, base }) => { mat.emissiveIntensity = base * boost; });
+      }
+
+      if (it.label) {
+        const bgOpacity = it.labelOpacity * 0.82;
+        const txtOpacity = it.labelOpacity * (0.82 + it.hoverT * 0.18);  // "VIEW +" algo mas brillante en hover
+        it.label.bg.setAttribute('material', 'opacity', bgOpacity);
+        it.label.txt.setAttribute('opacity', txtOpacity);
+        it.label.wrapper.object3D.visible = it.labelOpacity > 0.003;
+      }
+    });
+
+    if (time < this.nextCheck) return;
+    this.nextCheck = time + 180;
+    if (!this.wireUI()) return;
 
     let mejor = null, mejorD = Infinity;
     this.items.forEach((it) => {
@@ -1083,6 +1313,7 @@ AFRAME.registerComponent('exhibit-info', {
 
   remove() {
     window.removeEventListener('keydown', this.onKey);
+    window.removeEventListener('mousemove', this.onMouseMove);
     if (this.prompt) this.prompt.removeEventListener('click', this.onPromptClick);
   }
 });
