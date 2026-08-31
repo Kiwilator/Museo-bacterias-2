@@ -52,6 +52,7 @@
       setup-museum-model="length: 10.7; height: 8; wallMargin: 0.4; eyeHeight: 0.5"
       gltf-animations
       web-fixes
+      exhibit-info
       position="0 0 0"
       shadow="cast: true; receive: true"
     ></a-entity>
@@ -91,6 +92,32 @@
       ></a-entity>
     </a-entity>
   </a-scene>
+
+
+  <!-- Capa curatorial: un unico aviso, un unico panel y una unica ficha de
+       ventana, reutilizados por todas las piezas desde museumContent -->
+  <div id="intro-msg">
+    <p>MOVE THROUGH THE SPACE AND APPROACH THE EXHIBITS TO DISCOVER MORE</p>
+    <span><b>WASD</b> — MOVE &nbsp;&nbsp; <b>DRAG</b> — LOOK</span>
+  </div>
+
+  <button id="exhibit-prompt" type="button">EXPLORE +</button>
+
+  <aside id="exhibit-panel" role="dialog" aria-modal="false">
+    <button class="panel-close" type="button" aria-label="Close">&times;</button>
+    <span class="panel-section">01</span>
+    <h2 class="panel-title"></h2>
+    <p class="panel-body"></p>
+  </aside>
+
+  <figure id="exhibit-caption">
+    <img class="cap-img" alt="" />
+    <figcaption>
+      <span class="cap-num"></span>
+      <span class="cap-title"></span>
+      <span class="cap-text"></span>
+    </figcaption>
+  </figure>
 
   <script src="./script.js"></script>
 </body>

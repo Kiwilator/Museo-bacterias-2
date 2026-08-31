@@ -595,8 +595,22 @@ AFRAME.registerComponent('web-fixes', {
     });
 
     if (suelo) {
-      suelo.material.side = THREE.DoubleSide;
-      suelo.material.needsUpdate = true;
+      // El suelo es una malla aplastada a grosor cero, asi que su matriz de
+      // normales es singular: three no puede calcular sombreado y salia
+      // completamente negro (con la textura, las UVs y las luces correctas).
+      // Ningun ajuste de normales lo arregla porque no hay direccion valida
+      // que derivar. Se usa un material plano con la misma textura horneada,
+      // tintado en calido para que case con la luz de la sala. Mantiene la
+      // niebla y el tone mapping, y se ve exactamente como debe.
+      const base = suelo.material;
+      const plano = new THREE.MeshBasicMaterial({
+        map: base.map,
+        color: new THREE.Color(0xdccbb0),
+        side: THREE.DoubleSide,
+        fog: true
+      });
+      plano.name = 'Suelo_Plano';
+      suelo.material = plano;
     }
 
     // un unico material blanco compartido por todos los aros de vitrina
@@ -625,6 +639,233 @@ AFRAME.registerComponent('web-fixes', {
       });
     });
     console.log(`[web-fixes] suelo a doble cara, bacterias a una cara, ${pintados} aros de vitrina en blanco`);
+  }
+});
+
+
+/* ==========================================================================
+   CAPA CURATORIAL — contenido + interaccion por proximidad
+   Un unico objeto de contenido y un unico componente reutilizado por todas
+   las piezas. No toca geometria, materiales, luces ni animaciones: es una
+   capa de HTML por encima del museo.
+   ========================================================================== */
+
+const museumContent = {
+  bacteriaLarge01: {
+    tier: 'primary', anchor: 'BACTERIA_MASTER',
+    section: '01', title: 'INVISIBLE LIFE', label: 'EXPLORE +',
+    body: 'An invisible world surrounds us. Microorganisms form complex structures, surfaces and patterns that are normally hidden from the human eye. Enlarged beyond their natural scale, these forms become a new visual landscape and a starting point for observation, experimentation and design.'
+  },
+  bacteriaSmall01: {
+    tier: 'secondary', anchor: 'Bacteria_GRUPO_base',
+    title: 'FORM', label: 'VIEW +',
+    body: 'Simple biological volumes can produce surprisingly complex silhouettes. Curves, extensions and irregular contours become a vocabulary of forms that can later be translated into objects and jewellery.'
+  },
+  bacteriaSmall02: {
+    tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_10',
+    title: 'SURFACE', label: 'VIEW +',
+    body: 'At microscopic scale, a surface is never completely neutral. Texture, membrane, pattern and small irregularities create a visual identity that can inspire material finishes, reliefs and detailed geometries.'
+  },
+  bacteriaSmall03: {
+    tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_12',
+    title: 'MOVEMENT', label: 'VIEW +',
+    body: 'Biological form is not entirely static. Subtle oscillations, extensions and changes in orientation suggest a design language based on movement rather than on fixed geometry.'
+  },
+  bacteriaLarge02: {
+    tier: 'primary', anchor: 'Exhibit_Mesh0_Capsule',
+    section: '02', title: 'FROM BIOLOGY TO FORM', label: 'EXPLORE +',
+    body: 'Observation becomes design when biological characteristics are selected, simplified and reinterpreted. The aim is not to reproduce a microorganism literally, but to transform its visual logic into new proportions, structures and relationships.'
+  },
+  bacteriaSmall04: {
+    tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_14',
+    title: 'REPETITION', label: 'VIEW +',
+    body: 'Repeated units can generate rhythm and structure. A small biological detail can become a module, multiplied to construct larger patterns, surfaces or ornamental systems.'
+  },
+  bacteriaSmall05: {
+    tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_16',
+    title: 'SCALE', label: 'VIEW +',
+    body: 'Changing scale changes perception. A microscopic detail enlarged many times can stop being recognisable as biology and become an abstract form suitable for experimentation and design.'
+  },
+  bacteriaSmall06: {
+    tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_18',
+    title: 'TRANSFORMATION', label: 'VIEW +',
+    body: 'Design begins with transformation: selecting a characteristic, exaggerating it, simplifying it and combining it with new geometries until the biological reference becomes something new.'
+  },
+  reactor01: {
+    tier: 'primary', anchor: 'PEANA_Bioreactor',
+    section: '03', title: 'THE PROCESS', label: 'VIEW PROCESS +',
+    body: 'This experimental device represents the transition between biological observation and material experimentation. The animated liquid and bubbles introduce the idea of an active process: matter is not presented as something fixed, but as something that can evolve, react and be transformed.'
+  },
+
+  /* Ventanas de imagen de la pared opuesta. Contenido pasivo: no abren panel.
+     Para poner las imagenes basta con rellenar `image` con una ruta. */
+  window01: { tier: 'tertiary', windowIndex: 0, number: '01', title: 'MICROSCOPY',
+    image: '', caption: 'Observation reveals structures that remain invisible at human scale.' },
+  window02: { tier: 'tertiary', windowIndex: 1, number: '02', title: 'ABSTRACTION',
+    image: '', caption: 'Biological information is reduced to lines, volumes, textures and patterns.' },
+  window03: { tier: 'tertiary', windowIndex: 2, number: '03', title: 'FORM',
+    image: '', caption: 'Selected characteristics become a new three-dimensional design vocabulary.' },
+  window04: { tier: 'tertiary', windowIndex: 3, number: '04', title: 'DIGITAL MODEL',
+    image: '', caption: 'The abstracted form is developed and tested within a digital design process.' },
+  window05: { tier: 'tertiary', windowIndex: 4, number: '05', title: 'JEWELLERY',
+    image: '', caption: 'Biological inspiration is finally translated into scale, material and wearable form.' }
+};
+
+AFRAME.registerComponent('exhibit-info', {
+  schema: {
+    show:  { type: 'number', default: 2.0 },   // distancia a la que aparece el aviso
+    close: { type: 'number', default: 3.5 }    // distancia a la que se cierra el panel
+  },
+  init() {
+    this.items = [];
+    this.active = null;      // pieza con el aviso visible
+    this.openId = null;      // panel abierto
+    this.nextCheck = 0;
+    this.tmp = new THREE.Vector3();
+
+    this.prompt  = document.getElementById('exhibit-prompt');
+    this.panel   = document.getElementById('exhibit-panel');
+    this.caption = document.getElementById('exhibit-caption');
+    this.intro   = document.getElementById('intro-msg');
+
+    this.onPromptClick = () => this.open(this.active && this.active.id);
+    this.prompt.addEventListener('click', this.onPromptClick);
+    this.panel.querySelector('.panel-close').addEventListener('click', () => this.close());
+
+    this.onKey = (e) => {
+      if (e.key === 'Escape') this.close();
+      // E abre la pieza mas cercana; no interfiere con WASD
+      if ((e.key === 'e' || e.key === 'E') && this.active && !this.openId) this.open(this.active.id);
+    };
+    window.addEventListener('keydown', this.onKey);
+
+    this.el.addEventListener('model-loaded', () => this.onLoaded());
+    if (this.intro) setTimeout(() => this.hideIntro(), 6500);
+  },
+
+  onLoaded() {
+    const mesh = this.el.getObject3D('mesh');
+    if (!mesh) return;
+    const byName = {};
+    const turquesaAlto = [];
+    mesh.traverse((o) => {
+      if (!o.isMesh && !o.isObject3D) return;
+      if (o.name) byName[o.name] = o;
+      if (o.isMesh && o.material && o.material.name === 'Neon_Turquoise') {
+        const b = new THREE.Box3().setFromObject(o);
+        if (b.min.y > 1.2) turquesaAlto.push({ o, y: (b.min.y + b.max.y) / 2,
+                                               p: b.getCenter(new THREE.Vector3()) });
+      }
+    });
+
+    // Las ventanas de imagen se anclan a los nichos turquesa altos de la pared
+    // opuesta, agrupados por posicion. Asi no dependen de nombres concretos.
+    turquesaAlto.sort((a, b) => a.p.z - b.p.z);
+    const huecos = [];
+    turquesaAlto.forEach((n) => {
+      const cerca = huecos.find((h) => Math.abs(h.p.z - n.p.z) < 0.9);
+      if (cerca) { cerca.p.lerp(n.p, 0.5); } else { huecos.push({ p: n.p.clone() }); }
+    });
+
+    this.items = [];
+    Object.keys(museumContent).forEach((id) => {
+      const data = museumContent[id];
+      let pos = null;
+      if (data.tier === 'tertiary') {
+        const h = huecos[data.windowIndex];
+        if (h) pos = h.p.clone();
+      } else {
+        const o = byName[data.anchor];
+        if (o) pos = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3());
+      }
+      if (pos) this.items.push({ id, data, pos });
+      else console.warn('[exhibit-info] sin ancla:', id, data.anchor || 'ventana');
+    });
+    console.log(`[exhibit-info] ${this.items.length} piezas activas`);
+  },
+
+  tick(time) {
+    if (time < this.nextCheck || !this.items.length) return;
+    this.nextCheck = time + 180;
+
+    const rig = document.getElementById('rig');
+    if (!rig) return;
+    const p = rig.object3D.getWorldPosition(this.tmp);
+
+    let mejor = null, mejorD = Infinity, mejorTer = null, mejorTerD = Infinity;
+    this.items.forEach((it) => {
+      const d = Math.hypot(it.pos.x - p.x, it.pos.z - p.z);
+      if (it.data.tier === 'tertiary') {
+        if (d < mejorTerD) { mejorTerD = d; mejorTer = it; }
+      } else if (d < mejorD) { mejorD = d; mejor = it; }
+    });
+
+    // aviso de interaccion
+    if (mejor && mejorD <= this.data.show) {
+      if (!this.active || this.active.id !== mejor.id) {
+        this.active = mejor;
+        this.prompt.textContent = mejor.data.label;
+        this.prompt.classList.add('visible');
+      }
+    } else if (this.active) {
+      this.active = null;
+      this.prompt.classList.remove('visible');
+    }
+
+    // cerrar el panel si el visitante se aleja
+    if (this.openId) {
+      const abierto = this.items.find((i) => i.id === this.openId);
+      if (abierto && Math.hypot(abierto.pos.x - p.x, abierto.pos.z - p.z) > this.data.close) this.close();
+    }
+
+    // ventanas: contenido pasivo, sin panel ni boton
+    if (mejorTer && mejorTerD <= this.data.show + 0.6) {
+      if (this.captionId !== mejorTer.id) {
+        this.captionId = mejorTer.id;
+        const d = mejorTer.data;
+        this.caption.querySelector('.cap-num').textContent = d.number;
+        this.caption.querySelector('.cap-title').textContent = d.title;
+        this.caption.querySelector('.cap-text').textContent = d.caption;
+        const img = this.caption.querySelector('.cap-img');
+        if (d.image) { img.src = d.image; img.style.display = 'block'; }
+        else { img.removeAttribute('src'); img.style.display = 'none'; }
+        this.caption.classList.add('visible');
+      }
+    } else if (this.captionId) {
+      this.captionId = null;
+      this.caption.classList.remove('visible');
+    }
+  },
+
+  open(id) {
+    if (!id) return;
+    const it = this.items.find((i) => i.id === id);
+    if (!it || it.data.tier === 'tertiary') return;
+    const d = it.data;
+    this.panel.querySelector('.panel-section').textContent = d.section || '';
+    this.panel.querySelector('.panel-section').style.display = d.section ? 'block' : 'none';
+    this.panel.querySelector('.panel-title').textContent = d.title;
+    this.panel.querySelector('.panel-body').textContent = d.body;
+    this.panel.classList.toggle('secondary', d.tier === 'secondary');
+    this.panel.classList.add('visible');
+    this.openId = id;
+    this.prompt.classList.remove('visible');
+    this.hideIntro();
+  },
+
+  close() {
+    if (!this.openId) return;
+    this.panel.classList.remove('visible');
+    this.openId = null;
+  },
+
+  hideIntro() {
+    if (this.intro) this.intro.classList.add('hidden');
+  },
+
+  remove() {
+    window.removeEventListener('keydown', this.onKey);
+    this.prompt.removeEventListener('click', this.onPromptClick);
   }
 });
 
