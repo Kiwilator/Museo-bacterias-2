@@ -951,6 +951,64 @@ AFRAME.registerComponent('exhibit-info', {
   }
 });
 
+/*
+  Focos de exposicion. Es solo luz: no toca geometria, materiales, neones,
+  animaciones ni el GLB.
+
+  Jerarquia en tres niveles, que es lo que le da profundidad a la sala:
+    - hemisferico = relleno ambiental calido, bajo, para que nada quede negro
+    - directional = luz principal, marca el volumen de las paredes curvas
+    - estos focos  = acentos sobre las piezas, para separarlas del fondo
+
+  Los focos NO proyectan sombra a proposito: en una sala con esta cantidad
+  de geometria cada sombra adicional cuesta un mapa de sombras entero, y el
+  efecto buscado es un charco de luz suave, no una sombra marcada. La sombra
+  de contacto ya la da la directional.
+
+  Las posiciones se leen de las propias piezas del modelo ya cargado, asi que
+  siguen siendo correctas aunque el modelo se reescale en tiempo real.
+*/
+AFRAME.registerComponent('exhibit-lighting', {
+  init() {
+    this.el.addEventListener('model-loaded', () => this.onLoaded());
+  },
+  onLoaded() {
+    const mesh = this.el.getObject3D('mesh');
+    if (!mesh) return;
+
+    // piezas principales (mas presencia) y secundarias (acento discreto)
+    const focos = [
+      { anchor: 'BACTERIA_MASTER',       intensidad: 3.2, alcance: 7, angulo: 0.55, color: 0xfff0dc },
+      { anchor: 'Exhibit_Mesh0_Capsule', intensidad: 2.6, alcance: 6, angulo: 0.55, color: 0xfff0dc },
+      { anchor: 'PEANA_Bioreactor',      intensidad: 3.0, alcance: 7, angulo: 0.5,  color: 0xf2f6ff },
+      { anchor: 'VITRINA_Campana_1',     intensidad: 1.3, alcance: 4, angulo: 0.45, color: 0xfff2e0 },
+      { anchor: 'VITRINA_Campana_2',     intensidad: 1.3, alcance: 4, angulo: 0.45, color: 0xfff2e0 },
+      { anchor: 'VITRINA_Campana_3',     intensidad: 1.3, alcance: 4, angulo: 0.45, color: 0xfff2e0 },
+      { anchor: 'VITRINA_Campana_4',     intensidad: 1.3, alcance: 4, angulo: 0.45, color: 0xfff2e0 },
+      { anchor: 'VITRINA_Campana_5',     intensidad: 1.3, alcance: 4, angulo: 0.45, color: 0xfff2e0 },
+      { anchor: 'VITRINA_Campana_6',     intensidad: 1.3, alcance: 4, angulo: 0.45, color: 0xfff2e0 }
+    ];
+
+    const raiz = this.el.object3D;
+    let puestos = 0;
+    focos.forEach((f) => {
+      const o = mesh.getObjectByName(f.anchor);
+      if (!o) return;
+      const c = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3());
+      raiz.worldToLocal(c);                       // el rig del modelo esta reescalado
+
+      const spot = new THREE.SpotLight(f.color, f.intensidad, f.alcance, f.angulo, 0.9, 1.4);
+      spot.position.set(c.x, c.y + 2.4, c.z);
+      spot.castShadow = false;
+      spot.target.position.copy(c);
+      raiz.add(spot);
+      raiz.add(spot.target);
+      puestos++;
+    });
+    console.log(`[exhibit-lighting] ${puestos} focos de exposicion`);
+  }
+});
+
 /* Attach debug logging to gltf-model entities */
 AFRAME.scenes[0]?.addEventListener('loaded', () => {
   document.querySelectorAll('[gltf-model]').forEach((el) => {

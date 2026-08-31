@@ -5,7 +5,7 @@
   <title>Purple Bacteries</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <link rel="stylesheet" href="./style.css?v=60d4bda">
+  <link rel="stylesheet" href="./style.css?v=e7912d5">
 </head>
 <body>
 
@@ -23,13 +23,13 @@
     renderer="colorManagement: true; toneMapping: ACESFilmic; exposure: 0.95"
     shadow="type: pcfsoft"
     background="color: #bda98f"
-    fog="type: exponential; color: #c9b79c; density: 0.045"
+    fog="type: exponential; color: #cdb99b; density: 0.058"
   >
     <a-assets timeout="15000">
-      <a-asset-item id="museo" src="./museo_bacterias.glb?v=60d4bda"></a-asset-item>
+      <a-asset-item id="museo" src="./museo_bacterias.glb?v=e7912d5"></a-asset-item>
     </a-assets>
 
-    <!-- Modelo (museo_bacterias.glb?v=60d4bda"tira de techo" que cruzaba la
+    <!-- Modelo (museo_bacterias.glb?v=e7912d5"tira de techo" que cruzaba la
          sala como una curva flotante. El resto de neones sí está pegado a
          bordes reales (ventana, nicho, peana, junta) y se exporta intacto.
          Suelo y pared llevan ahora textura horneada (antes eran nodos
@@ -44,6 +44,7 @@
       gltf-animations
       web-fixes
       exhibit-info
+      exhibit-lighting
       position="0 0 0"
       shadow="cast: true; receive: true"
     ></a-entity>
@@ -57,7 +58,7 @@
          el glTF exportado (verificado), el problema era solo de exposición.
          A esta intensidad la sala se sigue viendo iluminada pero el morado ya
          no se quema. -->
-    <a-entity light="type: hemisphere; color: #ffeacd; groundColor: #9c7a52; intensity: 0.42"></a-entity>
+    <a-entity light="type: hemisphere; color: #ffe6c4; groundColor: #8f6d47; intensity: 0.32"></a-entity>
     <a-entity light="type: directional; intensity: 0.95; color: #ffd7a3" position="4 7 2" shadow="cast: true"></a-entity>
 
     <!-- Player rig: el rig va a nivel de suelo, la cámara dentro lleva la
@@ -110,6 +111,6 @@
     </figcaption>
   </figure>
 
-  <script src="./script.js?v=60d4bda"></script>
+  <script src="./script.js?v=e7912d5"></script>
 </body>
 </html>
