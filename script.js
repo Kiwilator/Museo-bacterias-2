@@ -201,10 +201,26 @@ AFRAME.registerComponent('setup-museum-model', {
     eyeHeight: { type: 'number', default: 0.5 }
   },
   init() {
-    this.el.addEventListener('model-loaded', () => this.onLoaded());
+    /*
+      El museo ya no es un GLB unico sino doce modulos, cada uno cargado en su
+      propia entidad hija y todos con las coordenadas de mundo de Blender. Este
+      componente espera a que TODOS terminen y solo entonces mide el conjunto y
+      aplica una unica escala al contenedor: si cada modulo se midiera y
+      escalara por separado, cada uno saldria con un factor distinto y las
+      piezas no encajarian.
+    */
+    const modulos = Array.from(this.el.querySelectorAll('[gltf-model]'));
+    this.pendientes = modulos.length;
+    if (!this.pendientes) { this.el.addEventListener('model-loaded', () => this.onLoaded()); return; }
+    modulos.forEach((m) => {
+      m.addEventListener('model-loaded', () => {
+        this.pendientes--;
+        if (this.pendientes === 0) this.onLoaded();
+      });
+    });
   },
   onLoaded() {
-    const mesh = this.el.getObject3D('mesh');
+    const mesh = this.el.object3D;
     if (!mesh) return;
 
     // 1) strip baked lights
@@ -232,6 +248,8 @@ AFRAME.registerComponent('setup-museum-model', {
     // clipping out.
 
     // 2) scale to real-world size
+    this.el.object3D.scale.set(1, 1, 1);
+    this.el.object3D.updateMatrixWorld(true);
     let box = new THREE.Box3().setFromObject(mesh);
     const size = new THREE.Vector3();
     box.getSize(size);
@@ -351,6 +369,7 @@ AFRAME.registerComponent('setup-museum-model', {
 
     window.MUSEO_SPAWN = { x: spawnXZ.x, y: floorY, z: spawnXZ.z, yaw };
 
+    this.el.emit('museo-modules-loaded', null, false);
     console.log(`[setup-museum-model] ${lights.length} baked lights removed, ` +
       `${obstacles.length} peanas tagged, spawn at`, window.MUSEO_SPAWN);
 
@@ -613,10 +632,10 @@ AFRAME.registerComponent('gltf-animations', {
 */
 AFRAME.registerComponent('web-fixes', {
   init() {
-    this.el.addEventListener('model-loaded', () => this.onLoaded());
+    this.el.addEventListener('museo-modules-loaded', () => this.onLoaded());
   },
   onLoaded() {
-    const mesh = this.el.getObject3D('mesh');
+    const mesh = this.el.object3D;
     if (!mesh) return;
     const THREE = AFRAME.THREE;
 
@@ -819,7 +838,7 @@ AFRAME.registerComponent('exhibit-info', {
     };
     window.addEventListener('keydown', this.onKey);
 
-    this.el.addEventListener('model-loaded', () => this.onLoaded());
+    this.el.addEventListener('museo-modules-loaded', () => this.onLoaded());
   },
 
   /*
@@ -844,7 +863,7 @@ AFRAME.registerComponent('exhibit-info', {
   },
 
   onLoaded() {
-    const mesh = this.el.getObject3D('mesh');
+    const mesh = this.el.object3D;
     if (!mesh) return;
     this.wireUI();
     const byName = {};
@@ -989,7 +1008,7 @@ AFRAME.registerComponent('exhibit-info', {
   solo como material vivo.
 */
 AFRAME.registerComponent('feature-glass', {
-  init() { this.el.addEventListener('model-loaded', () => this.onLoaded()); },
+  init() { this.el.addEventListener('museo-modules-loaded', () => this.onLoaded()); },
 
   gradiente() {
     const c = document.createElement('canvas');
@@ -1019,7 +1038,7 @@ AFRAME.registerComponent('feature-glass', {
   },
 
   onLoaded() {
-    const mesh = this.el.getObject3D('mesh');
+    const mesh = this.el.object3D;
     const campana = mesh && mesh.getObjectByName('VITRINA_Campana_Bacteria');
     if (!campana) return;
 
@@ -1066,7 +1085,7 @@ AFRAME.registerComponent('feature-glass', {
   museumContent con una ruta, la foto se usa de fondo en lugar del patron.
 */
 AFRAME.registerComponent('image-windows', {
-  init() { this.el.addEventListener('model-loaded', () => this.onLoaded()); },
+  init() { this.el.addEventListener('museo-modules-loaded', () => this.onLoaded()); },
 
   lamina(d) {
     const W = 512, H = 360;
@@ -1118,7 +1137,7 @@ AFRAME.registerComponent('image-windows', {
   onLoaded() {
     const comp = this.el.components['exhibit-info'];
     if (!comp || !comp.items.length) { setTimeout(() => this.onLoaded(), 300); return; }
-    const mesh = this.el.getObject3D('mesh');
+    const mesh = this.el.object3D;
     const raiz = this.el.object3D;
 
     /*
@@ -1172,11 +1191,10 @@ AFRAME.registerComponent('image-windows', {
 
 AFRAME.registerComponent('exhibit-lighting', {
   init() {
-    this.el.addEventListener('model-loaded', () => this.onLoaded());
+    this.el.addEventListener('museo-modules-loaded', () => this.onLoaded());
   },
   onLoaded() {
-    const mesh = this.el.getObject3D('mesh');
-    if (!mesh) return;
+    const mesh = this.el.object3D;
 
     // piezas principales (mas presencia) y secundarias (acento discreto)
     // Maximo tres luces, muy suaves. Son luces de museo, no simulacion de neon:

@@ -5,7 +5,7 @@
   <title>Purple Bacteries</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <link rel="stylesheet" href="./style.css?v=555b242">
+  <link rel="stylesheet" href="./style.css?v=1309469">
 </head>
 <body>
 
@@ -25,11 +25,22 @@
     background="color: #bda98f"
     fog="type: linear; color: #cbb89f; near: 4; far: 15.5"
   >
-    <a-assets timeout="15000">
-      <a-asset-item id="museo" src="./museo_bacterias.glb?v=555b242"></a-asset-item>
+    <a-assets timeout="60000">
+      <a-asset-item id="museum_floor" src="./modulos/museum_floor.glb?v=1309469"></a-asset-item>
+      <a-asset-item id="museum_walls" src="./modulos/museum_walls.glb?v=1309469"></a-asset-item>
+      <a-asset-item id="museum_neons" src="./modulos/museum_neons.glb?v=1309469"></a-asset-item>
+      <a-asset-item id="bacteria_large_01" src="./modulos/bacteria_large_01.glb?v=1309469"></a-asset-item>
+      <a-asset-item id="bacteria_large_02" src="./modulos/bacteria_large_02.glb?v=1309469"></a-asset-item>
+      <a-asset-item id="bacteria_small_01" src="./modulos/bacteria_small_01.glb?v=1309469"></a-asset-item>
+      <a-asset-item id="bacteria_small_02" src="./modulos/bacteria_small_02.glb?v=1309469"></a-asset-item>
+      <a-asset-item id="bacteria_small_03" src="./modulos/bacteria_small_03.glb?v=1309469"></a-asset-item>
+      <a-asset-item id="bacteria_small_04" src="./modulos/bacteria_small_04.glb?v=1309469"></a-asset-item>
+      <a-asset-item id="bacteria_small_05" src="./modulos/bacteria_small_05.glb?v=1309469"></a-asset-item>
+      <a-asset-item id="bacteria_small_06" src="./modulos/bacteria_small_06.glb?v=1309469"></a-asset-item>
+      <a-asset-item id="bioreactor" src="./modulos/bioreactor.glb?v=1309469"></a-asset-item>
     </a-assets>
 
-    <!-- Modelo (museo_bacterias.glb?v=555b242"tira de techo" que cruzaba la
+    <!-- Modelo (museo_bacterias.glb?v=1309469"tira de techo" que cruzaba la
          sala como una curva flotante. El resto de neones sí está pegado a
          bordes reales (ventana, nicho, peana, junta) y se exporta intacto.
          Suelo y pared llevan ahora textura horneada (antes eran nodos
@@ -37,11 +48,16 @@
          puede leer y se exportaban como color plano). Coloca el rig del
          jugador dentro del espacio orientado a la exposición, y calcula los
          límites/huecos de navegación (ver script.js). -->
+    <!-- El museo se carga como doce modulos independientes. Cada GLB conserva
+         las coordenadas de mundo de Blender, asi que todos van en el mismo
+         origen (0 0 0) y el conjunto se reconstruye solo. La escala se calcula
+         UNA vez sobre el contenedor cuando todos han terminado de cargar: si
+         cada modulo se midiera por separado, cada uno saldria con un factor
+         distinto y las piezas no encajarian. Para sustituir una pieza basta
+         con reemplazar su .glb, sin reexportar el resto. -->
     <a-entity
       id="modelo"
-      gltf-model="#museo"
       setup-museum-model="length: 10.7; height: 8; wallMargin: 0.4; playerRadius: 0.15; eyeHeight: 1.0"
-      gltf-animations
       web-fixes
       exhibit-info
       exhibit-lighting
@@ -49,7 +65,20 @@
       image-windows
       position="0 0 0"
       shadow="cast: true; receive: true"
-    ></a-entity>
+    >
+      <a-entity gltf-model="#museum_floor" gltf-animations></a-entity>
+      <a-entity gltf-model="#museum_walls" gltf-animations></a-entity>
+      <a-entity gltf-model="#museum_neons" gltf-animations></a-entity>
+      <a-entity gltf-model="#bacteria_large_01" gltf-animations></a-entity>
+      <a-entity gltf-model="#bacteria_large_02" gltf-animations></a-entity>
+      <a-entity gltf-model="#bacteria_small_01" gltf-animations></a-entity>
+      <a-entity gltf-model="#bacteria_small_02" gltf-animations></a-entity>
+      <a-entity gltf-model="#bacteria_small_03" gltf-animations></a-entity>
+      <a-entity gltf-model="#bacteria_small_04" gltf-animations></a-entity>
+      <a-entity gltf-model="#bacteria_small_05" gltf-animations></a-entity>
+      <a-entity gltf-model="#bacteria_small_06" gltf-animations></a-entity>
+      <a-entity gltf-model="#bioreactor" gltf-animations></a-entity>
+    </a-entity>
 
     <!-- Iluminación general: hemisferio cálido (crema arriba / tierra cálida
          abajo) + directional suave. Bajada desde 1.3/0.7: a esa intensidad, la
@@ -116,6 +145,6 @@
   </aside>
 
 
-  <script src="./script.js?v=555b242"></script>
+  <script src="./script.js?v=1309469"></script>
 </body>
 </html>
