@@ -201,35 +201,20 @@ AFRAME.registerComponent('setup-museum-model', {
       if (light.parent) light.parent.remove(light);
     });
 
-    // 1b) fix emissive materials so they show their real, designed color
-    // instead of washing out to near-white. This scene uses ACES filmic
-    // tone mapping (index.html: toneMapping: ACESFilmic), which clips any
-    // material whose emissive channel is bright enough — every neon strip
-    // and the purple bacteria/exhibit materials all hit that, regardless of
-    // which specific color they were painted in Blender. The old approach
-    // was a hand-picked list of mesh names with hand-built replacement
-    // materials (specific hex colors, extra glow-halo geometry) — brittle,
-    // and it only ever covered the strips someone remembered to list, never
-    // the bacteria. This instead walks every mesh once and, for any
-    // material that already has emission, sets toneMapped: false on it —
-    // the material itself is untouched, so whatever color/texture was
-    // actually authored in Blender is what renders.
-    let emissiveFixed = 0;
-    const seenMats = new Set();
-    mesh.traverse((o) => {
-      if (!o.isMesh || !o.material) return;
-      const mats = Array.isArray(o.material) ? o.material : [o.material];
-      mats.forEach((mat) => {
-        if (seenMats.has(mat.id)) return;
-        seenMats.add(mat.id);
-        const hasEmission = mat.emissive && (mat.emissive.r > 0 || mat.emissive.g > 0 || mat.emissive.b > 0);
-        if (hasEmission) {
-          mat.toneMapped = false;
-          emissiveFixed++;
-        }
-      });
-    });
-    console.log(`[setup-museum-model] ${emissiveFixed} emissive materials set to render true color (tone-mapping bypassed)`);
+    // 1b) NOTE: an earlier version of this step force-set `toneMapped =
+    // false` on every emissive material, to stop ACES from "washing" the
+    // neon/bacteria colors. Reverted: with toneMapped=false, any lit value
+    // that goes over 1.0 in a channel (very plausible here — bright
+    // hemisphere + directional light hitting a glossy low-roughness
+    // material, on top of its own emissive) hard-clips straight to white
+    // instead of being rolled off gracefully by the tone-mapping curve —
+    // that clip is almost certainly why the purple bacteria/exhibit
+    // materials were reading as white on screen. Leaving every material's
+    // default toneMapped: true in place, plus the light-intensity trim in
+    // index.html, restores the graceful roll-off so the actual Blender
+    // colors (confirmed correct in the source file and in the exported
+    // glTF: base color + emissive are both purple) show through instead of
+    // clipping out.
 
     // 2) scale to real-world size
     let box = new THREE.Box3().setFromObject(mesh);
