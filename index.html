@@ -2,15 +2,15 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Purple Bacteries</title>
+  <title>PURPLE BACTERIA</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <link rel="stylesheet" href="./style.css?v=b651660">
+  <link rel="stylesheet" href="./style.css?v=4a25186">
 </head>
 <body>
 
   <div id="loading-screen">
-    <div id="loading-title">Purple Bacteries</div>
+    <div id="loading-title">PURPLE BACTERIA</div>
     <div id="loading-spinner"></div>
   </div>
 
@@ -20,27 +20,27 @@
   </div>
 
   <a-scene
-    renderer="colorManagement: true; toneMapping: ACESFilmic; exposure: 0.95"
+    renderer="colorManagement: true; toneMapping: ACESFilmic; exposure: 0.88"
     shadow="type: pcfsoft"
     background="color: #bda98f"
-    fog="type: linear; color: #cbb89f; near: 4; far: 15.5"
+    fog="type: linear; color: #c9b79a; near: 3; far: 12"
   >
     <a-assets timeout="60000">
-      <a-asset-item id="museum_floor" src="./modulos/museum_floor.glb?v=b651660"></a-asset-item>
-      <a-asset-item id="museum_walls" src="./modulos/museum_walls.glb?v=b651660"></a-asset-item>
-      <a-asset-item id="museum_neons" src="./modulos/museum_neons.glb?v=b651660"></a-asset-item>
-      <a-asset-item id="bacteria_large_01" src="./modulos/bacteria_large_01.glb?v=b651660"></a-asset-item>
-      <a-asset-item id="bacteria_large_02" src="./modulos/bacteria_large_02.glb?v=b651660"></a-asset-item>
-      <a-asset-item id="bacteria_small_01" src="./modulos/bacteria_small_01.glb?v=b651660"></a-asset-item>
-      <a-asset-item id="bacteria_small_02" src="./modulos/bacteria_small_02.glb?v=b651660"></a-asset-item>
-      <a-asset-item id="bacteria_small_03" src="./modulos/bacteria_small_03.glb?v=b651660"></a-asset-item>
-      <a-asset-item id="bacteria_small_04" src="./modulos/bacteria_small_04.glb?v=b651660"></a-asset-item>
-      <a-asset-item id="bacteria_small_05" src="./modulos/bacteria_small_05.glb?v=b651660"></a-asset-item>
-      <a-asset-item id="bacteria_small_06" src="./modulos/bacteria_small_06.glb?v=b651660"></a-asset-item>
-      <a-asset-item id="bioreactor" src="./modulos/bioreactor.glb?v=b651660"></a-asset-item>
+      <a-asset-item id="museum_floor" src="./modulos/museum_floor.glb?v=4a25186"></a-asset-item>
+      <a-asset-item id="museum_walls" src="./modulos/museum_walls.glb?v=4a25186"></a-asset-item>
+      <a-asset-item id="museum_neons" src="./modulos/museum_neons.glb?v=4a25186"></a-asset-item>
+      <a-asset-item id="bacteria_large_01" src="./modulos/bacteria_large_01.glb?v=4a25186"></a-asset-item>
+      <a-asset-item id="bacteria_large_02" src="./modulos/bacteria_large_02.glb?v=4a25186"></a-asset-item>
+      <a-asset-item id="bacteria_small_01" src="./modulos/bacteria_small_01.glb?v=4a25186"></a-asset-item>
+      <a-asset-item id="bacteria_small_02" src="./modulos/bacteria_small_02.glb?v=4a25186"></a-asset-item>
+      <a-asset-item id="bacteria_small_03" src="./modulos/bacteria_small_03.glb?v=4a25186"></a-asset-item>
+      <a-asset-item id="bacteria_small_04" src="./modulos/bacteria_small_04.glb?v=4a25186"></a-asset-item>
+      <a-asset-item id="bacteria_small_05" src="./modulos/bacteria_small_05.glb?v=4a25186"></a-asset-item>
+      <a-asset-item id="bacteria_small_06" src="./modulos/bacteria_small_06.glb?v=4a25186"></a-asset-item>
+      <a-asset-item id="bioreactor" src="./modulos/bioreactor.glb?v=4a25186"></a-asset-item>
     </a-assets>
 
-    <!-- Modelo (museo_bacterias.glb?v=b651660"tira de techo" que cruzaba la
+    <!-- Modelo (museo_bacterias.glb?v=4a25186"tira de techo" que cruzaba la
          sala como una curva flotante. El resto de neones sí está pegado a
          bordes reales (ventana, nicho, peana, junta) y se exporta intacto.
          Suelo y pared llevan ahora textura horneada (antes eran nodos
@@ -61,7 +61,6 @@
       web-fixes
       exhibit-info
       exhibit-lighting
-      feature-glass
       image-windows
       position="0 0 0"
       shadow="cast: true; receive: true"
@@ -81,16 +80,15 @@
     </a-entity>
 
     <!-- Iluminación general: hemisferio cálido (crema arriba / tierra cálida
-         abajo) + directional suave. Bajada desde 1.3/0.7: a esa intensidad, la
-         luz directional sobre las cápsulas moradas (Exhibit_Capsule_Purple,
-         roughness bajo → brillo especular marcado) sumada al propio material
-         superaba 1.0 en varios canales y el tone-mapping ACES lo comprimía
-         hacia blanco — el color base/emisivo morado está bien en Blender y en
-         el glTF exportado (verificado), el problema era solo de exposición.
-         A esta intensidad la sala se sigue viendo iluminada pero el morado ya
-         no se quema. -->
-    <a-entity light="type: hemisphere; color: #ffe6c4; groundColor: #8f6d47; intensity: 0.25"></a-entity>
-    <a-entity light="type: directional; intensity: 0.95; color: #ffd7a3" position="4 7 2" shadow="cast: true"></a-entity>
+         abajo), bajado a 0.20 para que deje de aplanar la sala -- el volumen
+         real ahora lo aporta la directional y los dos focos de exposición.
+         La directional sigue moderada (0.85, calida) para no repetir el
+         quemado de las cápsulas moradas (Exhibit_Capsule_Purple, roughness
+         bajo → brillo especular marcado) que ya se corrigió una vez: el
+         color base/emisivo morado está bien en Blender y en el glTF
+         exportado, el problema era solo de exposición combinada. -->
+    <a-entity light="type: hemisphere; color: #ffe6c4; groundColor: #8f6d47; intensity: 0.20"></a-entity>
+    <a-entity light="type: directional; intensity: 0.85; color: #ffd7a3" position="4 7 2" shadow="cast: true"></a-entity>
 
     <!-- Player rig: el rig va a nivel de suelo, la cámara dentro lleva la
          altura de ojos. museum-movement da WASD + flechas, suave, sin volar
@@ -145,6 +143,6 @@
   </aside>
 
 
-  <script src="./script.js?v=b651660"></script>
+  <script src="./script.js?v=4a25186"></script>
 </body>
 </html>

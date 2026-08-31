@@ -1097,151 +1097,17 @@ AFRAME.registerComponent('exhibit-info', {
   siguen siendo correctas aunque el modelo se reescale en tiempo real.
 */
 /*
-  Vitral arquitectonico. UNA sola ventana de la sala (lado bacterias) recibe
-  un cristal con degradado violeta/magenta -- "coloured architectural glass /
-  scientific membrane", nunca un objeto flotando delante de una pieza.
-
-  NOTA: una version anterior aplicaba este mismo degradado sobre la campana
-  de vidrio de la bacteria grande (VITRINA_Campana_Bacteria). Al ser una
-  cupula cerrada, con emissive y una luz puntual dentro, se leia como una
-  burbuja/esfera morada envolviendo la bacteria -- exactamente lo que no se
-  queria. Se ha retirado por completo: la campana ya no se toca aqui y se ve
-  con su vidrio original, tal cual viene del modulo. El vitral se instala en
-  su lugar en un hueco de ventana real de la arquitectura (mismo criterio
-  geometrico que web-fixes usa para localizar esas ventanas: marco vertical,
-  lado bacterias, entre el suelo y ~1 m), como una lamina fina flush con el
-  marco -- no invade la zona de paso.
-
-  El degradado es una CanvasTexture generada en memoria (sin peticiones ni
-  archivos). El movimiento es un desplazamiento minimo de la textura con
-  periodo de 24 s -- a esa velocidad no se percibe como animacion, solo como
-  material vivo.
+  NOTA: hubo dos intentos de "vitral" en este hueco de ventana (primero sobre
+  la campana de vidrio de la bacteria grande -- se leia como una burbuja
+  morada envolviendo la bacteria --, despues como una lamina de degradado
+  flotando junto a la ventana -- se seguia leyendo como un panel de color
+  pegado delante de la arquitectura, no como parte de ella). Los dos se han
+  retirado por completo, sin sustituirlos por ninguna otra geometria: el
+  hueco de la ventana queda limpio, con su neon y su arquitectura tal cual
+  vienen del modulo. Si en el futuro se quiere un tratamiento de cristal de
+  color ahi, se hara a mano sobre el propio material del modulo, no generado
+  aqui.
 */
-AFRAME.registerComponent('feature-glass', {
-  init() { this.el.addEventListener('museo-modules-loaded', () => this.onLoaded()); },
-
-  gradiente() {
-    const c = document.createElement('canvas');
-    c.width = 64; c.height = 256;
-    const ctx = c.getContext('2d');
-    const g = ctx.createLinearGradient(0, 0, 0, 256);
-    // violeta -> purpura -> magenta contenido -> transicion fria al final
-    g.addColorStop(0.00, '#3a1258');
-    g.addColorStop(0.28, '#7b2fb5');
-    g.addColorStop(0.52, '#a63ad0');
-    g.addColorStop(0.72, '#b8489e');
-    g.addColorStop(0.90, '#4a5fb0');
-    g.addColorStop(1.00, '#2f7f9e');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, 64, 256);
-    // veteado suave, para que no sea un degradado perfecto de software
-    ctx.globalAlpha = 0.10;
-    for (let i = 0; i < 90; i++) {
-      ctx.beginPath();
-      ctx.ellipse(Math.random()*64, Math.random()*256, 6+Math.random()*16, 3+Math.random()*8, Math.random()*3, 0, 6.28);
-      ctx.fillStyle = Math.random() > 0.5 ? '#ffffff' : '#1b0b2a';
-      ctx.fill();
-    }
-    const t = new THREE.CanvasTexture(c);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  },
-
-  /*
-    Localiza los marcos de ventana del lado de las bacterias por geometria,
-    igual que web-fixes (posicion x<0, marco vertical >1m de alto, arranca
-    cerca del suelo) -- no por nombre de material, porque web-fixes puede
-    haber corrido antes y ya haberlos renombrado a 'Neon_Blanco_Ventana'.
-    Agrupa los marcos que comparten hueco (mismo Z, como en image-windows) y
-    devuelve el hueco de mayor superficie: ESA es la ventana protagonista.
-  */
-  buscarVentana(mesh) {
-    const marcos = [];
-    mesh.traverse((o) => {
-      if (!o.isMesh || !o.material) return;
-      const n = o.material.name;
-      if (n !== 'Neon_Purple' && n !== 'Neon_Blanco_Ventana') return;
-      const b = new THREE.Box3().setFromObject(o);
-      const c = b.getCenter(new THREE.Vector3());
-      if (c.x >= 0) return;                              // solo lado bacterias
-      const s = b.getSize(new THREE.Vector3());
-      if (s.y < 1.0 || b.min.y > 1.0) return;             // ni aros de peana ni arcos de techo
-      marcos.push({ box: b, center: c, size: s });
-    });
-    if (!marcos.length) return null;
-
-    const huecos = [];
-    marcos.forEach((m) => {
-      const h = huecos.find((h) => Math.abs(h.center.z - m.center.z) < 0.6);
-      if (h) {
-        h.box.union(m.box);
-        h.box.getCenter(h.center);
-        h.box.getSize(h.size);
-      } else {
-        huecos.push({ box: m.box.clone(), center: m.center.clone(), size: m.size.clone() });
-      }
-    });
-    huecos.sort((a, b) => (b.size.y * Math.max(b.size.x, b.size.z)) - (a.size.y * Math.max(a.size.x, a.size.z)));
-    return huecos[0];
-  },
-
-  onLoaded() {
-    const mesh = this.el.object3D;
-    const raiz = this.el.object3D;
-    if (!mesh) return;
-
-    const hueco = this.buscarVentana(mesh);
-    if (!hueco) { console.warn('[feature-glass] no se encontro ninguna ventana del lado de las bacterias'); return; }
-
-    this.tex = this.gradiente();
-
-    // ancho = a lo largo del marco (el eje horizontal mas grande del hueco);
-    // acotado al 82% del hueco para quedar dentro del marco, nunca sobre el muro.
-    const anchoHueco = Math.max(hueco.size.x, hueco.size.z);
-    const ancho = anchoHueco * 0.82;
-    const alto = hueco.size.y * 0.82;
-
-    const mat = new THREE.MeshStandardMaterial({
-      map: this.tex,
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.30,                 // translucido: la arquitectura de detras se sigue leyendo
-      roughness: 0.85,
-      metalness: 0.0,
-      emissive: new THREE.Color(0x2a1040),
-      emissiveIntensity: 0.4,
-      side: THREE.DoubleSide,
-      depthWrite: false
-    });
-    const plano = new THREE.Mesh(new THREE.PlaneGeometry(ancho, alto), mat);
-    plano.renderOrder = 1;
-
-    const p = hueco.center.clone();
-    raiz.worldToLocal(p);
-    plano.position.copy(p);
-    // el hueco es mas ancho en X que en Z (marco encastrado en la pared curva):
-    // el plano por defecto mira a +Z, asi que se gira 90 grados para quedar
-    // en el mismo plano que el marco en vez de atravesarlo hacia la sala.
-    if (hueco.size.x >= hueco.size.z) plano.rotation.y = Math.PI / 2;
-    raiz.add(plano);
-    this.plano = plano;
-
-    // una sola luz de contaminacion violeta, muy baja, junto al vitral -- sin
-    // geometria visible, sin esfera, sin varios focos de neon falsos.
-    const luz = new THREE.PointLight(0x9a4fd6, 0.5, 1.8, 2);
-    luz.position.copy(p);
-    luz.castShadow = false;
-    raiz.add(luz);
-
-    console.log('[feature-glass] vitral instalado en la ventana protagonista', hueco.center);
-  },
-
-  tick(time) {
-    if (!this.tex) return;
-    // ciclo de 24 s; el recorrido es de una sola altura de textura
-    this.tex.offset.y = (time / 24000) % 1;
-  }
-});
 
 /*
   Ventanas-imagen. Tres de los cinco nichos altos se convierten en lightbox de
@@ -1369,13 +1235,15 @@ AFRAME.registerComponent('exhibit-lighting', {
   onLoaded() {
     const mesh = this.el.object3D;
 
-    // piezas principales (mas presencia) y secundarias (acento discreto)
-    // Maximo tres luces, muy suaves. Son luces de museo, no simulacion de neon:
-    // el visitante debe notar que las piezas tienen volumen, no ver las lamparas.
+    // Exactamente dos focos de exposicion, anchos y suaves (no simulacion de
+    // neon, no relleno adicional): uno sobre la bacteria grande, calido y
+    // neutro, con caida suave sobre el muro cercano; otro sobre el reactor,
+    // neutro-frio, que conserva el turquesa del liquido y separa la pieza
+    // del fondo. Angulo abierto (0.95 rad ~ 54 grados) y penumbra al maximo
+    // para que se lea como un lavado amplio, no como un foco puntual.
     const focos = [
-      { anchor: 'BACTERIA_MASTER',  intensidad: 3.4, alcance: 7.5, angulo: 0.62, color: 0xfff0dc },
-      { anchor: 'PEANA_Bioreactor', intensidad: 3.0, alcance: 7.0, angulo: 0.60, color: 0xe8f2ff },
-      { anchor: 'PEANA_Bacteria',   intensidad: 1.1, alcance: 9.0, angulo: 0.95, color: 0xfff4e4 }
+      { anchor: 'BACTERIA_MASTER',  intensidad: 2.6, alcance: 8.0, angulo: 0.95, color: 0xfff1de },
+      { anchor: 'PEANA_Bioreactor', intensidad: 2.4, alcance: 8.0, angulo: 0.95, color: 0xe9f2ff }
     ];
 
     const raiz = this.el.object3D;
@@ -1386,7 +1254,7 @@ AFRAME.registerComponent('exhibit-lighting', {
       const c = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3());
       raiz.worldToLocal(c);                       // el rig del modelo esta reescalado
 
-      const spot = new THREE.SpotLight(f.color, f.intensidad, f.alcance, f.angulo, 0.9, 1.4);
+      const spot = new THREE.SpotLight(f.color, f.intensidad, f.alcance, f.angulo, 1.0, 1.4);
       spot.position.set(c.x, c.y + 2.4, c.z);
       spot.castShadow = false;
       spot.target.position.copy(c);
