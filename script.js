@@ -14,9 +14,18 @@ AFRAME.registerComponent('drag-look-controls', {
     this.dragging = false;
     this.lastX = 0;
     this.lastY = 0;
+    /*
+      Orden de rotacion YXZ (yaw y luego pitch). Con el orden por defecto XYZ
+      el pitch se aplica ANTES que el yaw, y al combinar ambos aparece un
+      alabeo parasito: el horizonte se inclinaba en diagonal en cuanto mirabas
+      hacia arriba o abajo y girabas a la vez. Con YXZ el horizonte se
+      mantiene horizontal siempre. El roll se fija a 0 explicitamente mas
+      abajo, asi que la camara nunca acumula giro sobre el eje de vision.
+    */
+    this.el.object3D.rotation.order = 'YXZ';
     this.pitch = this.el.object3D.rotation.x;
     this.yaw = this.el.object3D.rotation.y;
-    const maxPitch = Math.PI / 2 - 0.05;
+    const maxPitch = THREE.MathUtils.degToRad(80);   // ni techo ni suelo del reves
 
     const start = (x, y) => {
       this.dragging = true;
