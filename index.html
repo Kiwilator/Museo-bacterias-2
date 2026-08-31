@@ -20,10 +20,10 @@
   </div>
 
   <a-scene
-    renderer="colorManagement: true; toneMapping: ACESFilmic; exposure: 1.05"
+    renderer="colorManagement: true; toneMapping: ACESFilmic; exposure: 0.9"
     shadow="type: pcfsoft"
-    background="color: #9aa7b3"
-    fog="type: exponential; color: #7a8793; density: 0.06"
+    background="color: #bda98f"
+    fog="type: exponential; color: #c9b79c; density: 0.045"
   >
     <a-assets timeout="15000">
       <a-asset-item id="museo" src="./museo_bacterias.glb?v=8fc72a1"></a-asset-item>
@@ -51,6 +51,7 @@
       gltf-model="#museo"
       setup-museum-model="length: 10.7; height: 8; wallMargin: 0.4; eyeHeight: 0.5"
       gltf-animations
+      web-fixes
       position="0 0 0"
       shadow="cast: true; receive: true"
     ></a-entity>
@@ -64,8 +65,8 @@
          el glTF exportado (verificado), el problema era solo de exposición.
          A esta intensidad la sala se sigue viendo iluminada pero el morado ya
          no se quema. -->
-    <a-entity light="type: hemisphere; color: #fff6e8; groundColor: #b89f7d; intensity: 0.85"></a-entity>
-    <a-entity light="type: directional; intensity: 0.45; color: #fff1dd" position="3 6 3" shadow="cast: true"></a-entity>
+    <a-entity light="type: hemisphere; color: #ffeacd; groundColor: #a8875f; intensity: 0.6"></a-entity>
+    <a-entity light="type: directional; intensity: 0.4; color: #ffd9ac" position="3 6 3" shadow="cast: true"></a-entity>
 
     <!-- Player rig: el rig va a nivel de suelo, la cámara dentro lleva la
          altura de ojos. museum-movement da WASD + flechas, suave, sin volar

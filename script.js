@@ -266,11 +266,12 @@ AFRAME.registerComponent('setup-museum-model', {
       if (!o.isMesh) return;
       objBox.setFromObject(o);
       objBox.getSize(objSize);
-      const footprint = Math.max(objSize.x, objSize.z);
-      const restsOnFloor = (objBox.min.y - floorY) < 0.6;
-      const looksLikeFurniture = footprint >= 0.3 && footprint <= 3 &&
-        objSize.y >= 0.15 && objSize.y <= 2.2;
-      if (restsOnFloor && looksLikeFurniture) {
+      // Solo las peanas reales cuentan como obstaculo. La heuristica por
+      // tamaño detectaba 29 objetos (bacterias, bases de vitrina, piezas del
+      // reactor...) y sus margenes de 0.4 m se solapaban hasta tapar casi
+      // toda la sala, que es lo que impedia moverse. Los objetos del GLB ya
+      // vienen con nombres claros desde Blender, asi que basta con el prefijo.
+      if (o.name.startsWith('PEANA_')) {
         objBox.getCenter(objCenter);
         const id = `peana-${peanaIndex++}`;
         o.userData.museoType = 'peana';
@@ -550,6 +551,80 @@ AFRAME.registerComponent('gltf-animations', {
   },
   tick(time, timeDelta) {
     if (this.mixer && timeDelta) this.mixer.update(timeDelta / 1000);
+  }
+});
+
+/*
+  Correcciones de render sobre el GLB ya cargado. No tocan geometria,
+  animaciones ni el diseño: solo como se dibujan tres cosas concretas.
+
+  1. Suelo: la malla es un plano de grosor cero y su material venia con
+     FrontSide, asi que desde la altura de los ojos se veia por la cara
+     de atras y desaparecia. DoubleSide lo devuelve.
+  2. Bacterias: el cuerpo venia con DoubleSide y depthWrite, asi que las
+     caras traseras competian con las delanteras y producian el ruido de
+     pixeles sueltos. FrontSide lo limpia. Los pelitos SI necesitan
+     DoubleSide (son tiras finas), asi que esos no se tocan.
+  3. Neones bajo las cristaleras pequeñas: en blanco, como la linea de la
+     ventana grande. El resto del lado se queda morado. Se localizan por
+     posicion (el aro que hay justo debajo de cada VITRINA_Base_*), no por
+     nombre, para que siga funcionando si cambia la numeracion.
+*/
+AFRAME.registerComponent('web-fixes', {
+  init() {
+    this.el.addEventListener('model-loaded', () => this.onLoaded());
+  },
+  onLoaded() {
+    const mesh = this.el.getObject3D('mesh');
+    if (!mesh) return;
+    const THREE = AFRAME.THREE;
+
+    const bases = [];
+    const neones = [];
+    let suelo = null;
+    mesh.traverse((o) => {
+      if (!o.isMesh) return;
+      if (o.name === 'SUELO_Superficie') suelo = o;
+      if (o.name.startsWith('VITRINA_Base_')) bases.push(o);
+      if (o.material && o.material.name === 'Neon_Purple') neones.push(o);
+      // cuerpos de bacteria: quitar el doble cara que generaba los artefactos
+      if (o.material && o.material.name === 'Bacteria_Mat') {
+        o.material.side = THREE.FrontSide;
+        o.material.needsUpdate = true;
+      }
+    });
+
+    if (suelo) {
+      suelo.material.side = THREE.DoubleSide;
+      suelo.material.needsUpdate = true;
+    }
+
+    // un unico material blanco compartido por todos los aros de vitrina
+    let blanco = null;
+    let pintados = 0;
+    bases.forEach((base) => {
+      const bb = new THREE.Box3().setFromObject(base);
+      const cx = (bb.min.x + bb.max.x) / 2;
+      const cz = (bb.min.z + bb.max.z) / 2;
+      neones.forEach((n) => {
+        const nb = new THREE.Box3().setFromObject(n);
+        const nx = (nb.min.x + nb.max.x) / 2;
+        const nz = (nb.min.z + nb.max.z) / 2;
+        const cerca = Math.hypot(nx - cx, nz - cz) < 0.35;
+        const justoDebajo = nb.max.y <= bb.min.y + 0.05 && nb.max.y >= bb.min.y - 0.30;
+        if (!cerca || !justoDebajo) return;
+        if (!blanco) {
+          blanco = n.material.clone();
+          blanco.name = 'Neon_Blanco_Vitrina';
+          blanco.color = new THREE.Color(0xffffff);
+          blanco.emissive = new THREE.Color(0xfff4e2);
+          blanco.emissiveIntensity = n.material.emissiveIntensity;
+        }
+        n.material = blanco;
+        pintados++;
+      });
+    });
+    console.log(`[web-fixes] suelo a doble cara, bacterias a una cara, ${pintados} aros de vitrina en blanco`);
   }
 });
 
