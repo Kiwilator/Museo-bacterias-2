@@ -5,7 +5,7 @@
   <title>Purple Bacteries</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <link rel="stylesheet" href="./style.css?v=f989f92">
+  <link rel="stylesheet" href="./style.css?v=46f0268">
 </head>
 <body>
 
@@ -20,25 +20,16 @@
   </div>
 
   <a-scene
-    renderer="colorManagement: true; toneMapping: ACESFilmic; exposure: 0.9"
+    renderer="colorManagement: true; toneMapping: ACESFilmic; exposure: 0.95"
     shadow="type: pcfsoft"
     background="color: #bda98f"
     fog="type: exponential; color: #c9b79c; density: 0.045"
   >
     <a-assets timeout="15000">
-      <a-asset-item id="museo" src="./museo_bacterias.glb?v=f989f92"></a-asset-item>
+      <a-asset-item id="museo" src="./museo_bacterias.glb?v=46f0268"></a-asset-item>
     </a-assets>
 
-    <!-- Modelo (museo_bacterias.glb?v=f989f92): esta es ahora la ÚNICA fuente de verdad
-         del museo -- geometría, neones, materiales emisivos y texturas de
-         suelo/pared vienen todos de Blender, exportados tal cual. A-Frame no
-         crea ni recolorea neones ni geometría propia; solo reescala el modelo
-         en tiempo real a 10.7m x 8m y quita las luces horneadas de Blender
-         (mal calibradas para glTF). La exportación excluye, vía hide_render
-         en el propio .blend (no listas de nombres en el script de export):
-         las probetas de laboratorio (Lab_Batch2_*/Lab_Extra_*) y un puñado
-         de mallas de neón que resultaron ser geometría suelta (no seguían
-         ningún borde real) -- entre ellas la "tira de techo" que cruzaba la
+    <!-- Modelo (museo_bacterias.glb?v=46f0268"tira de techo" que cruzaba la
          sala como una curva flotante. El resto de neones sí está pegado a
          bordes reales (ventana, nicho, peana, junta) y se exporta intacto.
          Suelo y pared llevan ahora textura horneada (antes eran nodos
@@ -66,8 +57,8 @@
          el glTF exportado (verificado), el problema era solo de exposición.
          A esta intensidad la sala se sigue viendo iluminada pero el morado ya
          no se quema. -->
-    <a-entity light="type: hemisphere; color: #ffeacd; groundColor: #a8875f; intensity: 0.6"></a-entity>
-    <a-entity light="type: directional; intensity: 0.4; color: #ffd9ac" position="3 6 3" shadow="cast: true"></a-entity>
+    <a-entity light="type: hemisphere; color: #ffeacd; groundColor: #9c7a52; intensity: 0.42"></a-entity>
+    <a-entity light="type: directional; intensity: 0.95; color: #ffd7a3" position="4 7 2" shadow="cast: true"></a-entity>
 
     <!-- Player rig: el rig va a nivel de suelo, la cámara dentro lleva la
          altura de ojos. museum-movement da WASD + flechas, suave, sin volar
@@ -119,6 +110,6 @@
     </figcaption>
   </figure>
 
-  <script src="./script.js?v=f989f92"></script>
+  <script src="./script.js?v=46f0268"></script>
 </body>
 </html>

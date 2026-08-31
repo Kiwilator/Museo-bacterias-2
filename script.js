@@ -407,12 +407,38 @@ function isFreeOfObstacles(x, z, obstacles, extraMargin) {
 const groundRaycaster = new THREE.Raycaster();
 const groundRayOrigin = new THREE.Vector3();
 const groundRayDir = new THREE.Vector3(0, -1, 0);
-function isGrounded(x, z, floorMeshes, refY) {
-  if (!floorMeshes || !floorMeshes.length) return true;
+// null = sin comprobar, true = el raycast sirve, false = inservible (usar solo bounds)
+let groundProbe = null;
+
+function rayHitsFloor(x, z, floorMeshes, refY) {
   groundRayOrigin.set(x, refY + 5, z);
   groundRaycaster.set(groundRayOrigin, groundRayDir);
   groundRaycaster.far = 10;
   return groundRaycaster.intersectObjects(floorMeshes, false).length > 0;
+}
+
+/*
+  El suelo de este museo es una malla aplastada a grosor cero. Ademas de no
+  poder sombrearse, tampoco se puede intersecar: el raycast devuelve 0
+  impactos en CUALQUIER punto, incluido el propio spawn. Como clamp-to-bounds
+  usa esto como "¿hay suelo debajo?", el jugador quedaba congelado en su
+  ultima posicion valida y no habia forma de andar con WASD.
+
+  Se comprueba una sola vez en el spawn. Si ahi tampoco hay impacto, la malla
+  no sirve como referencia y se cae a los limites rectangulares, que ya
+  existen y son suficientes para no salirse de la sala.
+*/
+function isGrounded(x, z, floorMeshes, refY) {
+  if (!floorMeshes || !floorMeshes.length) return true;
+  if (groundProbe === null) {
+    const s = window.MUSEO_SPAWN;
+    groundProbe = s ? rayHitsFloor(s.x, s.z, floorMeshes, s.y) : false;
+    if (!groundProbe) {
+      console.warn('[clamp-to-bounds] el suelo no es intersecable; se usan solo los limites');
+    }
+  }
+  if (groundProbe === false) return true;
+  return rayHitsFloor(x, z, floorMeshes, refY);
 }
 
 /*
@@ -638,7 +664,45 @@ AFRAME.registerComponent('web-fixes', {
         pintados++;
       });
     });
-    console.log(`[web-fixes] suelo a doble cara, bacterias a una cara, ${pintados} aros de vitrina en blanco`);
+    /*
+      Tubos y probetas sueltos. Los de Lab_Batch2 y Lab_Extra ya no salen del
+      GLB, pero quedaban los del instrumental de laboratorio (Lab_Peana*,
+      Lab_Nicho6_*, TuboGenerico*, Tube*). Se ocultan por prefijo. El
+      reactor NO se toca: sus piezas se llaman Bioreactor_*, que no encaja
+      con ninguno de estos prefijos.
+    */
+    let tubos = 0;
+    mesh.traverse((o) => {
+      if (o.isMesh && /^(Lab_|Tubo|Tube)/.test(o.name)) { o.visible = false; tubos++; }
+    });
+
+    /*
+      Ventanas del lado de las bacterias en blanco. Se distinguen por forma,
+      no por nombre: son los marcos verticales pegados a la pared, altos
+      (mas de 1 m) y que arrancan cerca del suelo. Quedan fuera los aros de
+      peana (planos, a ras de suelo) y los arcos de techo (arrancan por
+      encima de 2,5 m), que siguen morados.
+    */
+    let blancoVentana = null;
+    let ventanas = 0;
+    mesh.traverse((o) => {
+      if (!o.isMesh || !o.material || o.material.name !== 'Neon_Purple') return;
+      const b = new THREE.Box3().setFromObject(o);
+      if ((b.min.x + b.max.x) / 2 >= 0) return;          // solo el lado bacterias
+      const alto = b.max.y - b.min.y;
+      if (alto < 1.0 || b.min.y > 1.0) return;           // ni aros de suelo ni arcos de techo
+      if (!blancoVentana) {
+        blancoVentana = o.material.clone();
+        blancoVentana.name = 'Neon_Blanco_Ventana';
+        blancoVentana.color = new THREE.Color(0xffffff);
+        blancoVentana.emissive = new THREE.Color(0xfff6ea);
+        blancoVentana.emissiveIntensity = o.material.emissiveIntensity;
+      }
+      o.material = blancoVentana;
+      ventanas++;
+    });
+
+    console.log(`[web-fixes] ${pintados} aros de vitrina y ${ventanas} marcos de ventana en blanco, ${tubos} tubos ocultos`);
   }
 });
 
