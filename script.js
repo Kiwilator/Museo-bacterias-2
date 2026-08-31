@@ -183,6 +183,12 @@ AFRAME.registerComponent('setup-museum-model', {
     length: { type: 'number', default: 11 },
     height: { type: 'number', default: 3 },
     wallMargin: { type: 'number', default: 0.4 },
+    // Radio del jugador para las peanas. Antes se reutilizaba wallMargin, que
+    // esta pensado para no pegarse a los muros: al inflar cada peana 0.4 m por
+    // lado, cualquier hueco perdia 0.8 m y varios pasos reales quedaban
+    // cerrados. Separado en su propio valor, mucho menor, para que se pueda
+    // pasar entre piezas sin dejar de chocar con ellas.
+    playerRadius: { type: 'number', default: 0.15 },
     eyeHeight: { type: 'number', default: 0.5 }
   },
   init() {
@@ -278,8 +284,8 @@ AFRAME.registerComponent('setup-museum-model', {
         o.userData.museoId = id;
         o.name = o.name || id;
         obstacles.push({
-          minX: objBox.min.x - this.data.wallMargin, maxX: objBox.max.x + this.data.wallMargin,
-          minZ: objBox.min.z - this.data.wallMargin, maxZ: objBox.max.z + this.data.wallMargin,
+          minX: objBox.min.x - this.data.playerRadius, maxX: objBox.max.x + this.data.playerRadius,
+          minZ: objBox.min.z - this.data.playerRadius, maxZ: objBox.max.z + this.data.playerRadius,
           center: { x: objCenter.x, z: objCenter.z },
           id,
           meshName: o.name

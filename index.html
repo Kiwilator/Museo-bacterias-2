@@ -5,7 +5,7 @@
   <title>Purple Bacteries</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <link rel="stylesheet" href="./style.css?v=71a5ae6">
+  <link rel="stylesheet" href="./style.css?v=b1be2d9">
 </head>
 <body>
 
@@ -26,10 +26,10 @@
     fog="type: exponential; color: #c9b79c; density: 0.045"
   >
     <a-assets timeout="15000">
-      <a-asset-item id="museo" src="./museo_bacterias.glb?v=71a5ae6"></a-asset-item>
+      <a-asset-item id="museo" src="./museo_bacterias.glb?v=b1be2d9"></a-asset-item>
     </a-assets>
 
-    <!-- Modelo (museo_bacterias.glb?v=71a5ae6"tira de techo" que cruzaba la
+    <!-- Modelo (museo_bacterias.glb?v=b1be2d9"tira de techo" que cruzaba la
          sala como una curva flotante. El resto de neones sí está pegado a
          bordes reales (ventana, nicho, peana, junta) y se exporta intacto.
          Suelo y pared llevan ahora textura horneada (antes eran nodos
@@ -40,7 +40,7 @@
     <a-entity
       id="modelo"
       gltf-model="#museo"
-      setup-museum-model="length: 10.7; height: 8; wallMargin: 0.4; eyeHeight: 0.5"
+      setup-museum-model="length: 10.7; height: 8; wallMargin: 0.4; playerRadius: 0.15; eyeHeight: 1.0"
       gltf-animations
       web-fixes
       exhibit-info
@@ -110,6 +110,6 @@
     </figcaption>
   </figure>
 
-  <script src="./script.js?v=71a5ae6"></script>
+  <script src="./script.js?v=b1be2d9"></script>
 </body>
 </html>
