@@ -5,7 +5,7 @@
   <title>PURPLE BACTERIA</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <link rel="stylesheet" href="./style.css?v=aa76f88">
+  <link rel="stylesheet" href="./style.css?v=0970c29">
 </head>
 <body>
 
@@ -26,22 +26,22 @@
     fog="type: linear; color: #8c748e; near: 9; far: 24"
   >
     <a-assets timeout="60000">
-      <a-asset-item id="museum_floor" src="./modulos/museum_floor.glb?v=aa76f88"></a-asset-item>
-      <a-asset-item id="museum_walls" src="./modulos/museum_walls.glb?v=aa76f88"></a-asset-item>
-      <a-asset-item id="museum_neons" src="./modulos/museum_neons.glb?v=aa76f88"></a-asset-item>
-      <a-asset-item id="bacteria_large_01" src="./modulos/bacteria_large_01.glb?v=aa76f88"></a-asset-item>
-      <a-asset-item id="bacteria_large_02" src="./modulos/bacteria_large_02.glb?v=aa76f88"></a-asset-item>
-      <a-asset-item id="bacteria_small_01" src="./modulos/bacteria_small_01.glb?v=aa76f88"></a-asset-item>
-      <a-asset-item id="bacteria_small_02" src="./modulos/bacteria_small_02.glb?v=aa76f88"></a-asset-item>
-      <a-asset-item id="bacteria_small_03" src="./modulos/bacteria_small_03.glb?v=aa76f88"></a-asset-item>
-      <a-asset-item id="bacteria_small_04" src="./modulos/bacteria_small_04.glb?v=aa76f88"></a-asset-item>
-      <a-asset-item id="bacteria_small_05" src="./modulos/bacteria_small_05.glb?v=aa76f88"></a-asset-item>
-      <a-asset-item id="bacteria_small_06" src="./modulos/bacteria_small_06.glb?v=aa76f88"></a-asset-item>
-      <a-asset-item id="bioreactor" src="./modulos/bioreactor.glb?v=aa76f88"></a-asset-item>
+      <a-asset-item id="museum_floor" src="./modulos/museum_floor.glb?v=0970c29"></a-asset-item>
+      <a-asset-item id="museum_walls" src="./modulos/museum_walls.glb?v=0970c29"></a-asset-item>
+      <a-asset-item id="museum_neons" src="./modulos/museum_neons.glb?v=0970c29"></a-asset-item>
+      <a-asset-item id="bacteria_large_01" src="./modulos/bacteria_large_01.glb?v=0970c29"></a-asset-item>
+      <a-asset-item id="bacteria_large_02" src="./modulos/bacteria_large_02.glb?v=0970c29"></a-asset-item>
+      <a-asset-item id="bacteria_small_01" src="./modulos/bacteria_small_01.glb?v=0970c29"></a-asset-item>
+      <a-asset-item id="bacteria_small_02" src="./modulos/bacteria_small_02.glb?v=0970c29"></a-asset-item>
+      <a-asset-item id="bacteria_small_03" src="./modulos/bacteria_small_03.glb?v=0970c29"></a-asset-item>
+      <a-asset-item id="bacteria_small_04" src="./modulos/bacteria_small_04.glb?v=0970c29"></a-asset-item>
+      <a-asset-item id="bacteria_small_05" src="./modulos/bacteria_small_05.glb?v=0970c29"></a-asset-item>
+      <a-asset-item id="bacteria_small_06" src="./modulos/bacteria_small_06.glb?v=0970c29"></a-asset-item>
+      <a-asset-item id="bioreactor" src="./modulos/bioreactor.glb?v=0970c29"></a-asset-item>
       <video id="ppb-video-01" src="./assets/videos/rhodospirillum-rubrum-pha.mp4" autoplay loop muted playsinline crossorigin="anonymous"></video>
     </a-assets>
 
-    <!-- Modelo (museo_bacterias.glb?v=aa76f88"tira de techo" que cruzaba la
+    <!-- Modelo (museo_bacterias.glb?v=0970c29"tira de techo" que cruzaba la
          sala como una curva flotante. El resto de neones sí está pegado a
          bordes reales (ventana, nicho, peana, junta) y se exporta intacto.
          Suelo y pared llevan ahora textura horneada (antes eran nodos
@@ -155,19 +155,22 @@
 
   <aside id="exhibit-panel" role="dialog" aria-modal="false">
     <button class="panel-close" type="button" aria-label="Close">&times;</button>
-    <div class="panel-scroll">
+    <div class="panel-head">
       <span class="panel-section">01</span>
-      <span class="panel-icon"></span>
+      <div class="panel-images"></div>
       <h2 class="panel-title"></h2>
       <p class="panel-lead"></p>
-      <p class="panel-body"></p>
-      <div class="panel-images"></div>
-      <span class="panel-tags"></span>
     </div>
-    <div class="panel-fade" aria-hidden="true"></div>
+    <div class="panel-scroll-wrap">
+      <div class="panel-scroll">
+        <div class="panel-body"></div>
+        <span class="panel-tags"></span>
+      </div>
+      <div class="panel-fade" aria-hidden="true"></div>
+    </div>
   </aside>
 
 
-  <script src="./script.js?v=aa76f88"></script>
+  <script src="./script.js?v=0970c29"></script>
 </body>
 </html>

@@ -838,6 +838,17 @@ AFRAME.registerComponent('web-fixes', {
    capa de HTML por encima del museo.
    ========================================================================== */
 
+/*
+  Sala 2 (Reactores y Aplicaciones) tiene su propio lenguaje de color: verde/
+  turquesa, no el morado de la Sala 1. El tono no es inventado -- se deriva
+  del propio material Neon_Turquoise ya presente en el modelo (mismo peso y
+  saturacion que el morado #74349A/#805096 que sustituye en toda la
+  señaletica y los acentos de interaccion del reactor), para que ambos
+  sistemas de color convivan como parte del mismo museo.
+*/
+const ROOM2_ACCENT = '#2C8C82';         // equivalente a #74349A en Sala 2
+const ROOM2_ACCENT_LIGHT = '#5A9994';   // equivalente a #805096 en Sala 2
+
 const museumContent = {
   /* Sala 1 (Purple Phototrophic Bacteria). Introduccion general + las 8 cepas
      avanzan de lo general a lo especifico. Solo hay 8 anclas fisicas en esta
@@ -857,6 +868,7 @@ const museumContent = {
     lead: 'The machinery that converts light into energy', tags: ['REACTION CENTER', 'NOBEL PRIZE'], icon: 'form',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_base',
     section: '02', title: 'BLASTOCHLORIS VIRIDIS', label: 'VIEW +',
+    images: ['./assets/images/blastochloris-viridis.png'],
     body: 'Inside photosynthetic bacteria, specialized structures capture light energy and begin its conversion into chemical energy. The photosynthetic reaction center of Blastochloris viridis occupies a particularly important place in the history of science.\n\nIt was the first membrane protein complex whose structure was resolved at atomic resolution. Observing its organization at this level of detail made it possible to better understand one of the essential processes of photosynthesis (the initial conversion of light energy into chemical energy).\n\nThis discovery went far beyond the study of a single bacterium. It opened new possibilities for investigating the structure of membrane proteins and contributed to the research recognized by the 1988 Nobel Prize in Chemistry.'
   },
   bacteriaSmall02: {
@@ -893,6 +905,9 @@ const museumContent = {
     lead: 'When a biological capability becomes an opportunity', tags: ['PHOTOFERMENTATION', 'ELECTROACTIVITY'], icon: 'transform',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_18',
     section: '08', title: 'RHODOPSEUDOMONAS PALUSTRIS', label: 'VIEW +',
+    // b1/b3 reales (no el circulo/nicho): ver brief -- dos imagenes propias
+    // para esta ficha, distintas del contenido del display circular.
+    images: ['./assets/images/b1.png', './assets/images/b3.png'],
     body: 'Rhodopseudomonas palustris brings together several of the capabilities explored throughout the exhibition.\n\nIt can use light to support the anaerobic degradation of aromatic compounds derived from plants, contributing to the recycling of complex organic matter and to processes associated with the carbon cycle.\n\nIt is also particularly effective at producing hydrogen through photofermentation. Among the purple phototrophic bacteria studied for this process, certain strains of R. palustris (such as strain 42OL) have achieved especially high hydrogen productivity.\n\nIt has another important characteristic as well (electroactivity). Some strains can exchange electrons with electrodes and, by combining electricity and light, use these processes to generate valuable products such as PHA and certain biofuels.\n\nAt this point, we have finished looking closely at the bacteria themselves. The next step is to understand how they can be cultivated and how these capabilities can be used at a larger scale.'
   },
   /* Sala 2 (Reactors and Applications). Continua la historia de la Sala 1:
@@ -944,17 +959,63 @@ const museumContent = {
     body: 'Purple phototrophic bacteria do not lead to a single product or application.\n\nDepending on the strain, cultivation conditions and process, their metabolism can be connected to different outcomes.\n\nHYDROGEN\nPHA\nBIOMASS\nELECTRON EXCHANGE\n\nThe value of these microorganisms lies precisely in this diversity.\n\nDifferent bacteria, different processes and different possibilities.\n\nBACTERIA → PROCESS → RESULT\n\nUnderstanding the microorganism is the first step. Controlling the process is what allows its capabilities to be explored at a larger scale.' }
 };
 
-/* Iconos monolinea de las fichas. SVG inline, sin dependencias ni peticiones. */
-const PANEL_ICONS = {
-  cell:      '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="13"/><circle cx="20" cy="20" r="6"/><circle cx="16" cy="15" r="1.6"/></svg>',
-  form:      '<svg viewBox="0 0 40 40"><path d="M8 26c0-9 6-14 12-14s12 4 12 11c0 5-5 7-10 7S8 30 8 26z"/></svg>',
-  surface:   '<svg viewBox="0 0 40 40"><path d="M6 14h28M6 20h28M6 26h28"/><circle cx="14" cy="14" r="2.4"/><circle cx="26" cy="26" r="2.4"/></svg>',
-  wave:      '<svg viewBox="0 0 40 40"><path d="M5 24c5-10 10 10 15 0s10 10 15 0"/></svg>',
-  grid:      '<svg viewBox="0 0 40 40"><circle cx="13" cy="13" r="4"/><circle cx="27" cy="13" r="4"/><circle cx="13" cy="27" r="4"/><circle cx="27" cy="27" r="4"/></svg>',
-  scale:     '<svg viewBox="0 0 40 40"><circle cx="14" cy="26" r="4"/><circle cx="27" cy="16" r="10"/></svg>',
-  transform: '<svg viewBox="0 0 40 40"><circle cx="12" cy="20" r="7"/><path d="M22 20h9M27 16l4 4-4 4"/><rect x="31" y="14" width="0.1" height="0.1"/></svg>',
-  reactor:   '<svg viewBox="0 0 40 40"><rect x="13" y="10" width="14" height="21" rx="3"/><path d="M13 17h14"/><circle cx="20" cy="24" r="2"/><path d="M20 10V6"/></svg>'
-};
+/*
+  Texto del cuerpo de la ficha: de textContent plano a HTML controlado, para
+  poder (a) resaltar en negrita solo los conceptos cientificos importantes
+  y (b) separar parrafos reales (cada \n\n de museumContent) en su propio
+  <p>, con \n simples como salto de linea dentro del mismo parrafo (para
+  listas cortas como la de window06). El texto en si NO cambia -- se
+  escapa primero para que nada de esto pueda romper el HTML del panel.
+
+  La lista de terminos es la misma para todo el museo (Sala 1 y Sala 2
+  comparten la ficha): son los conceptos que el propio brief señala como
+  ejemplo, mas los sinonimos directos que ya aparecen en los textos
+  existentes. Ordenados de mas largo a mas corto antes de construir el
+  regex, para que "hydrogen production" se resalte entero en vez de dejar
+  "hydrogen" suelto y "production" sin marcar.
+*/
+const PANEL_KEYWORDS = [
+  'photosynthetic reaction center', 'reaction center',
+  'carbon monoxide (CO)', 'carbon monoxide',
+  'anaerobic conditions', 'anaerobic degradation', 'anaerobic',
+  'hydrogen production', 'hydrogen productivity', 'biohydrogen', 'hydrogen',
+  'electroactivity', 'electroactive',
+  'photofermentation',
+  'nitrogen fixation',
+  'electron exchange', 'electron transfer', 'electrons',
+  'chromatophores',
+  'redox balance',
+  'bioelectrochemical', 'bioelectrochemistry',
+  'PHA'
+].sort((a, b) => b.length - a.length);
+
+const PANEL_KEYWORDS_RE = new RegExp(
+  '(' + PANEL_KEYWORDS.map((k) => {
+    const esc = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pre = /^\w/.test(k) ? '\\b' : '';
+    const post = /\w$/.test(k) ? '\\b' : '';
+    return pre + esc + post;
+  }).join('|') + ')',
+  'gi'
+);
+
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+}
+
+function highlightKeywords(escapedText) {
+  return escapedText.replace(PANEL_KEYWORDS_RE, '<strong>$1</strong>');
+}
+
+/* museumContent[id].body en <p> reales (parrafo = linea en blanco), con
+   negrita selectiva sobre terminos clave -- nunca frases/parrafos enteros. */
+function renderPanelBody(rawText) {
+  const highlighted = highlightKeywords(escapeHtml(rawText || ''));
+  return highlighted
+    .split(/\n\n+/)
+    .map((para) => `<p>${para.split('\n').join('<br>')}</p>`)
+    .join('');
+}
 
 /*
   Reasigna `child` a `newParent` conservando su transformacion de MUNDO
@@ -1224,7 +1285,16 @@ AFRAME.registerComponent('exhibit-info', {
         const b = new THREE.Box3().setFromObject(o);
         const c = b.getCenter(new THREE.Vector3());
         const s = b.getSize(new THREE.Vector3());
-        this.peanaBoxes.push({ center: c, radius: Math.max(s.x, s.z) / 2, minY: b.min.y, maxY: b.max.y });
+        // radiusX/radiusZ (medio ancho real en cada eje de mundo), ademas del
+        // "radius" unico ya existente: la peana central (PEANA_Bacteria) no
+        // es circular -- es una elipse suave, mas larga en Z que en X (medido
+        // por geometria real) -- y createPedestalPlacard necesita ambos
+        // valores por separado para esa pieza (ver isLowWidePlinth).
+        this.peanaBoxes.push({
+          center: c, radius: Math.max(s.x, s.z) / 2,
+          radiusX: s.x / 2, radiusZ: s.z / 2,
+          minY: b.min.y, maxY: b.max.y
+        });
       }
     });
 
@@ -1399,7 +1469,8 @@ AFRAME.registerComponent('exhibit-info', {
     wrapper.object3D.rotation.set(0, yaw, 0);
 
     const WIDTH = 0.30, HEIGHT = 0.165;
-    const tagColor = new THREE.Color(0x74349a);
+    // Sala 2: acento verde/turquesa, no el morado de la Sala 1 (ver ROOM2_ACCENT*).
+    const tagColor = new THREE.Color(ROOM2_ACCENT);
     const plane = new THREE.Mesh(
       new THREE.PlaneGeometry(WIDTH, HEIGHT),
       new THREE.MeshStandardMaterial({
@@ -1421,7 +1492,7 @@ AFRAME.registerComponent('exhibit-info', {
     section.setAttribute('width', 0.13);
     section.setAttribute('wrap-count', 3);
     section.setAttribute('letter-spacing', 1);
-    section.setAttribute('color', '#74349A');
+    section.setAttribute('color', ROOM2_ACCENT);
     section.object3D.position.set(0, HEIGHT / 2 - 0.032, TEXT_Z);
     wrapper.appendChild(section);
 
@@ -1443,7 +1514,7 @@ AFRAME.registerComponent('exhibit-info', {
     cue.setAttribute('width', 0.24);
     cue.setAttribute('wrap-count', 17);
     cue.setAttribute('letter-spacing', 0.5);
-    cue.setAttribute('color', '#805096');
+    cue.setAttribute('color', ROOM2_ACCENT_LIGHT);
     cue.object3D.position.set(0, -HEIGHT / 2 + 0.026, TEXT_Z);
     wrapper.appendChild(cue);
 
@@ -1624,7 +1695,7 @@ AFRAME.registerComponent('exhibit-info', {
     vertical, y solo para esta pieza.
   */
   createPedestalPlacard(it) {
-    let peanaRadius = 0.22, peanaMinY = null, peanaMaxY = null;
+    let peanaRadius = 0.22, peanaRadiusX = 0.22, peanaRadiusZ = 0.22, peanaMinY = null, peanaMaxY = null;
     let px = it.pos.x, pz = it.pos.z;
     let nearest = null, nearestD = Infinity;
     (this.peanaBoxes || []).forEach((pb) => {
@@ -1633,6 +1704,8 @@ AFRAME.registerComponent('exhibit-info', {
     });
     if (nearest) {
       peanaRadius = nearest.radius;
+      peanaRadiusX = nearest.radiusX;
+      peanaRadiusZ = nearest.radiusZ;
       peanaMinY = nearest.minY;
       peanaMaxY = nearest.maxY;
       px = nearest.center.x;   // centrada en el eje REAL de la peana, no en
@@ -1661,11 +1734,25 @@ AFRAME.registerComponent('exhibit-info', {
 
     const peanaHeightM = (peanaMinY !== null && peanaMaxY !== null) ? (peanaMaxY - peanaMinY) : null;
     const isLowWidePlinth = peanaHeightM !== null && peanaHeightM < 0.35;
+    // La peana principal (PEANA_Bacteria) no es circular: medida por
+    // geometria real (vertices reales del mesh, no solo su caja), es una
+    // elipse suave -- mas larga en Z que en X (radiusZ/radiusX ~= 1.25).
+    // isLowWidePlinth ya identificaba solo esta pieza (unica peana baja y
+    // ancha del museo); cuando ademas sus dos radios difieren de verdad, se
+    // usa geometria elíptica real en vez de asumir un circulo.
+    const isEllipticalPlinth = isLowWidePlinth &&
+      Math.abs(peanaRadiusX - peanaRadiusZ) > 0.03 * Math.max(peanaRadiusX, peanaRadiusZ);
 
-    // Geometria: medio cilindro abierto, arco centrado en el frente local
-    // (+Z, misma convencion que ya usan los circulos de video: yaw =
-    // atan2(dirX,dirZ) apunta +Z hacia la direccion de mundo elegida).
-    const CURVE_RADIUS = peanaRadius + 0.008;   // superficie real de la peana + 8 mm
+    // Geometria: medio cilindro (o media elipse) abierto, arco centrado en
+    // el frente. Caso circular (7 de las 8 peanas): misma convencion de
+    // siempre (yaw = atan2(dirX,dirZ) orienta el wrapper). Caso eliptico
+    // (solo PEANA_Bacteria): la elipse real esta alineada con los ejes de
+    // mundo X/Z (confirmado por analisis de la geometria -- eje principal a
+    // ~90 grados del eje local, es decir sin giro), asi que el wrapper NO
+    // se rota: el arco se construye ya en coordenadas de mundo, con
+    // radiusX/radiusZ propios, y el centro del arco (thetaCenter) se calcula
+    // con la formula de la normal real de una elipse (no la del circulo),
+    // para que seguir apuntando hacia MUSEO_SPAWN sea correcto igual.
     const ARC_DEG = isLowWidePlinth ? 50 : 82;  // peana ancha -> arco mas cerrado, cuerda razonable
     const ARC = ARC_DEG * Math.PI / 180;
     const PLACARD_HEIGHT = isLowWidePlinth ? 0.15 : 0.26;
@@ -1682,15 +1769,39 @@ AFRAME.registerComponent('exhibit-info', {
 
     const wrapper = document.createElement('a-entity');
     wrapper.object3D.position.set(px, py, pz);
-    wrapper.object3D.rotation.set(0, yaw, 0);
 
-    const arcLengthM = CURVE_RADIUS * ARC;   // cuerda real del arco, para no estirar el texto
+    let curveGeo, arcLengthM;
+    if (isEllipticalPlinth) {
+      // radios reales de la superficie (peana + 8 mm en cada eje).
+      const rx = peanaRadiusX + 0.008, rz = peanaRadiusZ + 0.008;
+      // normal real de una elipse (x/rx)^2+(z/rz)^2=1 en el punto theta,
+      // con la misma convencion seno-en-X/coseno-en-Z que usa el resto del
+      // museo para "yaw": normal ∝ (rx*sin(theta), rz*cos(theta)). Se
+      // resuelve theta para que esa normal apunte hacia (dirX,dirZ) --
+      // cuando rx=rz esto se reduce exactamente a yaw=atan2(dirX,dirZ).
+      const thetaCenter = Math.atan2(dirX * rx, dirZ * rz);
+      const thetaStart = thetaCenter - ARC / 2;
+      // wrapper SIN rotacion: la elipse ya esta en ejes de mundo reales.
+      wrapper.object3D.rotation.set(0, 0, 0);
+      curveGeo = new THREE.CylinderGeometry(1, 1, PLACARD_HEIGHT, segs, 1, true, thetaStart, ARC);
+      curveGeo.scale(rx, 1, rz);
+      // radio efectivo en el punto central del arco, para dimensionar el
+      // texto sin estirarlo (mismo criterio que el caso circular).
+      const rEff = Math.hypot(rx * Math.sin(thetaCenter), rz * Math.cos(thetaCenter));
+      arcLengthM = rEff * ARC;
+    } else {
+      const CURVE_RADIUS = peanaRadius + 0.008;   // superficie real de la peana + 8 mm
+      wrapper.object3D.rotation.set(0, yaw, 0);
+      curveGeo = new THREE.CylinderGeometry(CURVE_RADIUS, CURVE_RADIUS, PLACARD_HEIGHT, segs, 1, true, -ARC / 2, ARC);
+      arcLengthM = CURVE_RADIUS * ARC;   // cuerda real del arco, para no estirar el texto
+    }
+
     const texture = this.buildPlacardTextTexture(
       it.data.section || '', (it.data.title || '').toUpperCase(), 'CLICK TO EXPLORE',
       PLACARD_HEIGHT, arcLengthM
     );
     const curve = new THREE.Mesh(
-      new THREE.CylinderGeometry(CURVE_RADIUS, CURVE_RADIUS, PLACARD_HEIGHT, segs, 1, true, -ARC / 2, ARC),
+      curveGeo,
       new THREE.MeshStandardMaterial({
         color: 0xffffff, map: texture,
         roughness: 0.9, metalness: 0, side: THREE.DoubleSide
@@ -1800,14 +1911,16 @@ AFRAME.registerComponent('exhibit-info', {
     const d = it.data;
     this.panel.querySelector('.panel-section').textContent = d.section || '';
     this.panel.querySelector('.panel-section').style.display = d.section ? 'block' : 'none';
-    this.panel.querySelector('.panel-icon').innerHTML = PANEL_ICONS[d.icon] || '';
     this.panel.querySelector('.panel-title').textContent = d.title;
     const lead = this.panel.querySelector('.panel-lead');
     lead.textContent = d.lead || '';
     lead.style.display = d.lead ? 'block' : 'none';
-    this.panel.querySelector('.panel-body').textContent = d.body;
+    // cuerpo: parrafos reales + negrita solo en los conceptos clave (ver
+    // renderPanelBody/highlightKeywords) -- el texto en si no cambia.
+    this.panel.querySelector('.panel-body').innerHTML = renderPanelBody(d.body);
     // imagenes de apoyo opcionales (museumContent[id].images = ['./ruta.jpg', ...]);
-    // vacio por defecto, no se muestra nada si la pieza no las trae.
+    // vacio por defecto, no se muestra nada si la pieza no las trae -- nunca
+    // la imagen del circulo/nicho, que es un contenido aparte.
     const imagesEl = this.panel.querySelector('.panel-images');
     if (imagesEl) {
       imagesEl.innerHTML = '';
@@ -1822,7 +1935,13 @@ AFRAME.registerComponent('exhibit-info', {
     tags.textContent = (d.tags || []).join(' · ');
     tags.style.display = (d.tags && d.tags.length) ? 'block' : 'none';
     this.panel.classList.toggle('secondary', d.tier === 'secondary' || d.tier === 'tertiary');
+    // Sala 2 (reactor/ventanas) usa el acento verde/turquesa del propio
+    // sistema de color de esa sala, no el morado de la Sala 1 -- misma
+    // ficha compartida, solo cambia --mus-morado (ver style.css).
+    this.panel.classList.toggle('room2', id.startsWith('reactor') || id.startsWith('window'));
     this.panel.classList.add('visible');
+    const scroll = this.panel.querySelector('.panel-scroll');
+    if (scroll) scroll.scrollTop = 0;   // cada ficha nueva empieza arriba, no donde quedo la anterior
     this.openId = id;
     this.hideIntro();
   },
@@ -2323,7 +2442,7 @@ AFRAME.registerComponent('reactor-control', {
     heading.setAttribute('width', 0.44);
     heading.setAttribute('wrap-count', 20);
     heading.setAttribute('letter-spacing', 1);
-    heading.setAttribute('color', '#74349A');
+    heading.setAttribute('color', ROOM2_ACCENT);
     heading.object3D.position.set(0, HEIGHT / 2 - 0.034, TEXT_Z);
     wrapper.appendChild(heading);
 
@@ -2353,7 +2472,7 @@ AFRAME.registerComponent('reactor-control', {
       const bx = startX + i * spacing;
       const btnColor = new THREE.Color(d.id === 'active' ? 0xb9b3bd : 0xece4f2);
       const material = new THREE.MeshStandardMaterial({
-        color: btnColor, emissive: new THREE.Color(0x74349a),
+        color: btnColor, emissive: new THREE.Color(ROOM2_ACCENT),
         emissiveIntensity: d.id === 'active' ? 0.06 : 0.16,
         roughness: 0.55, metalness: 0.05, side: THREE.DoubleSide
       });
@@ -2370,7 +2489,7 @@ AFRAME.registerComponent('reactor-control', {
       num.setAttribute('baseline', 'center');
       num.setAttribute('width', 0.075);
       num.setAttribute('wrap-count', 2);
-      num.setAttribute('color', '#74349A');
+      num.setAttribute('color', ROOM2_ACCENT);
       num.object3D.position.set(bx, BTN_Y + 0.056, TEXT_Z);
       wrapper.appendChild(num);
 
@@ -2419,7 +2538,7 @@ AFRAME.registerComponent('reactor-control', {
     this.buttons.forEach((b) => {
       const on = this.stage[b.id];
       const unlocked = b.id !== 'active' || (this.stage.light && this.stage.flow && this.stage.nutrients);
-      b.material.color.set(on ? 0x74349a : (unlocked ? 0xece4f2 : 0xb9b3bd));
+      b.material.color.set(on ? ROOM2_ACCENT : (unlocked ? 0xece4f2 : 0xb9b3bd));
       b.baseEmissive = on ? 0.34 : (unlocked ? 0.16 : 0.06);
     });
   },

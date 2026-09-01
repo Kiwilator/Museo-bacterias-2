@@ -88,6 +88,15 @@ html, body {
   --mus-borde: rgba(42, 38, 34, 0.12);
 }
 
+/* Sala 2 (Reactores/Aplicaciones) usa verde/turquesa como color de acento,
+   no el morado de la Sala 1 -- misma ficha compartida (#exhibit-panel), solo
+   cambia el valor de --mus-morado cuando open() marca la pieza como de Sala
+   2 (id que empieza por "reactor"/"window"). Tono derivado del propio
+   Neon_Turquoise del modelo (no inventado), con el mismo peso/saturacion
+   que el morado que sustituye, para que ambas familias de color se sientan
+   parte del mismo sistema. */
+#exhibit-panel.room2 { --mus-morado: #2c8c82; }
+
 #exhibit-panel,
 #exhibit-caption,
 #intro-msg {
@@ -101,17 +110,24 @@ html, body {
    en cada peana son ahora la unica señal de interaccion (ver script.js,
    createPedestalPlacard). */
 
-/* --- panel de informacion --- */
+/* --- panel de informacion ---
+   Tarjeta compacta de museo (editorial, no un overlay de pagina web): alto
+   FIJO, no proporcional a la pantalla -- el panel ya no crece con el texto,
+   es el body (dentro de panel-scroll) el que se desplaza. Cabecera
+   (numero + imagen + nombre cientifico + subtitulo) y el boton de cerrar
+   quedan siempre visibles; solo el cuerpo del texto y el pie de etiquetas
+   se desplazan. */
 #exhibit-panel {
   display: flex;
   flex-direction: column;
-  right: 32px;
+  right: 28px;
   top: 50%;
-  width: 410px;
-  max-width: calc(100vw - 32px);
-  max-height: calc(100vh - 80px);
+  width: 300px;
+  max-width: calc(100vw - 28px);
+  height: 430px;
+  max-height: calc(100vh - 56px);
   transform: translate(0, calc(-50% + 10px));
-  padding: 30px 32px 32px;
+  padding: 22px 24px 20px;
   background: var(--mus-crema);
   border: 1px solid var(--mus-borde);
   border-radius: 8px;
@@ -122,20 +138,38 @@ html, body {
 }
 #exhibit-panel.visible { opacity: 1; transform: translate(0, -50%); pointer-events: auto; }
 #exhibit-panel .panel-close {
-  position: absolute; top: 14px; right: 16px; z-index: 1;
+  position: absolute; top: 12px; right: 14px; z-index: 1;
   border: 0; background: none; cursor: pointer;
-  font-size: 22px; line-height: 1; color: var(--mus-tinta); opacity: 0.5;
+  font-size: 20px; line-height: 1; color: var(--mus-tinta); opacity: 0.5;
 }
 #exhibit-panel .panel-close:hover { opacity: 1; }
-/* el texto largo (Sala 1 usa fichas de varios parrafos) se desplaza dentro
-   de esta zona en vez de forzar el panel entero fuera de la pantalla; el
-   degradado de abajo (panel-fade) avisa de que hay mas texto sin necesidad
-   de que se note un scrollbar grueso */
+
+/* cabecera fija: numero, imagen, nombre cientifico, subtitulo. Nunca se
+   desplaza -- ver panel-scroll-wrap mas abajo, que solo envuelve el cuerpo
+   del texto y el pie de etiquetas. */
+#exhibit-panel .panel-head { flex: 0 0 auto; padding-right: 20px; }
+#exhibit-panel .panel-section {
+  display: block; margin-bottom: 10px;
+  font-size: 10.5px; letter-spacing: 0.2em; color: var(--mus-morado); font-weight: 600;
+}
+#exhibit-panel .panel-title {
+  margin: 0 0 8px; font-size: 17px; line-height: 1.28; letter-spacing: 0.04em; font-weight: 600;
+}
+#exhibit-panel .panel-lead {
+  margin: 0 0 12px; font-size: 11.5px; line-height: 1.5;
+  letter-spacing: 0.08em; font-weight: 600; color: var(--mus-morado);
+}
+
+/* zona de scroll: solo el cuerpo del texto + el pie de etiquetas. El
+   degradado (panel-fade) se ancla al fondo de ESTA zona, no del panel
+   entero, para avisar de que hay mas texto sin un scrollbar grueso. */
+#exhibit-panel .panel-scroll-wrap { position: relative; flex: 1 1 auto; min-height: 0; }
 #exhibit-panel .panel-scroll {
-  flex: 1 1 auto;
-  min-height: 0;
+  height: 100%;
   overflow-y: auto;
-  padding-right: 6px;
+  overflow-x: hidden;
+  padding-right: 20px;
+  padding-bottom: 10px;
   scrollbar-width: thin;
   scrollbar-color: var(--mus-morado) transparent;
 }
@@ -145,35 +179,40 @@ html, body {
   background: var(--mus-morado); opacity: 0.5; border-radius: 3px;
 }
 #exhibit-panel .panel-fade {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 34px;
-  background: linear-gradient(to bottom, transparent, var(--mus-crema) 75%);
-  border-radius: 0 0 8px 8px;
+  position: absolute; left: 0; right: 20px; bottom: 0; height: 26px;
+  background: linear-gradient(to bottom, transparent, var(--mus-crema) 78%);
   pointer-events: none;
 }
-#exhibit-panel .panel-section {
-  display: block; margin-bottom: 14px;
-  font-size: 11px; letter-spacing: 0.2em; color: var(--mus-morado); font-weight: 600;
-}
-#exhibit-panel .panel-title {
-  margin: 0 0 16px; font-size: 21px; letter-spacing: 0.06em; font-weight: 600;
-}
-#exhibit-panel .panel-body { margin: 0; font-size: 14.5px; line-height: 1.72; opacity: 0.85; white-space: pre-line; }
+/* cuerpo: margenes comodos, interlineado un poco mas generoso,
+   parrafos con espacio consistente entre si (cada \n\n de museumContent se
+   convierte en <p> propio, ver script.js:renderPanelBody) -- lineas cortas
+   por el ancho reducido del panel. Los terminos clave via <strong> (ver
+   highlightKeywords) guian la lectura sin gritar: mismo tamaño, solo mas
+   peso y algo mas de opacidad que el resto del cuerpo. */
+#exhibit-panel .panel-body { margin: 0; font-size: 13px; line-height: 1.68; opacity: 0.85; }
+#exhibit-panel .panel-body p { margin: 0 0 12px; }
+#exhibit-panel .panel-body p:last-child { margin-bottom: 0; }
+#exhibit-panel .panel-body strong { font-weight: 700; opacity: 1; color: var(--mus-tinta); }
 /* imagenes de apoyo (opcional, solo para fichas que las traen en
-   museumContent[id].images): dos como maximo, lado a lado si caben o
-   apiladas si no, siempre proporcionales y sin recortes forzados */
+   museumContent[id].images): en la cabecera fija, nunca vacias a medias --
+   proporcionales, centradas, sin recortes forzados. */
 #exhibit-panel .panel-images {
-  display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px;
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px;
 }
-#exhibit-panel .panel-images:empty { display: none; margin-top: 0; }
+#exhibit-panel .panel-images:empty { display: none; margin: 0; }
 #exhibit-panel .panel-images img {
-  flex: 1 1 45%; min-width: 130px; max-width: 100%;
-  display: block; object-fit: contain; background: #fff;
+  flex: 1 1 45%; min-width: 90px; max-width: 100%; height: 92px;
+  display: block; object-fit: contain; object-position: center;
+  background: #fff;
   border: 1px solid var(--mus-borde); border-radius: 4px;
 }
-/* las piezas secundarias se leen mas rapido */
-#exhibit-panel.secondary { width: 360px; padding: 26px 28px 28px; }
-#exhibit-panel.secondary .panel-title { font-size: 18px; }
-#exhibit-panel.secondary .panel-body { font-size: 13.5px; line-height: 1.65; }
+/* las piezas secundarias/terciarias se leen mas rapido: tarjeta aun mas
+   compacta */
+#exhibit-panel.secondary { width: 270px; height: 380px; padding: 20px 22px 18px; }
+#exhibit-panel.secondary .panel-title { font-size: 15px; }
+#exhibit-panel.secondary .panel-lead { font-size: 11px; margin-bottom: 10px; }
+#exhibit-panel.secondary .panel-body { font-size: 12.5px; line-height: 1.62; }
+#exhibit-panel.secondary .panel-images img { height: 82px; }
 
 /* --- ficha de ventana (contenido pasivo) --- */
 #exhibit-caption {
@@ -205,33 +244,20 @@ html, body {
 #intro-msg.hidden { opacity: 0; pointer-events: none; }
 
 @media (max-width: 640px) {
-  #exhibit-panel { right: 12px; left: 12px; width: auto; padding: 24px 22px 26px; }
-  #exhibit-panel.secondary { width: auto; }
+  #exhibit-panel { right: 12px; left: 12px; width: auto; height: min(430px, 70vh); padding: 20px 18px 18px; }
+  #exhibit-panel.secondary { width: auto; height: min(380px, 66vh); }
   #exhibit-caption { left: 12px; right: 12px; width: auto; bottom: 96px; }
   #intro-msg { left: 12px; right: 12px; transform: none; }
 }
 
-/* --- jerarquia dentro de la ficha: icono, frase destacada y etiquetas --- */
-#exhibit-panel .panel-icon {
-  display: block; width: 34px; height: 34px; margin: 0 0 14px;
-}
-#exhibit-panel .panel-icon svg {
-  width: 100%; height: 100%; fill: none;
-  stroke: var(--mus-morado); stroke-width: 1.6;
-  stroke-linecap: round; stroke-linejoin: round; opacity: 0.85;
-}
-#exhibit-panel .panel-lead {
-  margin: 0 0 14px; font-size: 12px; line-height: 1.5;
-  letter-spacing: 0.09em; font-weight: 600; color: var(--mus-morado);
-}
+/* --- pie de etiquetas: dentro de la zona de scroll (ver panel-scroll-wrap
+   mas arriba), secundario visualmente frente al cuerpo --- */
 #exhibit-panel .panel-tags {
-  display: block; margin-top: 18px; padding-top: 14px;
+  display: block; margin-top: 14px; padding-top: 12px;
   border-top: 1px solid var(--mus-borde);
-  font-size: 10px; letter-spacing: 0.16em; font-weight: 600;
+  font-size: 9.5px; letter-spacing: 0.16em; font-weight: 600;
   color: var(--mus-tinta); opacity: 0.45;
 }
-#exhibit-panel.secondary .panel-icon { width: 28px; height: 28px; margin-bottom: 12px; }
-#exhibit-panel.secondary .panel-lead { font-size: 11px; margin-bottom: 12px; }
 
 /* --- grafismo de sala --- */
 #wall-graphic {
