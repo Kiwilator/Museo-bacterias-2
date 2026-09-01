@@ -1463,6 +1463,116 @@ AFRAME.registerComponent('exhibit-info', {
   },
 
   /*
+    Reparte "text" en lineas que quepan en maxWidthPx (medido con el font ya
+    puesto en ctx), partiendo siempre por palabra completa -- nunca a mitad
+    de palabra. Mismo criterio que ya usaba image-windows.lamina() para el
+    pie de foto, reutilizado aqui para el nombre de la especie.
+  */
+  wrapCanvasText(ctx, text, maxWidthPx) {
+    const words = (text || '').split(' ').filter(Boolean);
+    const lines = [];
+    let line = '';
+    words.forEach((w) => {
+      const test = line ? `${line} ${w}` : w;
+      if (line && ctx.measureText(test).width > maxWidthPx) { lines.push(line); line = w; }
+      else line = test;
+    });
+    if (line) lines.push(line);
+    return lines;
+  },
+
+  /*
+    El texto de la cartela YA NO son a-text sueltos flotando delante de la
+    curva (eso es lo que se veia "plano"/"proyectado", como una pegatina
+    cruzando el cilindro). Aqui se pinta numero + especie + "click to
+    explore" en un unico canvas -- fondo crema y grano de papel incluidos --
+    y ese canvas se aplica como textura de la MISMA malla curva que ya forma
+    la cartela (ver createPedestalPlacard). Al llevar el mapeado UV estandar
+    de un CylinderGeometry (u recorre justo el arco generado, v la altura),
+    el texto queda repartido sobre la propia superficie curva -- lee como
+    impreso en la etiqueta, no como una tarjeta plana delante de ella.
+
+    Los tamaños de fuente se calculan como fraccion de heightM (la altura
+    real de la cartela en metros), no en pixeles fijos: asi la jerarquia
+    numero/titulo/cita es identica, en proporcion, en una cartela pequeña o
+    en la grande del pedestal principal (mucho mas baja) -- se ven a
+    familia aunque su tamaño fisico absoluto sea distinto.
+  */
+  buildPlacardTextTexture(section, title, cueText, heightM, widthM) {
+    const HPX = 640;
+    const WPX = Math.max(64, Math.round(HPX * (widthM / heightM)));
+    const c = document.createElement('canvas');
+    c.width = WPX; c.height = HPX;
+    const ctx = c.getContext('2d');
+    const pxPerM = HPX / heightM;
+
+    // fondo crema + grano de papel muy suave (mismo lenguaje que el resto
+    // del museo), pintado aqui en vez de como mapa aparte para que quede en
+    // el mismo canvas que el texto y no se dupliquen texturas.
+    ctx.fillStyle = '#F7F4EE';
+    ctx.fillRect(0, 0, WPX, HPX);
+    const grano = Math.round((WPX * HPX) / 700);
+    for (let i = 0; i < grano; i++) {
+      const v = 205 + Math.floor(Math.random() * 40);
+      ctx.fillStyle = `rgba(${v},${v},${v},0.05)`;
+      ctx.fillRect(Math.random() * WPX, Math.random() * HPX, 1, 1);
+    }
+
+    // Jerarquia (fraccion de heightM): numero visible pero no gigante,
+    // especie como texto principal, cita mas pequeña y discreta. Margenes
+    // generosos arriba/abajo y a los lados -- nada pegado al borde.
+    const numberSizePx = heightM * 0.105 * pxPerM;
+    const titleSizePx = heightM * 0.125 * pxPerM;
+    const cueSizePx = heightM * 0.070 * pxPerM;
+    const gap1Px = heightM * 0.050 * pxPerM;     // numero -> titulo
+    const gap2Px = heightM * 0.055 * pxPerM;     // titulo -> cita
+    const padSidePx = WPX * 0.09;
+    const lineSpacing = 1.18;
+    const maxTextWidth = WPX - padSidePx * 2;
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+
+    ctx.font = `600 ${titleSizePx}px Helvetica, Arial, sans-serif`;
+    const lines = title ? this.wrapCanvasText(ctx, title, maxTextWidth) : [];
+    const titleBlockH = lines.length * titleSizePx * lineSpacing;
+
+    // bloque completo centrado verticalmente: un titulo de una sola linea
+    // (p. ej. "RHODOVULUM") no deja la cartela descompensada hacia arriba.
+    const contentH = (section ? numberSizePx + gap1Px : 0) + titleBlockH +
+                      (cueText ? gap2Px + cueSizePx : 0);
+    let cy = Math.max((HPX - contentH) / 2, HPX * 0.06);
+
+    if (section) {
+      ctx.font = `600 ${numberSizePx}px Helvetica, Arial, sans-serif`;
+      ctx.fillStyle = '#74349A';
+      cy += numberSizePx * 0.85;
+      ctx.fillText(section, WPX / 2, cy);
+      cy += numberSizePx * 0.15 + gap1Px;
+    }
+
+    ctx.font = `600 ${titleSizePx}px Helvetica, Arial, sans-serif`;
+    ctx.fillStyle = '#201A1E';
+    lines.forEach((line, i) => {
+      cy += titleSizePx * 0.85;
+      ctx.fillText(line, WPX / 2, cy);
+      cy += titleSizePx * (lineSpacing - 0.85);
+    });
+
+    if (cueText) {
+      cy += gap2Px - titleSizePx * (lineSpacing - 0.85);
+      ctx.font = `600 ${cueSizePx}px Helvetica, Arial, sans-serif`;
+      ctx.fillStyle = '#805096';
+      cy += cueSizePx * 0.85;
+      ctx.fillText(cueText, WPX / 2, cy);
+    }
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  },
+
+  /*
     Cartela fisica de museo, unica para las 8 cepas. Un segmento de cilindro
     parcial -- una etiqueta de papel envuelta solo en el frente de la peana,
     no un plano plano ni un tubo completo -- centrado en el propio eje de la
@@ -1482,6 +1592,15 @@ AFRAME.registerComponent('exhibit-info', {
     peanaMaxY), no un valor absoluto sobre el suelo -- así queda a la altura
     del cuerpo del pedestal (tercio medio/medio-alto), con peana visible por
     encima y por debajo, en vez de cerca de la cupula de cristal.
+
+    Caso especial -- peana principal (BACTERIA_MASTER / PEANA_Bacteria): es
+    una base baja y ancha (~0.27 m de alto, ~1.4 m de diametro), no una
+    columna como las demas. Usando el mismo arco/alto que el resto, la
+    cartela salia enorme (mas de 1 m de cuerda) y casi tan alta como la
+    propia peana. Se detecta por altura real (<0.35 m) y se usa un arco mas
+    cerrado y una cartela mas baja, a medida de ESA peana -- radio y
+    posicion siguen midiendose igual, solo cambian arco/alto/encaje
+    vertical, y solo para esta pieza.
   */
   createPedestalPlacard(it) {
     let peanaRadius = 0.22, peanaMinY = null, peanaMaxY = null;
@@ -1519,29 +1638,40 @@ AFRAME.registerComponent('exhibit-info', {
     }
     const yaw = Math.atan2(dirX, dirZ);
 
+    const peanaHeightM = (peanaMinY !== null && peanaMaxY !== null) ? (peanaMaxY - peanaMinY) : null;
+    const isLowWidePlinth = peanaHeightM !== null && peanaHeightM < 0.35;
+
+    // Geometria: medio cilindro abierto, arco centrado en el frente local
+    // (+Z, misma convencion que ya usan los circulos de video: yaw =
+    // atan2(dirX,dirZ) apunta +Z hacia la direccion de mundo elegida).
+    const CURVE_RADIUS = peanaRadius + 0.008;   // superficie real de la peana + 8 mm
+    const ARC_DEG = isLowWidePlinth ? 50 : 82;  // peana ancha -> arco mas cerrado, cuerda razonable
+    const ARC = ARC_DEG * Math.PI / 180;
+    const PLACARD_HEIGHT = isLowWidePlinth ? 0.15 : 0.26;
+    const heightFrac = isLowWidePlinth ? 0.50 : 0.58;   // centrada si apenas hay peana, si no tercio medio-alto
+    const segs = Math.max(10, Math.round(ARC_DEG / 6));
+
     const spawn = window.MUSEO_SPAWN;
     const floorY = (spawn && typeof spawn.y === 'number')
       ? spawn.y
       : (it.bottomY !== null ? it.bottomY - 0.9 : it.pos.y - 1.2);
     const py = (peanaMinY !== null && peanaMaxY !== null)
-      ? peanaMinY + (peanaMaxY - peanaMinY) * 0.58   // tercio medio/medio-alto del cuerpo real
+      ? peanaMinY + peanaHeightM * heightFrac
       : floorY + 0.55;
 
     const wrapper = document.createElement('a-entity');
     wrapper.object3D.position.set(px, py, pz);
     wrapper.object3D.rotation.set(0, yaw, 0);
 
-    // Geometria: medio cilindro abierto, arco centrado en el frente local
-    // (+Z, misma convencion que ya usan los circulos de video: yaw =
-    // atan2(dirX,dirZ) apunta +Z hacia la direccion de mundo elegida).
-    const CURVE_RADIUS = peanaRadius + 0.008;   // superficie real de la peana + 8 mm
-    const ARC = 82 * Math.PI / 180;             // 70-100 grados: curva sutil pero visible
-    const PLACARD_HEIGHT = 0.26;
-    const segs = Math.max(10, Math.round((ARC * 180 / Math.PI) / 6));
+    const arcLengthM = CURVE_RADIUS * ARC;   // cuerda real del arco, para no estirar el texto
+    const texture = this.buildPlacardTextTexture(
+      it.data.section || '', (it.data.title || '').toUpperCase(), 'CLICK TO EXPLORE',
+      PLACARD_HEIGHT, arcLengthM
+    );
     const curve = new THREE.Mesh(
       new THREE.CylinderGeometry(CURVE_RADIUS, CURVE_RADIUS, PLACARD_HEIGHT, segs, 1, true, -ARC / 2, ARC),
       new THREE.MeshStandardMaterial({
-        color: 0xf7f4ee, map: this.getPlacardPaperTexture(),
+        color: 0xffffff, map: texture,
         roughness: 0.9, metalness: 0, side: THREE.DoubleSide
       })
     );
@@ -1549,52 +1679,8 @@ AFRAME.registerComponent('exhibit-info', {
     wrapper.object3D.add(curve);
     this.selectableMeshes.push(curve);
 
-    const TEXT_Z = CURVE_RADIUS + 0.004;   // apenas delante del papel, evita z-fighting
-
-    // Numero de seccion: ahora es identidad visual, no un dato pequeño --
-    // wrap-count bajo (en vez del valor por defecto, 40, que lo dejaba
-    // minusculo) para que "01".."08" se vean grandes de verdad.
-    const section = document.createElement('a-text');
-    section.setAttribute('value', it.data.section || '');
-    section.setAttribute('align', 'center');
-    section.setAttribute('baseline', 'center');
-    section.setAttribute('width', 0.24);
-    section.setAttribute('wrap-count', 3);
-    section.setAttribute('letter-spacing', 1);
-    section.setAttribute('color', '#74349A');
-    section.object3D.position.set(0, PLACARD_HEIGHT / 2 - 0.065, TEXT_Z);
-    wrapper.appendChild(section);
-
-    // Nombre de la especie: el texto mas fuerte de la cartela, hasta 2
-    // lineas. wrap-count 20 corta por palabra completa (nunca a mitad de
-    // palabra) justo donde lo pide el guion: "PURPLE PHOTOTROPHIC" (19
-    // caracteres) cabe entera en una linea y "BACTERIA" baja a la segunda;
-    // "RHODOPSEUDOMONAS" / "PALUSTRIS", "RUBRIVIVAX" / "GELATINOSUS" y
-    // "RHODOMICROBIUM" / "VANNIELII" se parten igual, por palabra.
-    const title = document.createElement('a-text');
-    title.setAttribute('value', (it.data.title || '').toUpperCase());
-    title.setAttribute('align', 'center');
-    title.setAttribute('baseline', 'center');
-    title.setAttribute('width', 0.62);
-    title.setAttribute('wrap-count', 20);
-    title.setAttribute('line-height', 60);
-    title.setAttribute('color', '#201A1E');
-    title.object3D.position.set(0, 0.008, TEXT_Z);
-    wrapper.appendChild(title);
-
-    const cue = document.createElement('a-text');
-    cue.setAttribute('value', 'CLICK TO EXPLORE');
-    cue.setAttribute('align', 'center');
-    cue.setAttribute('baseline', 'center');
-    cue.setAttribute('width', 0.40);
-    cue.setAttribute('wrap-count', 17);
-    cue.setAttribute('letter-spacing', 1);
-    cue.setAttribute('color', '#805096');
-    cue.object3D.position.set(0, -PLACARD_HEIGHT / 2 + 0.048, TEXT_Z);
-    wrapper.appendChild(cue);
-
     this.el.sceneEl.appendChild(wrapper);
-    return { wrapper, curve, section, title, cue };
+    return { wrapper, curve };
   },
 
   /*
