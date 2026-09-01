@@ -2892,7 +2892,7 @@ AFRAME.registerComponent('reactor-control', {
     const panel = new THREE.Mesh(
       new THREE.PlaneGeometry(WIDTH, HEIGHT),
       new THREE.MeshStandardMaterial({
-        color: 0xf7f4ee, map: paperTex,
+        color: 0xf3eee7, map: paperTex,
         roughness: 0.9, metalness: 0, side: THREE.DoubleSide
       })
     );
@@ -2900,7 +2900,26 @@ AFRAME.registerComponent('reactor-control', {
     // el panel de fondo no es "una pieza": no abre nada ni se registra en
     // selectableMeshes, solo los 4 botones son interactivos.
 
-    const TEXT_Z = 0.004;
+    const DETAIL_Z = 0.003;
+    const TEXT_Z = 0.006;
+    const trimMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(ROOM2_ACCENT),
+      emissive: new THREE.Color(ROOM2_ACCENT),
+      emissiveIntensity: 0.08,
+      roughness: 0.7, metalness: 0, side: THREE.DoubleSide
+    });
+    const softLineMat = new THREE.MeshStandardMaterial({
+      color: 0xd7d0c8,
+      roughness: 0.85, metalness: 0, side: THREE.DoubleSide
+    });
+    const addRect = (x, y, w, h, mat, z = DETAIL_Z) => {
+      const rect = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+      rect.position.set(x, y, z);
+      wrapper.object3D.add(rect);
+      return rect;
+    };
+    addRect(0, HEIGHT / 2 - HEIGHT * 0.065, WIDTH * 0.88, HEIGHT * 0.018, trimMat);
+    addRect(0, -HEIGHT / 2 + HEIGHT * 0.10, WIDTH * 0.82, HEIGHT * 0.010, softLineMat);
 
     // 2 filas -- titulo arriba, boton + su "01 LIGHT" combinado debajo --
     // todo dimensionado como fraccion de HEIGHT/WIDTH (nunca en metros fijos)
@@ -2909,14 +2928,14 @@ AFRAME.registerComponent('reactor-control', {
     // separaciones) para dejar el maximo espacio posible al circulo del
     // boton, que es lo que el brief pide "claramente visible, no un punto".
     const heading = document.createElement('a-text');
-    heading.setAttribute('value', 'BUILD A BIOPROCESS');
+    heading.setAttribute('value', 'BIOREACTOR CONTROL');
     heading.setAttribute('align', 'center');
     heading.setAttribute('baseline', 'center');
-    heading.setAttribute('width', WIDTH * 0.78);
-    heading.setAttribute('wrap-count', 23);
-    heading.setAttribute('letter-spacing', 1);
+    heading.setAttribute('width', WIDTH * 0.72);
+    heading.setAttribute('wrap-count', 18);
+    heading.setAttribute('letter-spacing', 0.6);
     heading.setAttribute('color', ROOM2_ACCENT);
-    heading.object3D.position.set(0, HEIGHT / 2 - HEIGHT * 0.16, TEXT_Z);
+    heading.object3D.position.set(0, HEIGHT / 2 - HEIGHT * 0.18, TEXT_Z);
     wrapper.appendChild(heading);
 
     // fila de 4 botones, centrada, con espacio uniforme -- nunca mas ancha
@@ -2926,8 +2945,8 @@ AFRAME.registerComponent('reactor-control', {
     // arriesgar que se salgan del panel ni se toquen entre si.
     const defs = [
       { id: 'light', num: '01', label: 'LIGHT', symbol: 'LUX', off: 0xe8f7f5, on: 0x59e7e0 },
-      { id: 'flow', num: '02', label: 'FLOW', symbol: '~', off: 0xe5f3ef, on: 0x35d5d3 },
-      { id: 'nutrients', num: '03', label: 'NUTRIENTS', symbol: '+', off: 0xeaf4de, on: 0xa9dc69 },
+      { id: 'flow', num: '02', label: 'FLOW', symbol: 'FLOW', off: 0xe5f3ef, on: 0x35d5d3 },
+      { id: 'nutrients', num: '03', label: 'NUTRIENTS', symbol: 'FEED', off: 0xeaf4de, on: 0xa9dc69 },
       { id: 'active', num: '04', label: 'ACTIVATE', symbol: 'BIO', off: 0xeee4f4, on: 0xb06ce8 }
     ];
     const spacing = Math.min(WIDTH * 0.24, (WIDTH * 0.86) / (defs.length - 1));
@@ -2937,9 +2956,10 @@ AFRAME.registerComponent('reactor-control', {
     // (verificado con /tmp/verify_panel_layout.js: ~6 cm de diametro, con
     // margen de sobra tanto para el titulo arriba como para la etiqueta
     // debajo, sin que ninguno de los dos se salga del panel).
-    const BTN_R = HEIGHT * 0.24;
-    const BTN_Y = HEIGHT / 2 - HEIGHT * 0.26 - BTN_R;
-    const LABEL_Y = BTN_Y - BTN_R - HEIGHT * 0.10;
+    const BTN_R = HEIGHT * 0.22;
+    const BTN_Y = -HEIGHT * 0.015;
+    const LABEL_Y = -HEIGHT * 0.365;
+    const STATUS_Y = BTN_Y + BTN_R + HEIGHT * 0.065;
 
     defs.forEach((d, i) => {
       const bx = startX + i * spacing;
@@ -2951,15 +2971,33 @@ AFRAME.registerComponent('reactor-control', {
       const btnColor = new THREE.Color(d.off);
       const material = new THREE.MeshStandardMaterial({
         color: btnColor, emissive: new THREE.Color(d.on),
-        emissiveIntensity: 0.16,
-        roughness: 0.55, metalness: 0.05, side: THREE.DoubleSide
+        emissiveIntensity: 0.14,
+        roughness: 0.48, metalness: 0.08, side: THREE.DoubleSide
       });
+      const ringMaterial = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(d.on), emissive: new THREE.Color(d.on),
+        emissiveIntensity: 0.06, roughness: 0.62, metalness: 0,
+        transparent: true, opacity: 0.42, side: THREE.DoubleSide
+      });
+      const ring = new THREE.Mesh(new THREE.RingGeometry(BTN_R * 1.10, BTN_R * 1.30, 36), ringMaterial);
+      ring.position.set(bx, BTN_Y, TEXT_Z + 0.005);
+      wrapper.object3D.add(ring);
+
       const btn = new THREE.Mesh(new THREE.CircleGeometry(BTN_R, 28), material);
       btn.position.set(bx, BTN_Y, TEXT_Z + 0.006);
       btn.userData.museoExhibitId = `reactorBtn_${d.id}`;   // para el hover (setHover)
       btn.userData.museoAction = () => this.onButtonClick(d.id);
       wrapper.object3D.add(btn);
       if (exhibitInfo) exhibitInfo.selectableMeshes.push(btn);
+
+      const statusMaterial = new THREE.MeshStandardMaterial({
+        color: 0xc9c2bc, emissive: new THREE.Color(d.on),
+        emissiveIntensity: 0.02, roughness: 0.55, metalness: 0,
+        side: THREE.DoubleSide
+      });
+      const status = new THREE.Mesh(new THREE.PlaneGeometry(BTN_R * 1.36, HEIGHT * 0.018), statusMaterial);
+      status.position.set(bx, STATUS_Y, TEXT_Z + 0.007);
+      wrapper.object3D.add(status);
 
       const icon = document.createElement('a-text');
       icon.setAttribute('value', d.symbol);
@@ -2969,7 +3007,7 @@ AFRAME.registerComponent('reactor-control', {
       icon.setAttribute('wrap-count', Math.max(1, d.symbol.length));
       icon.setAttribute('letter-spacing', 0);
       icon.setAttribute('color', '#201A1E');
-      icon.object3D.position.set(bx, BTN_Y, TEXT_Z + 0.014);
+      icon.object3D.position.set(bx, BTN_Y, TEXT_Z + 0.015);
       wrapper.appendChild(icon);
 
       // numero + nombre combinados en una sola linea ("01 LIGHT") debajo del
@@ -2995,7 +3033,7 @@ AFRAME.registerComponent('reactor-control', {
       wrapper.appendChild(label);
 
       this.buttons.push({
-        id: d.id, mesh: btn, material, icon,
+        id: d.id, mesh: btn, material, icon, ring, ringMaterial, status, statusMaterial,
         offColor: d.off, onColor: d.on,
         baseEmissive: material.emissiveIntensity
       });
@@ -3031,6 +3069,14 @@ AFRAME.registerComponent('reactor-control', {
       b.material.color.set(on ? b.onColor : b.offColor);
       b.material.emissive.set(b.onColor);
       if (b.icon) b.icon.setAttribute('color', on ? '#ffffff' : '#201A1E');
+      if (b.ringMaterial) {
+        b.ringMaterial.opacity = on ? 0.88 : 0.42;
+        b.ringMaterial.emissiveIntensity = on ? 0.36 : 0.06;
+      }
+      if (b.statusMaterial) {
+        b.statusMaterial.color.set(on ? b.onColor : 0xc9c2bc);
+        b.statusMaterial.emissiveIntensity = on ? 0.30 : 0.02;
+      }
       b.baseEmissive = on ? 0.42 : 0.14;
     });
   },
@@ -3079,6 +3125,7 @@ AFRAME.registerComponent('reactor-control', {
       this._hoverT[b.id] = t;
       const scale = 1 + t * 0.12;
       b.mesh.scale.setScalar(scale);
+      if (b.ring) b.ring.scale.setScalar(1 + t * 0.08);
       b.material.emissiveIntensity = b.baseEmissive * (1 + t * 0.6);
     });
   }
@@ -3187,7 +3234,7 @@ AFRAME.scenes[0]?.addEventListener('loaded', () => {
 });
 
 /*
-  Bucle robusto del video del primer circulo. `loop` en el propio <video>
+  Bucle robusto de los videos circulares. `loop` en el propio <video>
   ya deberia bastar, pero se reafirma por si el navegador ignora el
   autoplay inicial (tipico si la pestaña no tenia foco) o si la textura de
   video de three.js se queda parada en el ultimo frame: se relanza al
@@ -3197,18 +3244,22 @@ AFRAME.scenes[0]?.addEventListener('loaded', () => {
   chocan con las politicas de autoplay de ningun navegador.
 */
 (function () {
-  const video = document.getElementById('ppb-video-01');
-  if (!video) return;
-  video.loop = true;
-  video.muted = true;
-  video.playsInline = true;
+  const videos = Array.from(document.querySelectorAll('video[id^="ppb-video-"]'));
+  if (!videos.length) return;
+  videos.forEach((video) => {
+    video.loop = true;
+    video.muted = true;
+    video.playsInline = true;
+  });
 
   const tryPlay = () => {
-    const p = video.play();
-    if (p && p.catch) p.catch(() => {});
+    videos.forEach((video) => {
+      const p = video.play();
+      if (p && p.catch) p.catch(() => {});
+    });
   };
 
-  video.addEventListener('ended', tryPlay);
+  videos.forEach((video) => video.addEventListener('ended', tryPlay));
   tryPlay();
 
   const onFirstInteraction = () => {
