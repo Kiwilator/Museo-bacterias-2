@@ -112,6 +112,10 @@ AFRAME.registerComponent('drag-look-controls', {
     this._raycaster.setFromCamera(this._ndc, camera);
     const hits = this._raycaster.intersectObjects(info.selectableMeshes, false);
     if (!hits.length) return;
+    // Los controles del reactor (Sala 2) no abren ficha: llevan su propia
+    // accion (museoAction) en vez de museoExhibitId, y se comprueban primero.
+    const action = hits[0].object.userData.museoAction;
+    if (action) { action(); return; }
     const id = hits[0].object.userData.museoExhibitId;
     if (id) info.open(id);
   },
@@ -891,29 +895,53 @@ const museumContent = {
     section: '08', title: 'RHODOPSEUDOMONAS PALUSTRIS', label: 'VIEW +',
     body: 'Rhodopseudomonas palustris brings together several of the capabilities explored throughout the exhibition.\n\nIt can use light to support the anaerobic degradation of aromatic compounds derived from plants, contributing to the recycling of complex organic matter and to processes associated with the carbon cycle.\n\nIt is also particularly effective at producing hydrogen through photofermentation. Among the purple phototrophic bacteria studied for this process, certain strains of R. palustris (such as strain 42OL) have achieved especially high hydrogen productivity.\n\nIt has another important characteristic as well (electroactivity). Some strains can exchange electrons with electrodes and, by combining electricity and light, use these processes to generate valuable products such as PHA and certain biofuels.\n\nAt this point, we have finished looking closely at the bacteria themselves. The next step is to understand how they can be cultivated and how these capabilities can be used at a larger scale.'
   },
+  /* Sala 2 (Reactors and Applications). Continua la historia de la Sala 1:
+     BACTERIA -> CULTIVATION -> REACTOR -> PROCESS -> PRODUCT -> APPLICATION.
+     El reactor es la pieza principal (misma ficha ya funcionaba por click,
+     solo cambia el contenido); las 6 ventanas pasan de "vitrina pasiva sin
+     ficha" a piezas informativas reales (ver openable, mas abajo) que abren
+     el mismo panel que el resto del museo. Ninguna imagen todavia -- display
+     se queda en false a proposito en las 6, ver nota en image-windows. */
   reactor01: {
-    lead: 'FROM BIOLOGICAL CULTIVATION TO MATERIAL EXPERIMENTATION', tags: ['MODULAR', 'ACTIVE PROCESS', 'EXPERIMENTAL'], icon: 'reactor',
+    lead: 'Creating the right conditions for microbial growth',
+    tags: ['CULTIVATION', 'CONTROLLED CONDITIONS', 'PROCESS'], icon: 'reactor',
     tier: 'primary', anchor: 'PEANA_Bioreactor',
-    section: '03', title: 'THE PROCESS', label: 'VIEW PROCESS +',
-    body: 'This experimental device represents the transition between biological observation and material experimentation. The animated liquid and bubbles introduce the idea of an active process: matter is not presented as something fixed, but as something that can evolve, react and be transformed.'
+    title: 'PHOTOBIOREACTOR', label: 'VIEW PROCESS +',
+    body: 'FROM BACTERIA TO BIOPROCESS\n\nIn the previous room, we discovered the remarkable metabolic diversity of purple phototrophic bacteria.\n\nBut understanding what these microorganisms can do is only the beginning. To use their capabilities, researchers need to create controlled environments where bacteria receive the appropriate light, nutrients and operating conditions. Photobioreactors make this possible.\n\nInside these systems, microorganisms can be cultivated under controlled conditions, allowing researchers to study and develop processes related to hydrogen production, bioplastics, biomass and bioelectrochemical applications.\n\nIn this room, the focus moves from the microorganism itself to the process.\n\nPHOTOBIOREACTOR\n\nA photobioreactor provides a controlled environment for cultivating photosynthetic microorganisms.\n\nThe system allows key conditions such as light, nutrient supply and circulation to be managed while the culture grows. By controlling these variables, researchers can investigate how purple phototrophic bacteria transform resources and produce compounds of potential interest.\n\nThe reactor therefore represents the transition between understanding the biology of these microorganisms and using their capabilities in technological processes.'
   },
 
-  /* Ventanas de imagen de la pared opuesta. Contenido pasivo: no abren panel.
-     display:false en las cinco: los graficos generados por IA (MICROSCOPY,
-     ABSTRACTION, FORM, DIGITAL MODEL, JEWELLERY) se han retirado y los nichos
-     quedan limpios a proposito -- el contenido grafico final se disenara
-     aparte. Para reactivar una vitrina de imagen real basta con poner
-     display:true y rellenar `image` con una ruta. */
-  window01: { display: false, tier: 'tertiary', windowIndex: 0, number: '01', title: 'MICROSCOPY',
-    image: '', caption: 'Observation reveals structures that remain invisible at human scale.' },
-  window02: { display: false, tier: 'tertiary', windowIndex: 1, number: '02', title: 'ABSTRACTION',
-    image: '', caption: 'Biological information is reduced to lines, volumes, textures and patterns.' },
-  window03: { display: false, tier: 'tertiary', windowIndex: 2, number: '03', title: 'FORM',
-    image: '', caption: 'Selected characteristics become a new three-dimensional design vocabulary.' },
-  window04: { display: false, tier: 'tertiary', windowIndex: 3, number: '04', title: 'DIGITAL MODEL',
-    image: '', caption: 'The abstracted form is developed and tested within a digital design process.' },
-  window05: { display: false, tier: 'tertiary', windowIndex: 4, number: '05', title: 'JEWELLERY',
-    image: '', caption: 'Biological inspiration is finally translated into scale, material and wearable form.' }
+  /* Ventanas de la pared del laboratorio. openable:true (nuevo) -- antes eran
+     contenido pasivo sin ficha; ahora abren el panel de informacion como
+     cualquier otra pieza (ver exhibit-info.open). display se queda en false:
+     sin imagenes ni graficos todavia, los nichos quedan limpios a proposito
+     -- el contenido grafico final se disenara aparte (ver image-windows). */
+  window01: { display: false, tier: 'tertiary', windowIndex: 0, openable: true, icon: 'wave',
+    section: '01', title: 'FROM LIGHT TO HYDROGEN', lead: 'Photofermentation',
+    tags: ['HYDROGEN', 'PHOTOFERMENTATION'],
+    body: 'Some purple phototrophic bacteria can use light energy to produce hydrogen through a process known as photofermentation.\n\nRhodopseudomonas palustris is particularly relevant in this field, with certain strains showing high hydrogen productivity.\n\nThis process illustrates how the metabolism of a microorganism can become the basis of a potential renewable energy pathway.' },
+  window02: { display: false, tier: 'tertiary', windowIndex: 1, openable: true, icon: 'form',
+    section: '02', title: 'FROM CARBON TO BIOPLASTIC', lead: 'PHA production',
+    tags: ['PHA', 'BIOPLASTIC'],
+    body: 'Some purple phototrophic bacteria can accumulate carbon inside their cells in the form of PHA.\n\nFor the microorganism, these compounds function as carbon and energy reserves. For biotechnology, however, PHA is especially interesting because it can be used as a basis for producing bio-based and biodegradable materials.\n\nThe process creates a direct connection between microbial metabolism and the development of alternative materials.' },
+  window03: { display: false, tier: 'tertiary', windowIndex: 2, openable: true, icon: 'scale',
+    section: '03', title: 'FROM CULTURE TO BIOMASS', lead: 'Food and feed applications',
+    tags: ['BIOMASS', 'FOOD & FEED'],
+    body: 'Cultivating purple phototrophic bacteria also produces microbial biomass.\n\nThis biomass contains compounds of nutritional interest and is being investigated for possible applications in food and animal feed.\n\nThe challenge is not only to produce biomass, but also to develop cultivation systems capable of generating it efficiently and at an appropriate scale.' },
+  window04: { display: false, tier: 'tertiary', windowIndex: 3, openable: true, icon: 'grid',
+    section: '04', title: 'BIOELECTRICITY', lead: 'Microorganisms and electrodes',
+    tags: ['ELECTROACTIVITY', 'BIOELECTROCHEMISTRY'],
+    body: 'Some purple phototrophic bacteria are electroactive.\n\nThis means that they can exchange electrons with external materials, including electrodes.\n\nThese interactions allow researchers to investigate bioelectrochemical systems in which living microorganisms and conductive materials become part of the same process.\n\nElectroactivity opens new possibilities for connecting microbial metabolism with technological systems.' },
+  window05: { display: false, tier: 'tertiary', windowIndex: 4, openable: true, icon: 'surface',
+    section: '05', title: 'SCALE UP', lead: 'From laboratory to larger production',
+    tags: ['SCALE-UP', 'PRODUCTION'],
+    body: 'A successful biological process must eventually move beyond the laboratory.\n\nOne strategy for reducing production and installation costs is to cultivate purple phototrophic bacteria in low-cost plastic bag reactors using food-grade equipment.\n\nInstead of building one increasingly large reactor, production capacity can be expanded by operating several reactors in parallel.\n\nThis approach offers a flexible way of increasing cultivation capacity while keeping the system relatively simple.' },
+  /* Ultima ventana del recorrido: cierra con la sintesis de la sala
+     (BACTERIA -> PROCESS -> RESULT), igual que bacteriaLarge01/bacteriaSmall06
+     cierran la Sala 1 dentro de su propio body -- ningun panel nuevo. */
+  window06: { display: false, tier: 'tertiary', windowIndex: 5, openable: true, icon: 'transform',
+    section: '06', title: 'ONE MICROORGANISM, MANY OUTPUTS', lead: 'Different processes, different possibilities',
+    tags: ['HYDROGEN', 'PHA', 'BIOMASS', 'ELECTRON EXCHANGE'],
+    body: 'Purple phototrophic bacteria do not lead to a single product or application.\n\nDepending on the strain, cultivation conditions and process, their metabolism can be connected to different outcomes.\n\nHYDROGEN\nPHA\nBIOMASS\nELECTRON EXCHANGE\n\nThe value of these microorganisms lies precisely in this diversity.\n\nDifferent bacteria, different processes and different possibilities.\n\nBACTERIA → PROCESS → RESULT\n\nUnderstanding the microorganism is the first step. Controlling the process is what allows its capabilities to be explored at a larger scale.' }
 };
 
 /* Iconos monolinea de las fichas. SVG inline, sin dependencias ni peticiones. */
@@ -1123,11 +1151,20 @@ AFRAME.registerComponent('exhibit-info', {
     mesh.traverse((o) => {
       if (!o.isMesh && !o.isObject3D) return;
       if (o.name) byName[o.name] = o;
-      if (o.isMesh && o.material && o.material.name === 'Neon_Turquoise') {
-        const b = new THREE.Box3().setFromObject(o);
-        if (b.min.y > 1.2) turquesaAlto.push({ o, y: (b.min.y + b.max.y) / 2,
-                                               p: b.getCenter(new THREE.Vector3()) });
-      }
+      if (!o.isMesh || !o.material || o.material.name !== 'Neon_Turquoise') return;
+      const b = new THREE.Box3().setFromObject(o);
+      const s = b.getSize(new THREE.Vector3());
+      const c = b.getCenter(new THREE.Vector3());
+      // Mismo filtro que ya usa image-windows (afinado alli tras comprobar
+      // que un filtro mas simple -- solo "alto", b.min.y > 1.2 -- tambien
+      // enganchaba los arcos de neon del techo, mucho mas altos que un
+      // nicho real: quedaban 13 "ventanas" candidatas en vez de las 4 que
+      // hay de verdad, con huecos[] apuntando sobre todo al techo. Un unico
+      // filtro consistente (lado laboratorio, altura y tamaño de nicho) para
+      // las dos cosas que dependen de estos nichos: la posicion 3D de la
+      // ficha interactiva (aqui) y la lamina de imagen (image-windows).
+      if (c.x < 1.2 || s.y < 0.9 || s.y > 2.6 || Math.max(s.x, s.z) > 1.6) return;
+      turquesaAlto.push({ o, p: c, minY: b.min.y, maxY: b.max.y });
     });
 
     // Las ventanas de imagen se anclan a los nichos turquesa altos de la pared
@@ -1135,8 +1172,14 @@ AFRAME.registerComponent('exhibit-info', {
     turquesaAlto.sort((a, b) => a.p.z - b.p.z);
     const huecos = [];
     turquesaAlto.forEach((n) => {
-      const cerca = huecos.find((h) => Math.abs(h.p.z - n.p.z) < 0.9);
-      if (cerca) { cerca.p.lerp(n.p, 0.5); } else { huecos.push({ p: n.p.clone() }); }
+      const cerca = huecos.find((h) => Math.abs(h.p.z - n.p.z) < 0.6);
+      if (cerca) {
+        cerca.p.lerp(n.p, 0.5);
+        cerca.minY = Math.min(cerca.minY, n.minY);
+        cerca.maxY = Math.max(cerca.maxY, n.maxY);
+      } else {
+        huecos.push({ p: n.p.clone(), minY: n.minY, maxY: n.maxY });
+      }
     });
 
     this.items = [];
@@ -1148,7 +1191,7 @@ AFRAME.registerComponent('exhibit-info', {
       let anchorObj = null;
       if (data.tier === 'tertiary') {
         const h = huecos[data.windowIndex];
-        if (h) pos = h.p.clone();
+        if (h) { pos = h.p.clone(); topY = h.maxY; bottomY = h.minY; }
       } else {
         const o = byName[data.anchor];
         if (o) {
@@ -1219,10 +1262,22 @@ AFRAME.registerComponent('exhibit-info', {
 
     // Lenguaje visual de interaccion (hover + placa fisica en la peana) en
     // las 8 cepas de la Sala 1 (ids que empiezan por "bacteria"). No toca el
-    // reactor (Sala 2) ni las ventanas de imagen (pasivas, sin ficha).
+    // reactor (Sala 2, su propia malla PEANA_Bioreactor ya quedo marcada
+    // arriba con museoExhibitId y abre panel igual que siempre).
     this.items.forEach((it) => {
       if (it.data.tier === 'tertiary' || !it.id.startsWith('bacteria')) return;
       this.setupHoverAffordance(it);
+    });
+
+    // Ventanas de la Sala 2 (openable:true): antes eran contenido pasivo sin
+    // ficha ni malla seleccionable. Cada una recibe ahora una pequeña placa
+    // fisica de pared (setupWindowTag), pegada justo debajo de su nicho real,
+    // que reutiliza exactamente el mismo lenguaje visual que las placas de
+    // peana (papel, sin cristal, sin resplandor) y el mismo mecanismo de
+    // hover por pivote que ya usa tick() para las 8 cepas.
+    this.items.forEach((it) => {
+      if (it.data.tier !== 'tertiary' || !it.data.openable) return;
+      this.setupWindowTag(it);
     });
 
     console.log(`[exhibit-info] ${this.items.length} piezas activas, ${this.selectableMeshes.length} mallas seleccionables por click/tap, ` +
@@ -1283,6 +1338,102 @@ AFRAME.registerComponent('exhibit-info', {
 
     // Una unica placa fisica para las 8 cepas (ver createPedestalPlacard).
     it.placard = this.createPedestalPlacard(it);
+  },
+
+  /*
+    Placa fisica de pared para las ventanas de la Sala 2 (openable:true):
+    misma familia visual que las placas de peana (papel, sin cristal, sin
+    resplandor permanente), pero plana -- aqui no hay ninguna peana
+    cilindrica que envolver, solo el nicho de neon turquesa real (this.items
+    ya trae su centro/alto/bajo, medidos en onLoaded). Se cuelga justo debajo
+    del nicho, ligeramente separada del muro para no pisar el marco.
+
+    Como no hay malla de bacteria que "respire" al pasar el raton por
+    encima, aqui el propio pivote de hover ES la placa: se le da un tinte
+    emisivo sutil para que el mismo bucle de tick() (pensado para las 8
+    cepas, solo mira it.pivot/it.emissiveMats) la haga brillar un poco al
+    pasar el cursor, sin codigo nuevo en tick().
+  */
+  setupWindowTag(it) {
+    let dirX = 0, dirZ = -1;
+    const spawn = window.MUSEO_SPAWN;
+    const bounds = window.MUSEO_BOUNDS;
+    let tx = null, tz = null;
+    if (spawn && typeof spawn.x === 'number') { tx = spawn.x; tz = spawn.z; }
+    else if (bounds) { tx = (bounds.minX + bounds.maxX) / 2; tz = (bounds.minZ + bounds.maxZ) / 2; }
+    if (tx !== null) {
+      const dx = tx - it.pos.x, dz = tz - it.pos.z;
+      const len = Math.hypot(dx, dz);
+      if (len > 0.001) { dirX = dx / len; dirZ = dz / len; }
+    }
+    const yaw = Math.atan2(dirX, dirZ);
+
+    const OFFSET = 0.05;                                   // separada del marco, no pegada
+    const px = it.pos.x + dirX * OFFSET;
+    const py = (it.bottomY !== null ? it.bottomY : it.pos.y) - 0.18;   // justo bajo el nicho real
+    const pz = it.pos.z + dirZ * OFFSET;
+
+    const wrapper = document.createElement('a-entity');
+    wrapper.object3D.position.set(px, py, pz);
+    wrapper.object3D.rotation.set(0, yaw, 0);
+
+    const WIDTH = 0.30, HEIGHT = 0.165;
+    const tagColor = new THREE.Color(0x74349a);
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(WIDTH, HEIGHT),
+      new THREE.MeshStandardMaterial({
+        color: 0xf7f4ee, map: this.getPlacardPaperTexture(),
+        emissive: tagColor, emissiveIntensity: 0.10,
+        roughness: 0.9, metalness: 0, side: THREE.DoubleSide
+      })
+    );
+    plane.userData.museoExhibitId = it.id;
+    wrapper.object3D.add(plane);
+    this.selectableMeshes.push(plane);
+
+    const TEXT_Z = 0.004;
+
+    const section = document.createElement('a-text');
+    section.setAttribute('value', it.data.section || '');
+    section.setAttribute('align', 'center');
+    section.setAttribute('baseline', 'center');
+    section.setAttribute('width', 0.13);
+    section.setAttribute('wrap-count', 3);
+    section.setAttribute('letter-spacing', 1);
+    section.setAttribute('color', '#74349A');
+    section.object3D.position.set(0, HEIGHT / 2 - 0.032, TEXT_Z);
+    wrapper.appendChild(section);
+
+    const title = document.createElement('a-text');
+    title.setAttribute('value', (it.data.title || '').toUpperCase());
+    title.setAttribute('align', 'center');
+    title.setAttribute('baseline', 'center');
+    title.setAttribute('width', 0.27);
+    title.setAttribute('wrap-count', 22);
+    title.setAttribute('line-height', 32);
+    title.setAttribute('color', '#201A1E');
+    title.object3D.position.set(0, 0.006, TEXT_Z);
+    wrapper.appendChild(title);
+
+    const cue = document.createElement('a-text');
+    cue.setAttribute('value', 'CLICK TO EXPLORE');
+    cue.setAttribute('align', 'center');
+    cue.setAttribute('baseline', 'center');
+    cue.setAttribute('width', 0.24);
+    cue.setAttribute('wrap-count', 17);
+    cue.setAttribute('letter-spacing', 0.5);
+    cue.setAttribute('color', '#805096');
+    cue.object3D.position.set(0, -HEIGHT / 2 + 0.026, TEXT_Z);
+    wrapper.appendChild(cue);
+
+    this.el.sceneEl.appendChild(wrapper);
+
+    // el pivote/emisivo son los mismos campos que usa el bucle de hover de
+    // tick() para las 8 cepas -- aqui el "pivote" es la placa entera.
+    it.pivot = wrapper.object3D;
+    it.hoverT = 0;
+    it.emissiveMats = [{ mat: plane.material, base: plane.material.emissiveIntensity }];
+    it.tag = { wrapper, plane, section, title, cue };
   },
 
   /*
@@ -1519,9 +1670,10 @@ AFRAME.registerComponent('exhibit-info', {
 
     // Ya no hay ningun boton flotante que actualizar: esto solo alimenta
     // this.active para el atajo de teclado "E" (abrir la pieza mas cercana).
+    // Las ventanas openable cuentan igual que cualquier otra pieza real.
     let mejor = null, mejorD = Infinity;
     this.items.forEach((it) => {
-      if (it.data.tier === 'tertiary') return;   // las ventanas no abren panel
+      if (it.data.tier === 'tertiary' && !it.data.openable) return;
       const d = Math.hypot(it.pos.x - p.x, it.pos.z - p.z);
       if (d < mejorD) { mejorD = d; mejor = it; }
     });
@@ -1537,7 +1689,7 @@ AFRAME.registerComponent('exhibit-info', {
   open(id) {
     if (!id || !this.wireUI()) return;
     const it = this.items.find((i) => i.id === id);
-    if (!it || it.data.tier === 'tertiary') return;
+    if (!it || (it.data.tier === 'tertiary' && !it.data.openable)) return;
     const d = it.data;
     this.panel.querySelector('.panel-section').textContent = d.section || '';
     this.panel.querySelector('.panel-section').style.display = d.section ? 'block' : 'none';
@@ -1562,7 +1714,7 @@ AFRAME.registerComponent('exhibit-info', {
     const tags = this.panel.querySelector('.panel-tags');
     tags.textContent = (d.tags || []).join(' · ');
     tags.style.display = (d.tags && d.tags.length) ? 'block' : 'none';
-    this.panel.classList.toggle('secondary', d.tier === 'secondary');
+    this.panel.classList.toggle('secondary', d.tier === 'secondary' || d.tier === 'tertiary');
     this.panel.classList.add('visible');
     this.openId = id;
     this.hideIntro();
@@ -1733,6 +1885,287 @@ AFRAME.registerComponent('image-windows', {
   }
 });
 
+/* ==========================================================================
+   SALA 2 -- estacion de control del reactor. Cuatro botones fisicos sobre
+   la peana cuadrada ya existente (PEANA_Alta_B, sin usar hasta ahora),
+   ninguna geometria/material nuevo en el reactor: solo se reescala, en
+   tiempo de ejecucion, la intensidad emisiva real de sus materiales
+   (Bioreactor_Bubble, Bioreactor_Liquid) y el foco que exhibit-lighting ya
+   crea sobre el -- exactamente el mismo mecanismo de "escalar sobre una
+   base guardada" que usa el hover de las bacterias, nunca un valor o color
+   inventado. Las burbujas siguen animando siempre (gltf-animations, en
+   bucle desde que carga el modulo): lo que cambia con cada boton es cuanto
+   se nota esa animacion (opacidad/brillo), no si existe.
+   ========================================================================== */
+AFRAME.registerComponent('reactor-control', {
+  init() {
+    this.stage = { light: false, flow: false, nutrients: false, active: false };
+    this.buttons = [];        // {id, mesh, material, locked, baseEmissive}
+    this._hoverT = {};        // id -> 0..1, suavizado de hover por boton
+    this.el.addEventListener('museo-modules-loaded', () => this.onLoaded());
+  },
+
+  onLoaded() {
+    const mesh = this.el.object3D;
+
+    // Materiales reales del reactor. Un unico material por nombre (glTF los
+    // comparte entre sus mallas), asi que basta con encontrar cada uno una
+    // vez y guardar su intensidad/opacidad de fabrica como "base": los
+    // botones solo escalan esa base, nunca la sustituyen.
+    let bubbleMat = null, liquidMat = null;
+    mesh.traverse((o) => {
+      if (!o.isMesh || !o.material) return;
+      if (o.material.name === 'Bioreactor_Bubble' && !bubbleMat) bubbleMat = o.material;
+      if (o.material.name === 'Bioreactor_Liquid' && !liquidMat) liquidMat = o.material;
+    });
+    this.bubbleMat = bubbleMat;
+    this.liquidMat = liquidMat;
+    this.bubbleBase = bubbleMat ? { i: bubbleMat.emissiveIntensity, o: bubbleMat.opacity } : null;
+    this.liquidBase = liquidMat ? { i: liquidMat.emissiveIntensity, o: liquidMat.opacity } : null;
+
+    // Foco de exposicion que exhibit-lighting ya crea sobre PEANA_Bioreactor.
+    const lightingComp = this.el.components['exhibit-lighting'];
+    this.reactorSpot = lightingComp && lightingComp.spotsByAnchor && lightingComp.spotsByAnchor['PEANA_Bioreactor'];
+    this.spotBase = (this.reactorSpot && this.reactorSpot.userData.baseIntensity) || 2.4;
+
+    // valores actuales (se interpolan en tick hacia this.target*)
+    this.curSpot = this.spotBase;
+    this.curBubbleI = this.bubbleBase ? this.bubbleBase.i : 0;
+    this.curBubbleO = this.bubbleBase ? this.bubbleBase.o : 0;
+    this.curLiquidI = this.liquidBase ? this.liquidBase.i : 0;
+    this.recomputeTargets();
+    // arranca ya en el estado 0 (inactivo), sin animar desde el valor de fabrica
+    this.curSpot = this.targetSpot;
+    this.curBubbleI = this.targetBubbleI;
+    this.curBubbleO = this.targetBubbleO;
+    this.curLiquidI = this.targetLiquidI;
+    this.applyReactorState();
+
+    this.buildControlStand();
+    console.log('[reactor-control] listo -- estado 0 (reactor inactivo)');
+  },
+
+  /*
+    Estado 0..1 de cada variable, a partir de que botones estan activados.
+    Cada boton SUMA a la mezcla en vez de fijar un valor unico: asi
+    LIGHT+NUTRIENTS (que comparten el brillo del liquido) se notan los dos,
+    y el boton final (ACTIVATE) da un ultimo empujon modesto de conjunto en
+    vez de un efecto nuevo y desconectado del resto.
+  */
+  recomputeTargets() {
+    const s = this.stage;
+    const activeBoost = s.active ? 1.12 : 1;
+
+    this.targetSpot = this.spotBase * (0.42 + (s.light ? 0.58 : 0)) * (s.active ? activeBoost : 1);
+
+    const bubbleIFrac = 0.28 + (s.flow ? 0.72 : 0);
+    const bubbleOFrac = 0.55 + (s.flow ? 0.45 : 0);
+    this.targetBubbleI = this.bubbleBase ? this.bubbleBase.i * bubbleIFrac * activeBoost : 0;
+    this.targetBubbleO = this.bubbleBase ? Math.min(1, this.bubbleBase.o * bubbleOFrac) : 0;
+
+    const liquidIFrac = 0.30 + (s.light ? 0.35 : 0) + (s.nutrients ? 0.35 : 0);
+    this.targetLiquidI = this.liquidBase ? this.liquidBase.i * liquidIFrac * activeBoost : 0;
+  },
+
+  applyReactorState() {
+    if (this.reactorSpot) this.reactorSpot.intensity = this.curSpot;
+    if (this.bubbleMat) { this.bubbleMat.emissiveIntensity = this.curBubbleI; this.bubbleMat.opacity = this.curBubbleO; }
+    if (this.liquidMat) this.liquidMat.emissiveIntensity = this.curLiquidI;
+  },
+
+  /*
+    Estacion de control: una unica placa (misma familia visual que las
+    cartelas del resto del museo -- papel, sin cristal, sin resplandor
+    permanente) pegada al frente de PEANA_Alta_B, con el titulo pequeño, la
+    instruccion y los 4 botones en fila. Nada de esto es un panel flotante
+    de HTML: es señaletica fisica, como el resto de la Sala 1.
+  */
+  buildControlStand() {
+    const mesh = this.el.object3D;
+    const standObj = mesh.getObjectByName('PEANA_Alta_B');
+    if (!standObj) { console.warn('[reactor-control] no se encontro PEANA_Alta_B'); return; }
+
+    const box = new THREE.Box3().setFromObject(standObj);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const topY = box.max.y;
+    const approxRadius = Math.max(size.x, size.z) / 2;
+
+    // misma formula ya usada en todo el museo: direccion generica hacia el
+    // punto de partida del visitante, tangente/frontal a la pieza.
+    let dirX = 0, dirZ = 1;
+    const spawn = window.MUSEO_SPAWN;
+    const bounds = window.MUSEO_BOUNDS;
+    let tx = null, tz = null;
+    if (spawn && typeof spawn.x === 'number') { tx = spawn.x; tz = spawn.z; }
+    else if (bounds) { tx = (bounds.minX + bounds.maxX) / 2; tz = (bounds.minZ + bounds.maxZ) / 2; }
+    if (tx !== null) {
+      const dx = tx - center.x, dz = tz - center.z;
+      const len = Math.hypot(dx, dz);
+      if (len > 0.001) { dirX = dx / len; dirZ = dz / len; }
+    }
+    const yaw = Math.atan2(dirX, dirZ);
+
+    const OFFSET = approxRadius + 0.01;
+    const px = center.x + dirX * OFFSET;
+    const pz = center.z + dirZ * OFFSET;
+    const py = topY - 0.24;   // tercio superior del frente de la peana
+
+    const wrapper = document.createElement('a-entity');
+    wrapper.object3D.position.set(px, py, pz);
+    wrapper.object3D.rotation.set(0, yaw, 0);
+
+    const WIDTH = 0.60, HEIGHT = 0.40;
+    const exhibitInfo = this.el.components['exhibit-info'];
+    const paperTex = exhibitInfo && exhibitInfo.getPlacardPaperTexture
+      ? exhibitInfo.getPlacardPaperTexture() : null;
+    const panel = new THREE.Mesh(
+      new THREE.PlaneGeometry(WIDTH, HEIGHT),
+      new THREE.MeshStandardMaterial({
+        color: 0xf7f4ee, map: paperTex,
+        roughness: 0.9, metalness: 0, side: THREE.DoubleSide
+      })
+    );
+    wrapper.object3D.add(panel);
+    // el panel de fondo no es "una pieza": no abre nada ni se registra en
+    // selectableMeshes, solo los 4 botones son interactivos.
+
+    const TEXT_Z = 0.004;
+
+    const heading = document.createElement('a-text');
+    heading.setAttribute('value', 'BUILD A BIOPROCESS');
+    heading.setAttribute('align', 'center');
+    heading.setAttribute('baseline', 'center');
+    heading.setAttribute('width', 0.52);
+    heading.setAttribute('wrap-count', 24);
+    heading.setAttribute('letter-spacing', 1);
+    heading.setAttribute('color', '#74349A');
+    heading.object3D.position.set(0, HEIGHT / 2 - 0.045, TEXT_Z);
+    wrapper.appendChild(heading);
+
+    const instruction = document.createElement('a-text');
+    instruction.setAttribute('value', 'Activate the reactor step by step.');
+    instruction.setAttribute('align', 'center');
+    instruction.setAttribute('baseline', 'center');
+    instruction.setAttribute('width', 0.46);
+    instruction.setAttribute('wrap-count', 34);
+    instruction.setAttribute('color', '#201A1E');
+    instruction.object3D.position.set(0, HEIGHT / 2 - 0.09, TEXT_Z);
+    wrapper.appendChild(instruction);
+
+    // fila de 4 botones, centrada, con espacio uniforme
+    const defs = [
+      { id: 'light', num: '01', label: 'LIGHT' },
+      { id: 'flow', num: '02', label: 'FLOW' },
+      { id: 'nutrients', num: '03', label: 'NUTRIENTS' },
+      { id: 'active', num: '04', label: 'ACTIVATE' }
+    ];
+    const spacing = 0.15;
+    const startX = -spacing * (defs.length - 1) / 2;
+    const BTN_Y = -0.03;
+    const BTN_R = 0.042;
+
+    defs.forEach((d, i) => {
+      const bx = startX + i * spacing;
+      const btnColor = new THREE.Color(d.id === 'active' ? 0xb9b3bd : 0xece4f2);
+      const material = new THREE.MeshStandardMaterial({
+        color: btnColor, emissive: new THREE.Color(0x74349a),
+        emissiveIntensity: d.id === 'active' ? 0.06 : 0.16,
+        roughness: 0.55, metalness: 0.05, side: THREE.DoubleSide
+      });
+      const btn = new THREE.Mesh(new THREE.CircleGeometry(BTN_R, 28), material);
+      btn.position.set(bx, BTN_Y, TEXT_Z + 0.006);
+      btn.userData.museoExhibitId = `reactorBtn_${d.id}`;   // para el hover (setHover)
+      btn.userData.museoAction = () => this.onButtonClick(d.id);
+      wrapper.object3D.add(btn);
+      if (exhibitInfo) exhibitInfo.selectableMeshes.push(btn);
+
+      const num = document.createElement('a-text');
+      num.setAttribute('value', d.num);
+      num.setAttribute('align', 'center');
+      num.setAttribute('baseline', 'center');
+      num.setAttribute('width', 0.09);
+      num.setAttribute('wrap-count', 2);
+      num.setAttribute('color', '#74349A');
+      num.object3D.position.set(bx, BTN_Y + 0.075, TEXT_Z);
+      wrapper.appendChild(num);
+
+      const label = document.createElement('a-text');
+      label.setAttribute('value', d.label);
+      label.setAttribute('align', 'center');
+      label.setAttribute('baseline', 'center');
+      label.setAttribute('width', 0.14);
+      label.setAttribute('wrap-count', 10);
+      label.setAttribute('letter-spacing', 0.5);
+      label.setAttribute('color', '#201A1E');
+      label.object3D.position.set(bx, BTN_Y - 0.075, TEXT_Z);
+      wrapper.appendChild(label);
+
+      this.buttons.push({ id: d.id, mesh: btn, material, baseEmissive: material.emissiveIntensity });
+      this._hoverT[d.id] = 0;
+    });
+
+    // igual que las cartelas de peana/ventana: se cuelga directamente del
+    // escenario (sin escala), asi que px/py/pz -- ya en espacio de mundo,
+    // medidos con Box3 sobre la peana ya reescalada -- no se vuelven a
+    // reescalar por error al colgarlo bajo #modelo (que si tiene escala).
+    this.el.sceneEl.appendChild(wrapper);
+    this.wrapper = wrapper;
+  },
+
+  /*
+    01 LIGHT / 02 FLOW / 03 NUTRIENTS activan de forma independiente, en
+    cualquier orden, y no se pueden deshacer ("paso a paso"). 04 ACTIVATE
+    solo hace algo cuando los tres anteriores ya estan activos -- es la
+    activacion final del proceso completo, no un cuarto efecto suelto.
+  */
+  onButtonClick(id) {
+    if (id === 'active') {
+      if (!(this.stage.light && this.stage.flow && this.stage.nutrients) || this.stage.active) return;
+      this.stage.active = true;
+    } else {
+      if (this.stage[id]) return;
+      this.stage[id] = true;
+    }
+    this.recomputeTargets();
+    this.updateButtonLooks();
+  },
+
+  updateButtonLooks() {
+    this.buttons.forEach((b) => {
+      const on = this.stage[b.id];
+      const unlocked = b.id !== 'active' || (this.stage.light && this.stage.flow && this.stage.nutrients);
+      b.material.color.set(on ? 0x74349a : (unlocked ? 0xece4f2 : 0xb9b3bd));
+      b.baseEmissive = on ? 0.34 : (unlocked ? 0.16 : 0.06);
+    });
+  },
+
+  tick(time, delta) {
+    if (!this.wrapper) return;
+    const dt = Math.min((delta || 16) / 1000, 0.1);
+    const speed = 1 - Math.pow(0.001, dt);   // suavizado exponencial, ~0.6s
+
+    this.curSpot += (this.targetSpot - this.curSpot) * speed;
+    this.curBubbleI += (this.targetBubbleI - this.curBubbleI) * speed;
+    this.curBubbleO += (this.targetBubbleO - this.curBubbleO) * speed;
+    this.curLiquidI += (this.targetLiquidI - this.curLiquidI) * speed;
+    this.applyReactorState();
+
+    // hover de los 4 botones: mismo lenguaje que el resto del museo (escala
+    // + brillo muy sutiles), leyendo el hoverId que ya calcula exhibit-info.
+    const info = this.el.components['exhibit-info'];
+    const hoverId = info && info.hoverId;
+    this.buttons.forEach((b) => {
+      const isHovered = hoverId === `reactorBtn_${b.id}`;
+      const t = this._hoverT[b.id] + ((isHovered ? 1 : 0) - this._hoverT[b.id]) * 0.15;
+      this._hoverT[b.id] = t;
+      const scale = 1 + t * 0.12;
+      b.mesh.scale.setScalar(scale);
+      b.material.emissiveIntensity = b.baseEmissive * (1 + t * 0.6);
+    });
+  }
+});
+
 /*
   Tres acentos puntuales, sin sombra, tomados de la version antigua del
   proyecto -- son luces reales (THREE.PointLight), no un cambio de
@@ -1789,6 +2222,7 @@ AFRAME.registerComponent('mood-lighting', {
 
 AFRAME.registerComponent('exhibit-lighting', {
   init() {
+    this.spotsByAnchor = {};   // expuesto para reactor-control (foco del reactor)
     this.el.addEventListener('museo-modules-loaded', () => this.onLoaded());
   },
   onLoaded() {
@@ -1817,8 +2251,10 @@ AFRAME.registerComponent('exhibit-lighting', {
       spot.position.set(c.x, c.y + 2.4, c.z);
       spot.castShadow = false;
       spot.target.position.copy(c);
+      spot.userData.baseIntensity = f.intensidad;
       raiz.add(spot);
       raiz.add(spot.target);
+      this.spotsByAnchor[f.anchor] = spot;
       puestos++;
     });
     console.log(`[exhibit-lighting] ${puestos} focos de exposicion`);
