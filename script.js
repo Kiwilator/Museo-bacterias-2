@@ -1131,6 +1131,7 @@ AFRAME.registerComponent('exhibit-info', {
       const data = museumContent[id];
       let pos = null;
       let topY = null;
+      let bottomY = null;
       let anchorObj = null;
       if (data.tier === 'tertiary') {
         const h = huecos[data.windowIndex];
@@ -1142,13 +1143,14 @@ AFRAME.registerComponent('exhibit-info', {
           const box = new THREE.Box3().setFromObject(o);
           pos = box.getCenter(new THREE.Vector3());
           topY = box.max.y;
+          bottomY = box.min.y;
           // Marca cada malla de esta pieza para la seleccion directa por
           // click/tap (ver drag-look-controls.trySelect): asi el raycaster
           // solo puede tocar piezas con ficha real, nunca paredes/suelo/neon.
           o.traverse((n) => { if (n.isMesh) n.userData.museoExhibitId = id; });
         }
       }
-      if (pos) this.items.push({ id, data, pos, topY, anchorObj });
+      if (pos) this.items.push({ id, data, pos, topY, bottomY, anchorObj });
       else console.warn('[exhibit-info] sin ancla:', id, data.anchor || 'ventana');
     });
 
@@ -1168,11 +1170,11 @@ AFRAME.registerComponent('exhibit-info', {
   },
 
   /*
-    Prepara UNA pieza informativa para el nuevo lenguaje visual de
-    interaccion: un "pivote" (THREE.Group) centrado en su propio volumen,
-    del que cuelga la entidad gltf-model que la contiene (nunca el nodo
-    animado en si -- ver nota mas abajo), y una etiqueta flotante "VIEW +"
-    en la escena que se atenua/enciende segun la distancia del visitante.
+    Prepara UNA pieza informativa para el lenguaje visual de interaccion: un
+    "pivote" (THREE.Group) centrado en su propio volumen, del que cuelga la
+    entidad gltf-model que la contiene (nunca el nodo animado en si -- ver
+    nota mas abajo), y una ficha compacta (numero + nombre + "VIEW +") junto
+    a la peana que se atenua/enciende segun la distancia del visitante.
 
     Por que un pivote y no escalar la pieza directamente: cada bacteria trae
     su propia animacion de posicion/rotacion horneada en el propio nodo
@@ -1223,36 +1225,64 @@ AFRAME.registerComponent('exhibit-info', {
     it.label = this.createLabel(it);
   },
 
-  /* Etiqueta flotante "VIEW +": una placa crema muy tenue + texto violeta,
-     siempre orientada a la camara, hija de la escena (no del pivote, para
-     que el escalado del hover no deforme el texto). Arranca invisible; el
-     tick() la va encendiendo/apagando segun la distancia y el hover. */
+  /*
+    Ficha compacta junto a la peana: numero de seccion, nombre de la pieza y,
+    debajo y mas pequeño, "VIEW +" -- la misma jerarquia numero/titulo que ya
+    usa el panel grande (.panel-section/.panel-title), en miniatura, pegada
+    a la exhibicion en vez de flotando arriba en el hueco. Placa crema muy
+    tenue detras para que se lea sobre cualquier fondo. Siempre orientada a
+    la camara, hija de la escena (no del pivote, para que el escalado del
+    hover no la deforme). Arranca invisible; tick() la enciende/apaga segun
+    la distancia y el hover, igual que antes.
+  */
   createLabel(it) {
-    const labelY = (it.topY !== null ? it.topY : it.pos.y + 0.4) + 0.16;
+    const baseY = (it.bottomY !== null ? it.bottomY : it.pos.y - 0.4) + 0.13;
 
     const wrapper = document.createElement('a-entity');
     wrapper.setAttribute('face-camera', '');
-    wrapper.object3D.position.set(it.pos.x, labelY, it.pos.z);
+    wrapper.object3D.position.set(it.pos.x, baseY, it.pos.z);
 
     const bg = document.createElement('a-plane');
-    bg.setAttribute('width', 0.4);
-    bg.setAttribute('height', 0.13);
+    bg.setAttribute('width', 0.34);
+    bg.setAttribute('height', 0.21);
     bg.setAttribute('material', 'color: #faf6f0; shader: flat; opacity: 0; transparent: true; side: double');
     wrapper.appendChild(bg);
 
-    const txt = document.createElement('a-text');
-    txt.setAttribute('value', 'VIEW +');
-    txt.setAttribute('align', 'center');
-    txt.setAttribute('baseline', 'center');
-    txt.setAttribute('width', 1.1);
-    txt.setAttribute('letter-spacing', 4);
-    txt.setAttribute('color', '#7d3fa8');
-    txt.setAttribute('opacity', 0);
-    txt.object3D.position.set(0, 0, 0.003);
-    wrapper.appendChild(txt);
+    const section = document.createElement('a-text');
+    section.setAttribute('value', it.data.section || '');
+    section.setAttribute('align', 'center');
+    section.setAttribute('baseline', 'center');
+    section.setAttribute('width', 0.5);
+    section.setAttribute('letter-spacing', 3);
+    section.setAttribute('color', '#7d3fa8');
+    section.setAttribute('opacity', 0);
+    section.object3D.position.set(0, 0.07, 0.003);
+    wrapper.appendChild(section);
+
+    const title = document.createElement('a-text');
+    title.setAttribute('value', it.data.title || '');
+    title.setAttribute('align', 'center');
+    title.setAttribute('baseline', 'center');
+    title.setAttribute('width', 0.62);
+    title.setAttribute('wrap-count', 16);
+    title.setAttribute('color', '#2a2622');
+    title.setAttribute('opacity', 0);
+    title.object3D.position.set(0, 0.015, 0.003);
+    wrapper.appendChild(title);
+
+    const cue = document.createElement('a-text');
+    cue.setAttribute('value', 'VIEW +');
+    cue.setAttribute('align', 'center');
+    cue.setAttribute('baseline', 'center');
+    cue.setAttribute('width', 0.42);
+    cue.setAttribute('letter-spacing', 3);
+    cue.setAttribute('color', '#7d3fa8');
+    cue.setAttribute('opacity', 0);
+    cue.object3D.position.set(0, -0.065, 0.003);
+    wrapper.appendChild(cue);
 
     this.el.sceneEl.appendChild(wrapper);
-    return { wrapper, bg, txt };
+    return { wrapper, bg, section, title, cue };
   },
 
   /*
@@ -1333,9 +1363,12 @@ AFRAME.registerComponent('exhibit-info', {
 
       if (it.label) {
         const bgOpacity = it.labelOpacity * 0.82;
-        const txtOpacity = it.labelOpacity * (0.82 + it.hoverT * 0.18);  // "VIEW +" algo mas brillante en hover
+        const textOpacity = it.labelOpacity * 0.9;
+        const cueOpacity = it.labelOpacity * (0.82 + it.hoverT * 0.18);  // "VIEW +" algo mas brillante en hover
         it.label.bg.setAttribute('material', 'opacity', bgOpacity);
-        it.label.txt.setAttribute('opacity', txtOpacity);
+        it.label.section.setAttribute('opacity', textOpacity);
+        it.label.title.setAttribute('opacity', textOpacity);
+        it.label.cue.setAttribute('opacity', cueOpacity);
         it.label.wrapper.object3D.visible = it.labelOpacity > 0.003;
       }
     });
@@ -1604,6 +1637,42 @@ AFRAME.scenes[0]?.addEventListener('loaded', () => {
     el.setAttribute('log-when-loaded', '');
   });
 });
+
+/*
+  Bucle robusto del video del primer circulo. `loop` en el propio <video>
+  ya deberia bastar, pero se reafirma por si el navegador ignora el
+  autoplay inicial (tipico si la pestaña no tenia foco) o si la textura de
+  video de three.js se queda parada en el ultimo frame: se relanza al
+  terminar y, si el primer intento de reproduccion es bloqueado, se
+  reintenta en cuanto haya cualquier primer gesto del visitante (click,
+  toque o tecla) -- el video sigue muted, asi que esos reintentos no
+  chocan con las politicas de autoplay de ningun navegador.
+*/
+(function () {
+  const video = document.getElementById('ppb-video-01');
+  if (!video) return;
+  video.loop = true;
+  video.muted = true;
+  video.playsInline = true;
+
+  const tryPlay = () => {
+    const p = video.play();
+    if (p && p.catch) p.catch(() => {});
+  };
+
+  video.addEventListener('ended', tryPlay);
+  tryPlay();
+
+  const onFirstInteraction = () => {
+    tryPlay();
+    window.removeEventListener('click', onFirstInteraction);
+    window.removeEventListener('touchstart', onFirstInteraction);
+    window.removeEventListener('keydown', onFirstInteraction);
+  };
+  window.addEventListener('click', onFirstInteraction);
+  window.addEventListener('touchstart', onFirstInteraction);
+  window.addEventListener('keydown', onFirstInteraction);
+})();
 
 /* ---------- Loading screen ---------- */
 (function () {
