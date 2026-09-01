@@ -1222,7 +1222,10 @@ AFRAME.registerComponent('exhibit-info', {
     });
     it.emissiveMats = Array.from(mats).map((mat) => ({ mat, base: mat.emissiveIntensity }));
 
-    it.label = this.createLabel(it);
+    // Las 6 cepas pequeñas (tier "secondary") usan el popup nuevo, compacto
+    // y desplazado delante de la vitrina; las 2 piezas grandes conservan la
+    // ficha ya existente, que no tenia el problema reportado.
+    it.label = (it.data.tier === 'secondary') ? this.createSmallPopup(it) : this.createLabel(it);
   },
 
   /*
@@ -1286,6 +1289,109 @@ AFRAME.registerComponent('exhibit-info', {
   },
 
   /*
+    Textura compartida (un solo canvas, reutilizado por las 6 cepas
+    pequeñas) para el resplandor suave que sustituye a la placa rectangular
+    de fondo: un degradado radial, sin bordes duros, para que el popup se
+    lea como luz sobre la peana en vez de como una tarjeta de interfaz.
+  */
+  getPopupGlowTexture() {
+    if (this._popupGlowTexture) return this._popupGlowTexture;
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const ctx = c.getContext('2d');
+    const g = ctx.createRadialGradient(64, 64, 2, 64, 64, 64);
+    g.addColorStop(0, 'rgba(250,244,234,0.95)');
+    g.addColorStop(0.5, 'rgba(250,244,234,0.5)');
+    g.addColorStop(1, 'rgba(250,244,234,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 128, 128);
+    this._popupGlowTexture = new THREE.CanvasTexture(c);
+    return this._popupGlowTexture;
+  },
+
+  /*
+    Popup compacto para las 6 cepas pequeñas (tier "secondary"). Sustituye a
+    la ficha rectangular anterior, que quedaba centrada en el mismo eje X/Z
+    que la propia bacteria -- es decir, dentro del hueco de la vitrina,
+    detras del cristal. Aqui el popup se desplaza desde el centro de la
+    pieza hacia el centro de la sala (mismo criterio ya usado para orientar
+    los circulos de video: la normal/direccion "hacia el centro" es la que
+    de verdad mira al visitante), asi que aparece delante del cristal, a la
+    altura de la base de la peana, nunca detras ni sobre la bacteria.
+
+    Visualmente es deliberadamente ligero: sin placa opaca, solo el
+    resplandor radial de getPopupGlowTexture() detras de tres lineas de
+    texto pequeñas (numero / nombre / "Click to explore"). El disparo por
+    proximidad es mucho mas corto que el de la ficha grande (ver tick()) --
+    debe leerse como un gesto de interaccion al llegar a esa peana concreta,
+    no como un rotulo fijo visible desde el centro de la sala.
+  */
+  createSmallPopup(it) {
+    const bounds = window.MUSEO_BOUNDS;
+    let ox = 0, oz = 1;
+    if (bounds) {
+      const cx = (bounds.minX + bounds.maxX) / 2;
+      const cz = (bounds.minZ + bounds.maxZ) / 2;
+      const dx = cx - it.pos.x, dz = cz - it.pos.z;
+      const len = Math.hypot(dx, dz);
+      if (len > 0.001) { ox = dx / len; oz = dz / len; }
+    }
+    const OFFSET = 0.30;
+    const baseY = (it.bottomY !== null ? it.bottomY : it.pos.y - 0.4) + 0.11;
+    const px = it.pos.x + ox * OFFSET;
+    const pz = it.pos.z + oz * OFFSET;
+
+    const wrapper = document.createElement('a-entity');
+    wrapper.setAttribute('face-camera', '');
+    wrapper.object3D.position.set(px, baseY, pz);
+
+    const bg = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.34, 0.20),
+      new THREE.MeshBasicMaterial({
+        map: this.getPopupGlowTexture(), transparent: true, opacity: 0,
+        depthWrite: false, toneMapped: false, side: THREE.DoubleSide
+      })
+    );
+    wrapper.object3D.add(bg);
+
+    const section = document.createElement('a-text');
+    section.setAttribute('value', it.data.section || '');
+    section.setAttribute('align', 'center');
+    section.setAttribute('baseline', 'center');
+    section.setAttribute('width', 0.34);
+    section.setAttribute('letter-spacing', 2);
+    section.setAttribute('color', '#7d3fa8');
+    section.setAttribute('opacity', 0);
+    section.object3D.position.set(0, 0.052, 0.003);
+    wrapper.appendChild(section);
+
+    const title = document.createElement('a-text');
+    title.setAttribute('value', it.data.title || '');
+    title.setAttribute('align', 'center');
+    title.setAttribute('baseline', 'center');
+    title.setAttribute('width', 0.40);
+    title.setAttribute('wrap-count', 20);
+    title.setAttribute('color', '#3a3530');
+    title.setAttribute('opacity', 0);
+    title.object3D.position.set(0, 0.006, 0.003);
+    wrapper.appendChild(title);
+
+    const cue = document.createElement('a-text');
+    cue.setAttribute('value', 'Click to explore');
+    cue.setAttribute('align', 'center');
+    cue.setAttribute('baseline', 'center');
+    cue.setAttribute('width', 0.30);
+    cue.setAttribute('letter-spacing', 0.5);
+    cue.setAttribute('color', '#8a6a9c');
+    cue.setAttribute('opacity', 0);
+    cue.object3D.position.set(0, -0.048, 0.003);
+    wrapper.appendChild(cue);
+
+    this.el.sceneEl.appendChild(wrapper);
+    return { wrapper, bg, section, title, cue, isPopup: true };
+  },
+
+  /*
     Hover por raton: raycast contra las mismas mallas seleccionables que ya
     usa el click (drag-look-controls.trySelect), pero en cada movimiento del
     raton en vez de al soltar. Solo cambia this.hoverId + el cursor; el
@@ -1339,17 +1445,24 @@ AFRAME.registerComponent('exhibit-info', {
     this.items.forEach((it) => {
       if (!it.pivot) return;
       const d = Math.hypot(it.pos.x - p.x, it.pos.z - p.z);
+      const isHovered = this.hoverId === it.id;
+      const isPopup = !!(it.label && it.label.isPopup);
 
-      // 1) fundido de la etiqueta segun distancia: visible dentro de `show`,
-      // oculta a partir de `close`, rampa suave entre medias.
-      const range = Math.max(0.001, this.data.close - this.data.show);
-      const targetOpacity = THREE.MathUtils.clamp((this.data.close - d) / range, 0, 1);
+      // 1) fundido de la etiqueta segun distancia. El popup compacto de las
+      // 6 cepas pequeñas usa un radio mucho mas corto que la ficha grande:
+      // debe leerse como un gesto de interaccion al llegar a esa peana en
+      // concreto (o al señalarla con el raton), nunca como un rotulo fijo
+      // visible ya desde el centro de la sala.
+      const showDist = isPopup ? 0.95 : this.data.show;
+      const closeDist = isPopup ? 1.7 : this.data.close;
+      const range = Math.max(0.001, closeDist - showDist);
+      let targetOpacity = THREE.MathUtils.clamp((closeDist - d) / range, 0, 1);
+      if (isPopup && isHovered) targetOpacity = 1;
       it.labelOpacity += (targetOpacity - it.labelOpacity) * 0.12;
       if (it.labelOpacity < 0.004) it.labelOpacity = 0;
 
       // 2) hover: entra/sale con una curva lenta (nada de saltos), y con una
       // respiracion muy leve mientras se mantiene el raton encima.
-      const isHovered = this.hoverId === it.id;
       it.hoverT += ((isHovered ? 1 : 0) - it.hoverT) * 0.08;
 
       const breathe = 0.5 + 0.5 * Math.sin(time * 0.0016);
@@ -1362,10 +1475,16 @@ AFRAME.registerComponent('exhibit-info', {
       }
 
       if (it.label) {
-        const bgOpacity = it.labelOpacity * 0.82;
-        const textOpacity = it.labelOpacity * 0.9;
-        const cueOpacity = it.labelOpacity * (0.82 + it.hoverT * 0.18);  // "VIEW +" algo mas brillante en hover
-        it.label.bg.setAttribute('material', 'opacity', bgOpacity);
+        const bgOpacity = it.labelOpacity * (isPopup ? 0.60 : 0.82);
+        const textOpacity = it.labelOpacity * (isPopup ? 0.95 : 0.9);
+        const cueOpacity = isPopup
+          ? it.labelOpacity * 0.75
+          : it.labelOpacity * (0.82 + it.hoverT * 0.18);  // "VIEW +" algo mas brillante en hover
+        if (isPopup) {
+          it.label.bg.material.opacity = bgOpacity;
+        } else {
+          it.label.bg.setAttribute('material', 'opacity', bgOpacity);
+        }
         it.label.section.setAttribute('opacity', textOpacity);
         it.label.title.setAttribute('opacity', textOpacity);
         it.label.cue.setAttribute('opacity', cueOpacity);
