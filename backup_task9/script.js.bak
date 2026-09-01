@@ -674,16 +674,8 @@ AFRAME.registerComponent('respawn-guard', {
   no van sincronizadas entre si).
 */
 AFRAME.registerComponent('gltf-animations', {
-  // fps: el mixer no necesita actualizarse a la frecuencia de refresco de la
-  // pantalla para verse suave -- son respiraciones/balanceos lentos. 30 Hz
-  // es indistinguible a la vista y evita recalcular 12 modulos por frame.
-  // document.hidden ademas pausa el trabajo cuando la pestaña no es visible.
-  schema: {
-    fps: { type: 'number', default: 30 }
-  },
   init() {
     this.mixer = null;
-    this.accumulated = 0;
     this.el.addEventListener('model-loaded', () => this.onLoaded());
   },
   onLoaded() {
@@ -704,12 +696,7 @@ AFRAME.registerComponent('gltf-animations', {
     console.log(`[gltf-animations] reproduciendo ${clips.length} animaciones en bucle`);
   },
   tick(time, timeDelta) {
-    if (!this.mixer || !timeDelta || document.hidden) return;
-    this.accumulated += timeDelta;
-    const interval = 1000 / Math.max(1, this.data.fps);
-    if (this.accumulated < interval) return;
-    this.mixer.update(this.accumulated / 1000);
-    this.accumulated = 0;
+    if (this.mixer && timeDelta) this.mixer.update(timeDelta / 1000);
   }
 });
 
