@@ -1364,7 +1364,10 @@ AFRAME.registerComponent('exhibit-info', {
       const len = Math.hypot(dx, dz);
       if (len > 0.001) { ox = dx / len; oz = dz / len; }
     }
-    const OFFSET = 0.28;
+    // Empujon claro hacia el frente de la peana: tiene que leerse delante
+    // del tubo, no metido/fundido en su superficie. Sigue siendo la misma
+    // direccion (centro de la sala), solo mas generoso que el primer ajuste.
+    const OFFSET = 0.17;
     const spawn = window.MUSEO_SPAWN;
     const floorY = (spawn && typeof spawn.y === 'number')
       ? spawn.y
@@ -1377,14 +1380,32 @@ AFRAME.registerComponent('exhibit-info', {
     wrapper.setAttribute('face-camera', '');
     wrapper.object3D.position.set(px, baseY, pz);
 
+    /*
+      Placa con volumen real, no un plano 2D: una porcion curva de cilindro
+      (un "semi-tubo" muy abierto, como una cartela de museo ligeramente
+      combada) en vez de PlaneGeometry. El arco se centra en el eje -Z local
+      (delante de la camara tras el face-camera) y se retrasa su propio
+      radio para que el punto mas hundido del arco quede en z=0 y los bordes
+      se curven ligeramente hacia el visitante -- de ahi que el texto (mas
+      abajo) se adelante un poco mas en Z que la placa.
+    */
+    const PLAQUE_RADIUS = 0.55;
+    const PLAQUE_ARC = THREE.MathUtils.degToRad(34);
+    const bgGeo = new THREE.CylinderGeometry(
+      PLAQUE_RADIUS, PLAQUE_RADIUS, 0.20, 20, 1, true,
+      -Math.PI / 2 - PLAQUE_ARC / 2, PLAQUE_ARC
+    );
     const bg = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.34, 0.20),
+      bgGeo,
       new THREE.MeshBasicMaterial({
         map: this.getPopupGlowTexture(), transparent: true, opacity: 0,
         color: 0xe6d8c2, depthWrite: false, toneMapped: false, side: THREE.DoubleSide
       })
     );
+    bg.position.z = PLAQUE_RADIUS;
     wrapper.object3D.add(bg);
+
+    const TEXT_Z = 0.035;   // delante del punto mas saliente de la curva
 
     const section = document.createElement('a-text');
     section.setAttribute('value', it.data.section || '');
@@ -1394,7 +1415,7 @@ AFRAME.registerComponent('exhibit-info', {
     section.setAttribute('letter-spacing', 2);
     section.setAttribute('color', '#7d3fa8');
     section.setAttribute('opacity', 0);
-    section.object3D.position.set(0, 0.052, 0.003);
+    section.object3D.position.set(0, 0.052, TEXT_Z);
     wrapper.appendChild(section);
 
     const title = document.createElement('a-text');
@@ -1405,7 +1426,7 @@ AFRAME.registerComponent('exhibit-info', {
     title.setAttribute('wrap-count', 20);
     title.setAttribute('color', '#3a3530');
     title.setAttribute('opacity', 0);
-    title.object3D.position.set(0, 0.006, 0.003);
+    title.object3D.position.set(0, 0.006, TEXT_Z);
     wrapper.appendChild(title);
 
     const cue = document.createElement('a-text');
@@ -1416,7 +1437,7 @@ AFRAME.registerComponent('exhibit-info', {
     cue.setAttribute('letter-spacing', 0.5);
     cue.setAttribute('color', '#8a6a9c');
     cue.setAttribute('opacity', 0);
-    cue.object3D.position.set(0, -0.048, 0.003);
+    cue.object3D.position.set(0, -0.048, TEXT_Z);
     wrapper.appendChild(cue);
 
     this.el.sceneEl.appendChild(wrapper);

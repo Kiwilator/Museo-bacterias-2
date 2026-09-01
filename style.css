@@ -121,12 +121,13 @@ html, body {
 
 /* --- panel de informacion --- */
 #exhibit-panel {
+  display: flex;
+  flex-direction: column;
   right: 32px;
   top: 50%;
   width: 410px;
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 80px);
-  overflow-y: auto;
   transform: translate(0, calc(-50% + 10px));
   padding: 30px 32px 32px;
   background: var(--mus-crema);
@@ -139,11 +140,34 @@ html, body {
 }
 #exhibit-panel.visible { opacity: 1; transform: translate(0, -50%); pointer-events: auto; }
 #exhibit-panel .panel-close {
-  position: absolute; top: 14px; right: 16px;
+  position: absolute; top: 14px; right: 16px; z-index: 1;
   border: 0; background: none; cursor: pointer;
   font-size: 22px; line-height: 1; color: var(--mus-tinta); opacity: 0.5;
 }
 #exhibit-panel .panel-close:hover { opacity: 1; }
+/* el texto largo (Sala 1 usa fichas de varios parrafos) se desplaza dentro
+   de esta zona en vez de forzar el panel entero fuera de la pantalla; el
+   degradado de abajo (panel-fade) avisa de que hay mas texto sin necesidad
+   de que se note un scrollbar grueso */
+#exhibit-panel .panel-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--mus-morado) transparent;
+}
+#exhibit-panel .panel-scroll::-webkit-scrollbar { width: 5px; }
+#exhibit-panel .panel-scroll::-webkit-scrollbar-track { background: transparent; }
+#exhibit-panel .panel-scroll::-webkit-scrollbar-thumb {
+  background: var(--mus-morado); opacity: 0.5; border-radius: 3px;
+}
+#exhibit-panel .panel-fade {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 34px;
+  background: linear-gradient(to bottom, transparent, var(--mus-crema) 75%);
+  border-radius: 0 0 8px 8px;
+  pointer-events: none;
+}
 #exhibit-panel .panel-section {
   display: block; margin-bottom: 14px;
   font-size: 11px; letter-spacing: 0.2em; color: var(--mus-morado); font-weight: 600;
