@@ -1238,7 +1238,12 @@ AFRAME.registerComponent('exhibit-info', {
     // Las 6 cepas pequeñas (tier "secondary") usan el popup nuevo, compacto
     // y desplazado delante de la vitrina; las 2 piezas grandes conservan la
     // ficha ya existente, que no tenia el problema reportado.
-    it.label = (it.data.tier === 'secondary') ? this.createSmallPopup(it) : this.createLabel(it);
+    // Las 8 cepas usan el mismo popup compacto: la ficha antigua (create
+    // Label, ver abajo) quedaba centrada en el eje X/Z de la propia pieza y
+    // por eso se leia pegada o encima de la bacteria grande -- el mismo
+    // problema que ya se corrigio para las 6 pequeñas, asi que aqui se
+    // aplica el mismo popup a las 8.
+    it.label = this.createSmallPopup(it);
   },
 
   /*
@@ -1323,21 +1328,31 @@ AFRAME.registerComponent('exhibit-info', {
   },
 
   /*
-    Popup compacto para las 6 cepas pequeñas (tier "secondary"). Sustituye a
-    la ficha rectangular anterior, que quedaba centrada en el mismo eje X/Z
-    que la propia bacteria -- es decir, dentro del hueco de la vitrina,
-    detras del cristal. Aqui el popup se desplaza desde el centro de la
-    pieza hacia el centro de la sala (mismo criterio ya usado para orientar
-    los circulos de video: la normal/direccion "hacia el centro" es la que
-    de verdad mira al visitante), asi que aparece delante del cristal, a la
-    altura de la base de la peana, nunca detras ni sobre la bacteria.
+    Popup compacto para las 8 cepas. Sustituye a la ficha rectangular
+    anterior (createLabel, mas abajo, ya sin uso), que quedaba centrada en
+    el mismo eje X/Z que la propia bacteria -- por eso se leia pegada o
+    encima de la pieza grande, dentro del hueco de la vitrina. Aqui el popup
+    se desplaza desde el centro de la pieza hacia el centro de la sala
+    (mismo criterio ya usado para orientar los circulos de video: la
+    normal/direccion "hacia el centro" es la que de verdad mira al
+    visitante), asi que aparece delante del cristal, nunca detras ni sobre
+    la bacteria.
+
+    La altura se mide desde el SUELO real (window.MUSEO_SPAWN.y, calculado
+    en setup-museum-model), no desde la base de la propia bacteria: esa
+    malla ya empieza bastante por encima del suelo (se apoya en la peana),
+    asi que anclar la altura ahi dejaba el popup a la altura del cristal en
+    vez de a la altura del pie de la peana. Medio metro sobre el suelo real
+    lo deja pegado a la base solida de la peana, por debajo de la campana de
+    cristal.
 
     Visualmente es deliberadamente ligero: sin placa opaca, solo el
     resplandor radial de getPopupGlowTexture() detras de tres lineas de
     texto pequeñas (numero / nombre / "Click to explore"). El disparo por
-    proximidad es mucho mas corto que el de la ficha grande (ver tick()) --
-    debe leerse como un gesto de interaccion al llegar a esa peana concreta,
-    no como un rotulo fijo visible desde el centro de la sala.
+    proximidad es mucho mas corto que el de la ficha grande antigua (ver
+    tick()) -- debe leerse como un gesto de interaccion al llegar a esa
+    peana concreta, no como un rotulo fijo visible desde el centro de la
+    sala.
   */
   createSmallPopup(it) {
     const bounds = window.MUSEO_BOUNDS;
@@ -1349,8 +1364,12 @@ AFRAME.registerComponent('exhibit-info', {
       const len = Math.hypot(dx, dz);
       if (len > 0.001) { ox = dx / len; oz = dz / len; }
     }
-    const OFFSET = 0.30;
-    const baseY = (it.bottomY !== null ? it.bottomY : it.pos.y - 0.4) + 0.11;
+    const OFFSET = 0.28;
+    const spawn = window.MUSEO_SPAWN;
+    const floorY = (spawn && typeof spawn.y === 'number')
+      ? spawn.y
+      : (it.bottomY !== null ? it.bottomY - 0.9 : it.pos.y - 1.2);
+    const baseY = floorY + 0.5;
     const px = it.pos.x + ox * OFFSET;
     const pz = it.pos.z + oz * OFFSET;
 
