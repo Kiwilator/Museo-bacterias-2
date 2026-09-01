@@ -254,18 +254,24 @@ a-scene canvas { touch-action: none; }
 #exhibit-panel .panel-body p { margin: 0 0 12px; }
 #exhibit-panel .panel-body p:last-child { margin-bottom: 0; }
 #exhibit-panel .panel-body strong { font-weight: 700; opacity: 1; color: var(--mus-tinta); }
-/* imagenes de apoyo (opcional, solo para fichas que las traen en
-   museumContent[id].images): en la cabecera fija, nunca vacias a medias --
-   proporcionales, centradas, sin recortes forzados. */
+/* medios de apoyo (opcional, imagenes o videos cortos): en la cabecera fija,
+   nunca vacios a medias -- proporcionales, centrados, sin recortes forzados. */
 #exhibit-panel .panel-images {
   display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px;
 }
 #exhibit-panel .panel-images:empty { display: none; margin: 0; }
-#exhibit-panel .panel-images img {
+#exhibit-panel .panel-images img,
+#exhibit-panel .panel-images video {
   flex: 1 1 45%; min-width: 90px; max-width: 100%; height: 92px;
   display: block; object-fit: contain; object-position: center;
   background: #fff;
   border: 1px solid var(--mus-borde); border-radius: 4px;
+}
+#exhibit-panel .panel-images video {
+  flex-basis: 100%;
+  width: 100%;
+  height: 138px;
+  background: #050415;
 }
 /* las piezas secundarias/terciarias se leen mas rapido: tarjeta aun mas
    compacta */
@@ -274,6 +280,7 @@ a-scene canvas { touch-action: none; }
 #exhibit-panel.secondary .panel-lead { font-size: 11px; margin-bottom: 10px; }
 #exhibit-panel.secondary .panel-body { font-size: 12.5px; line-height: 1.62; }
 #exhibit-panel.secondary .panel-images img { height: 82px; }
+#exhibit-panel.secondary .panel-images video { height: 112px; }
 
 /* --- ficha de ventana (contenido pasivo) --- */
 #exhibit-caption {

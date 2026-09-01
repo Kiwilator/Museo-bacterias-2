@@ -1036,7 +1036,7 @@ const museumContent = {
     section: '05', title: 'RHODOMICROBIUM VANNIELII', label: 'EXPLORE +',
     // Microscopia de contraste de fase real, celulas con apendices polares
     // -- coherente con la budding/hifas descritas en el cuerpo del texto.
-    images: ['./assets/images/rhodomicrobium-budding.jpg'],
+    images: ['./assets/videos/rhodomicrobium-vannielii-animation.mp4', './assets/images/rhodomicrobium-budding.jpg'],
     body: 'We often imagine bacteria reproducing through a simple division in which one cell produces two almost identical cells. Rhodomicrobium vannielii shows that bacterial reproduction can be considerably more complex.\n\nThis bacterium develops filamentous extensions known as hyphae. New cells are formed by budding from the tips of these structures. A small bud appears, gradually grows and eventually separates to form a new cell.\n\nThis life cycle includes processes of cellular differentiation and unusual multicellular stages, making R. vannielii an important organism for studying the evolution of complex bacterial life cycles.\n\nIts distinctive morphology also provides a striking example of the extraordinary diversity found among photosynthetic bacteria.'
   },
   bacteriaSmall04: {
@@ -2120,17 +2120,33 @@ AFRAME.registerComponent('exhibit-info', {
     // cuerpo: parrafos reales + negrita solo en los conceptos clave (ver
     // renderPanelBody/highlightKeywords) -- el texto en si no cambia.
     this.panel.querySelector('.panel-body').innerHTML = renderPanelBody(d.body);
-    // imagenes de apoyo opcionales (museumContent[id].images = ['./ruta.jpg', ...]);
-    // vacio por defecto, no se muestra nada si la pieza no las trae -- nunca
-    // la imagen del circulo/nicho, que es un contenido aparte.
+    // medios de apoyo opcionales (imagenes o videos cortos). Vacio por
+    // defecto, no se muestra nada si la pieza no los trae -- nunca la imagen
+    // del circulo/nicho, que es un contenido aparte.
     const imagesEl = this.panel.querySelector('.panel-images');
     if (imagesEl) {
       imagesEl.innerHTML = '';
       (d.images || []).forEach((src) => {
-        const img = document.createElement('img');
-        img.src = src;
-        img.alt = d.title || '';
-        imagesEl.appendChild(img);
+        const isVideo = /\.(mp4|webm|mov)(\?|#|$)/i.test(src);
+        if (isVideo) {
+          const video = document.createElement('video');
+          video.src = src;
+          video.muted = true;
+          video.loop = true;
+          video.autoplay = true;
+          video.playsInline = true;
+          video.setAttribute('aria-label', d.title || '');
+          video.addEventListener('canplay', () => {
+            const p = video.play();
+            if (p && p.catch) p.catch(() => {});
+          }, { once: true });
+          imagesEl.appendChild(video);
+        } else {
+          const img = document.createElement('img');
+          img.src = src;
+          img.alt = d.title || '';
+          imagesEl.appendChild(img);
+        }
       });
     }
     const tags = this.panel.querySelector('.panel-tags');
