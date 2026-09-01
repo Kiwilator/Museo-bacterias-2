@@ -2793,6 +2793,84 @@ AFRAME.registerComponent('reactor-control', {
     };
   },
 
+  buildControlPanelTexture(widthM, heightM, defs) {
+    const HPX = 520;
+    const WPX = Math.max(1200, Math.round(HPX * (widthM / heightM)));
+    const c = document.createElement('canvas');
+    c.width = WPX; c.height = HPX;
+    const ctx = c.getContext('2d');
+
+    ctx.fillStyle = '#F7F4EE';
+    ctx.fillRect(0, 0, WPX, HPX);
+    const grain = Math.round((WPX * HPX) / 650);
+    for (let i = 0; i < grain; i++) {
+      const v = 205 + Math.floor(Math.random() * 42);
+      ctx.fillStyle = `rgba(${v},${v},${v},0.045)`;
+      ctx.fillRect(Math.random() * WPX, Math.random() * HPX, 1, 1);
+    }
+
+    const accent = ROOM2_ACCENT;
+    const ink = '#201A1E';
+    const muted = '#756E69';
+    const padX = WPX * 0.075;
+    const topY = HPX * 0.18;
+
+    ctx.fillStyle = accent;
+    ctx.fillRect(padX, HPX * 0.145, WPX - padX * 2, 6);
+    ctx.fillStyle = '#D7D0C8';
+    ctx.fillRect(padX, HPX * 0.765, WPX - padX * 2, 3);
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = accent;
+    ctx.font = '700 46px Arial, Helvetica, sans-serif';
+    ctx.fillText('02', padX, topY);
+
+    ctx.fillStyle = ink;
+    ctx.font = '800 62px Arial, Helvetica, sans-serif';
+    ctx.fillText('BIOREACTOR', padX + 92, topY);
+
+    ctx.fillStyle = muted;
+    ctx.font = '600 24px Arial, Helvetica, sans-serif';
+    ctx.fillText('CONTROL STATES', padX + 92, topY + 50);
+
+    const cols = defs.length;
+    const usableW = WPX - padX * 2;
+    const colW = usableW / cols;
+    const labelY = HPX * 0.64;
+    const cueY = HPX * 0.82;
+    ctx.textAlign = 'center';
+    defs.forEach((d, i) => {
+      const x = padX + colW * (i + 0.5);
+      const color = `#${new THREE.Color(d.on).getHexString()}`;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, HPX * 0.36, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(44, 140, 130, 0.10)';
+      ctx.fillRect(x - colW * 0.37, HPX * 0.505, colW * 0.74, 2);
+
+      ctx.fillStyle = accent;
+      ctx.font = '700 30px Arial, Helvetica, sans-serif';
+      ctx.fillText(d.num, x, labelY - 34);
+
+      ctx.fillStyle = ink;
+      const labelFont = d.label.length > 8 ? 34 : 40;
+      ctx.font = `800 ${labelFont}px Arial, Helvetica, sans-serif`;
+      ctx.fillText(d.label, x, labelY + 10);
+
+      ctx.fillStyle = muted;
+      ctx.font = '600 20px Arial, Helvetica, sans-serif';
+      ctx.fillText('ON / OFF', x, cueY);
+    });
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    tex.needsUpdate = true;
+    return tex;
+  },
+
   /*
     Estacion de control: una unica placa (misma familia visual que las
     cartelas del resto del museo -- papel, sin cristal, sin resplandor
@@ -2887,12 +2965,17 @@ AFRAME.registerComponent('reactor-control', {
       ? fitWithin(0.13, 0.105, top.extentShort * 0.72)
       : 0.13;
     const exhibitInfo = this.el.components['exhibit-info'];
-    const paperTex = exhibitInfo && exhibitInfo.getPlacardPaperTexture
-      ? exhibitInfo.getPlacardPaperTexture() : null;
+    const defs = [
+      { id: 'light', num: '01', label: 'LIGHT', symbol: 'LUX', off: 0xe8f7f5, on: 0x59e7e0 },
+      { id: 'flow', num: '02', label: 'FLOW', symbol: 'FLOW', off: 0xe5f3ef, on: 0x35d5d3 },
+      { id: 'nutrients', num: '03', label: 'NUTRIENTS', symbol: 'FEED', off: 0xeaf4de, on: 0xa9dc69 },
+      { id: 'active', num: '04', label: 'ACTIVATE', symbol: 'BIO', off: 0xeee4f4, on: 0xb06ce8 }
+    ];
+    const controlTex = this.buildControlPanelTexture(WIDTH, HEIGHT, defs);
     const panel = new THREE.Mesh(
       new THREE.PlaneGeometry(WIDTH, HEIGHT),
       new THREE.MeshStandardMaterial({
-        color: 0xf3eee7, map: paperTex,
+        color: 0xffffff, map: controlTex,
         roughness: 0.9, metalness: 0, side: THREE.DoubleSide
       })
     );
@@ -2901,65 +2984,13 @@ AFRAME.registerComponent('reactor-control', {
     // selectableMeshes, solo los 4 botones son interactivos.
 
     const DETAIL_Z = 0.003;
-    const TEXT_Z = 0.006;
-    const trimMat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(ROOM2_ACCENT),
-      emissive: new THREE.Color(ROOM2_ACCENT),
-      emissiveIntensity: 0.08,
-      roughness: 0.7, metalness: 0, side: THREE.DoubleSide
-    });
-    const softLineMat = new THREE.MeshStandardMaterial({
-      color: 0xd7d0c8,
-      roughness: 0.85, metalness: 0, side: THREE.DoubleSide
-    });
-    const addRect = (x, y, w, h, mat, z = DETAIL_Z) => {
-      const rect = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
-      rect.position.set(x, y, z);
-      wrapper.object3D.add(rect);
-      return rect;
-    };
-    addRect(0, HEIGHT / 2 - HEIGHT * 0.065, WIDTH * 0.88, HEIGHT * 0.018, trimMat);
-    addRect(0, -HEIGHT / 2 + HEIGHT * 0.10, WIDTH * 0.82, HEIGHT * 0.010, softLineMat);
+    const BUTTON_Z = 0.008;
 
-    // 2 filas -- titulo arriba, boton + su "01 LIGHT" combinado debajo --
-    // todo dimensionado como fraccion de HEIGHT/WIDTH (nunca en metros fijos)
-    // para que encaje sea cual sea el tamaño real medido en cada carga.
-    // Fracciones mas ajustadas que antes (menos hueco reservado a margenes/
-    // separaciones) para dejar el maximo espacio posible al circulo del
-    // boton, que es lo que el brief pide "claramente visible, no un punto".
-    const heading = document.createElement('a-text');
-    heading.setAttribute('value', 'BIOREACTOR CONTROL');
-    heading.setAttribute('align', 'center');
-    heading.setAttribute('baseline', 'center');
-    heading.setAttribute('width', WIDTH * 0.72);
-    heading.setAttribute('wrap-count', 18);
-    heading.setAttribute('letter-spacing', 0.6);
-    heading.setAttribute('color', ROOM2_ACCENT);
-    heading.object3D.position.set(0, HEIGHT / 2 - HEIGHT * 0.18, TEXT_Z);
-    wrapper.appendChild(heading);
-
-    // fila de 4 botones, centrada, con espacio uniforme -- nunca mas ancha
-    // que un 80% de WIDTH, para que quede margen a los lados. Con el WIDTH
-    // mucho mayor que antes, cada columna dispone de mucho mas ancho real:
-    // eso es lo que permite botones y texto notablemente mas grandes sin
-    // arriesgar que se salgan del panel ni se toquen entre si.
-    const defs = [
-      { id: 'light', num: '01', label: 'LIGHT', symbol: 'LUX', off: 0xe8f7f5, on: 0x59e7e0 },
-      { id: 'flow', num: '02', label: 'FLOW', symbol: 'FLOW', off: 0xe5f3ef, on: 0x35d5d3 },
-      { id: 'nutrients', num: '03', label: 'NUTRIENTS', symbol: 'FEED', off: 0xeaf4de, on: 0xa9dc69 },
-      { id: 'active', num: '04', label: 'ACTIVATE', symbol: 'BIO', off: 0xeee4f4, on: 0xb06ce8 }
-    ];
     const spacing = Math.min(WIDTH * 0.24, (WIDTH * 0.86) / (defs.length - 1));
     const startX = -spacing * (defs.length - 1) / 2;
-    // Radio del boton: fraccion de HEIGHT (limite fisico real, el eje corto
-    // de la repisa), pero notablemente mayor que antes -- ya no "un punto"
-    // (verificado con /tmp/verify_panel_layout.js: ~6 cm de diametro, con
-    // margen de sobra tanto para el titulo arriba como para la etiqueta
-    // debajo, sin que ninguno de los dos se salga del panel).
-    const BTN_R = HEIGHT * 0.22;
-    const BTN_Y = -HEIGHT * 0.015;
-    const LABEL_Y = -HEIGHT * 0.365;
-    const STATUS_Y = BTN_Y + BTN_R + HEIGHT * 0.065;
+    const BTN_R = HEIGHT * 0.145;
+    const BTN_Y = -HEIGHT * 0.03;
+    const STATUS_Y = BTN_Y + BTN_R + HEIGHT * 0.085;
 
     defs.forEach((d, i) => {
       const bx = startX + i * spacing;
@@ -2976,15 +3007,15 @@ AFRAME.registerComponent('reactor-control', {
       });
       const ringMaterial = new THREE.MeshStandardMaterial({
         color: new THREE.Color(d.on), emissive: new THREE.Color(d.on),
-        emissiveIntensity: 0.06, roughness: 0.62, metalness: 0,
-        transparent: true, opacity: 0.42, side: THREE.DoubleSide
+        emissiveIntensity: 0.04, roughness: 0.62, metalness: 0,
+        transparent: true, opacity: 0.34, side: THREE.DoubleSide
       });
       const ring = new THREE.Mesh(new THREE.RingGeometry(BTN_R * 1.10, BTN_R * 1.30, 36), ringMaterial);
-      ring.position.set(bx, BTN_Y, TEXT_Z + 0.005);
+      ring.position.set(bx, BTN_Y, BUTTON_Z);
       wrapper.object3D.add(ring);
 
       const btn = new THREE.Mesh(new THREE.CircleGeometry(BTN_R, 28), material);
-      btn.position.set(bx, BTN_Y, TEXT_Z + 0.006);
+      btn.position.set(bx, BTN_Y, BUTTON_Z + 0.001);
       btn.userData.museoExhibitId = `reactorBtn_${d.id}`;   // para el hover (setHover)
       btn.userData.museoAction = () => this.onButtonClick(d.id);
       wrapper.object3D.add(btn);
@@ -2995,45 +3026,12 @@ AFRAME.registerComponent('reactor-control', {
         emissiveIntensity: 0.02, roughness: 0.55, metalness: 0,
         side: THREE.DoubleSide
       });
-      const status = new THREE.Mesh(new THREE.PlaneGeometry(BTN_R * 1.36, HEIGHT * 0.018), statusMaterial);
-      status.position.set(bx, STATUS_Y, TEXT_Z + 0.007);
+      const status = new THREE.Mesh(new THREE.PlaneGeometry(BTN_R * 1.18, HEIGHT * 0.016), statusMaterial);
+      status.position.set(bx, STATUS_Y, BUTTON_Z + 0.002);
       wrapper.object3D.add(status);
 
-      const icon = document.createElement('a-text');
-      icon.setAttribute('value', d.symbol);
-      icon.setAttribute('align', 'center');
-      icon.setAttribute('baseline', 'center');
-      icon.setAttribute('width', BTN_R * 2.2);
-      icon.setAttribute('wrap-count', Math.max(1, d.symbol.length));
-      icon.setAttribute('letter-spacing', 0);
-      icon.setAttribute('color', '#201A1E');
-      icon.object3D.position.set(bx, BTN_Y, TEXT_Z + 0.015);
-      wrapper.appendChild(icon);
-
-      // numero + nombre combinados en una sola linea ("01 LIGHT") debajo del
-      // boton. El ancho del cuadro de texto se calcula a partir del hueco
-      // real disponible por columna (spacing), no de HEIGHT como antes --
-      // con HEIGHT ya no era mas que ~0.09-0.11 m, ese ancho de texto
-      // acababa siendo mayor que el propio hueco entre botones y las
-      // etiquetas vecinas se solapaban. wrap-count = longitud exacta de
-      // cada texto (no un 12 fijo) para que la fuente aproveche todo el
-      // ancho de su columna sea cual sea la longitud de esa etiqueta en
-      // concreto ("02 FLOW" se ve mas grande que "03 NUTRIENTS", ambas
-      // llenan su columna igual).
-      const txt = `${d.num} ${d.label}`;
-      const label = document.createElement('a-text');
-      label.setAttribute('value', txt);
-      label.setAttribute('align', 'center');
-      label.setAttribute('baseline', 'center');
-      label.setAttribute('width', spacing * 0.96);
-      label.setAttribute('wrap-count', txt.length);
-      label.setAttribute('letter-spacing', 0.3);
-      label.setAttribute('color', '#201A1E');
-      label.object3D.position.set(bx, LABEL_Y, TEXT_Z);
-      wrapper.appendChild(label);
-
       this.buttons.push({
-        id: d.id, mesh: btn, material, icon, ring, ringMaterial, status, statusMaterial,
+        id: d.id, mesh: btn, material, ring, ringMaterial, status, statusMaterial,
         offColor: d.off, onColor: d.on,
         baseEmissive: material.emissiveIntensity
       });
@@ -3068,10 +3066,9 @@ AFRAME.registerComponent('reactor-control', {
       const on = this.stage[b.id];
       b.material.color.set(on ? b.onColor : b.offColor);
       b.material.emissive.set(b.onColor);
-      if (b.icon) b.icon.setAttribute('color', on ? '#ffffff' : '#201A1E');
       if (b.ringMaterial) {
-        b.ringMaterial.opacity = on ? 0.88 : 0.42;
-        b.ringMaterial.emissiveIntensity = on ? 0.36 : 0.06;
+        b.ringMaterial.opacity = on ? 0.82 : 0.34;
+        b.ringMaterial.emissiveIntensity = on ? 0.30 : 0.04;
       }
       if (b.statusMaterial) {
         b.statusMaterial.color.set(on ? b.onColor : 0xc9c2bc);
