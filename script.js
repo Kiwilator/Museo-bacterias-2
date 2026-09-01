@@ -878,12 +878,16 @@ const museumContent = {
     lead: 'Changing from within to adapt', tags: ['CHROMATOPHORES', 'ADAPTATION'], icon: 'surface',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_10',
     section: '03', title: 'CEREIBACTER SPHAEROIDES', label: 'VIEW +',
+    // Microscopia optica real, celulas esfericas -- coherente con "sphaeroides".
+    images: ['./assets/images/cereibacter-sphaeroides-microscopy.jpg'],
     body: 'Bacteria are not static organisms. Some can modify their own cellular architecture in response to the conditions around them.\n\nCereibacter sphaeroides (formerly known as Rhodobacter sphaeroides) is one of the most extensively studied photosynthetic microorganisms and provides a particularly clear example of this ability to adapt.\n\nWhen oxygen availability decreases, the bacterium develops extensive intracellular membranes known as chromatophores. These membranes contain the machinery required for photosynthesis. As environmental conditions change, the internal organization of the cell changes as well.\n\nResearch on C. sphaeroides has helped scientists understand both the molecular mechanisms of electron transfer during photosynthesis and the way microorganisms regulate and reorganize their metabolism in response to changing environments.'
   },
   bacteriaSmall03: {
     lead: 'Coordinating light, nitrogen and energy', tags: ['NITROGEN FIXATION', 'REDOX BALANCE'], icon: 'wave',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_12',
     section: '04', title: 'RHODOBACTER CAPSULATUS', label: 'VIEW +',
+    // Microscopia de fluorescencia real de bacterias purpuras.
+    images: ['./assets/images/rhodobacter-capsulatus-microscopy.jpg'],
     body: 'A cell must coordinate many processes at the same time. Rhodobacter capsulatus has become an important model organism for studying how a photosynthetic bacterium maintains this balance.\n\nResearch on this species has revealed important connections between photosynthesis, nitrogen fixation and cellular redox balance. These processes are interconnected and form part of the regulatory networks controlling how the cell obtains and uses energy.\n\nMore recently, structural studies have revealed an unusually compact architecture in its light-harvesting and reaction-center complex.\n\nIts study demonstrates that even within purple phototrophic bacteria, different biological solutions exist for capturing light, managing energy and responding to changing environmental conditions.'
   },
   bacteriaLarge02: {
@@ -899,12 +903,17 @@ const museumContent = {
     lead: 'Bacteria connected to electricity', tags: ['ELECTROACTIVITY', 'BIOELECTROCHEMISTRY'], icon: 'grid',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_14',
     section: '06', title: 'RHODOVULUM', label: 'VIEW +',
+    // Trabajo de laboratorio real con sondas de electrodo -- coherente con
+    // la electroactividad descrita en el cuerpo del texto.
+    images: ['./assets/images/rhodovulum-electroactivity.jpg'],
     body: 'Some purple phototrophic bacteria have a particularly remarkable ability (they are electroactive). This means that they can exchange electrons with elements outside the cell.\n\nSpecies of Rhodovulum (including Rhodovulum sulfidophilum and Rhodovulum visakhapatnamense) can obtain electrons from hydrogen, iron or even directly from an electrode.\n\nThese processes allow us to understand the bacterium not as an isolated organism, but as part of a system in which biological matter and conductive materials can exchange electrical charges.\n\nThe mechanisms responsible for this electroactivity are still not completely understood. For this reason, these bacteria remain an active field of research and provide new opportunities to investigate interactions between microorganisms, minerals and bioelectrochemical systems.'
   },
   bacteriaSmall05: {
     lead: 'Living from a toxic gas', tags: ['CARBON MONOXIDE', 'BIOHYDROGEN'], icon: 'scale',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_16',
     section: '07', title: 'RUBRIVIVAX GELATINOSUS', label: 'VIEW +',
+    // Micrografia TEM real de bacterias purpuras.
+    images: ['./assets/images/rubrivivax-gelatinosus-tem.jpg'],
     body: 'Carbon monoxide (CO) is toxic to many organisms. Rubrivivax gelatinosus, however, is able to use it as an energy source.\n\nUnder anaerobic conditions (in the absence of oxygen), some purple phototrophic bacteria can oxidize CO using specialized enzyme systems. In R. gelatinosus, this metabolism can also be linked to hydrogen production.\n\nThis ability has made the species an important model for studying both the biological conversion of carbon monoxide and potential processes for biohydrogen production.\n\nIts case illustrates one of the key ideas running throughout this room (the remarkable metabolic flexibility of purple phototrophic bacteria and their ability to exploit substances and environmental conditions that would be unfavorable for many other organisms).'
   },
   bacteriaSmall06: {
@@ -1287,6 +1296,22 @@ AFRAME.registerComponent('exhibit-info', {
           // click/tap (ver drag-look-controls.trySelect): asi el raycaster
           // solo puede tocar piezas con ficha real, nunca paredes/suelo/neon.
           o.traverse((n) => { if (n.isMesh) n.userData.museoExhibitId = id; });
+          // Caso especial del reactor: su ancla (PEANA_Bioreactor) es solo la
+          // peana/base, un anillo pequeño y en gran parte tapado por el
+          // propio reactor que se apoya encima -- el cuerpo visible del
+          // reactor (cristal, liquido, burbujas, tapa...) vive en nodos
+          // hermanos con prefijo "Bioreactor_" del mismo modulo GLB, sin
+          // marcar hasta ahora. Sin esto, el visitante podia pasar el raton
+          // o hacer click sobre el propio reactor -- lo obvio para
+          // seleccionarlo -- y no pasaba nada, solo funcionaba sobre el
+          // aro estrecho de la base: es lo que hacia que "no se notara
+          // seleccionable". Se marcan aqui con el mismo id para que el
+          // hover/click funcionen sobre el cuerpo real del reactor.
+          if (id === 'reactor01') {
+            mesh.traverse((n) => {
+              if (n.isMesh && n.name && n.name.startsWith('Bioreactor_')) n.userData.museoExhibitId = id;
+            });
+          }
         }
       }
       if (pos) this.items.push({ id, data, pos, topY, bottomY, anchorObj });
@@ -2175,16 +2200,31 @@ AFRAME.registerComponent('reactor-control', {
     // comparte entre sus mallas), asi que basta con encontrar cada uno una
     // vez y guardar su intensidad/opacidad de fabrica como "base": los
     // botones solo escalan esa base, nunca la sustituyen.
-    let bubbleMat = null, liquidMat = null, liquidMesh = null;
+    let bubbleMat = null, liquidMat = null, liquidMesh = null, glassMat = null;
     mesh.traverse((o) => {
       if (!o.isMesh || !o.material) return;
       if (o.material.name === 'Bioreactor_Bubble' && !bubbleMat) bubbleMat = o.material;
       if (o.material.name === 'Bioreactor_Liquid' && !liquidMat) { liquidMat = o.material; liquidMesh = o; }
+      // "Vidrio" es el material del cristal exterior del reactor (Bioreactor_
+      // Glass): sin emisivo propio en el glTF (solo transparencia), asi que
+      // sirve de superficie neutra sobre la que pintar el realce de hover
+      // (ver hoverGlow en tick) sin depender de que LIGHT/FLOW ya esten
+      // encendidos -- el reactor debe notarse seleccionable incluso apagado.
+      if (o.material.name === 'Vidrio' && !glassMat) glassMat = o.material;
     });
     this.bubbleMat = bubbleMat;
     this.liquidMat = liquidMat;
+    this.glassMat = glassMat;
     this.bubbleBase = bubbleMat ? { i: bubbleMat.emissiveIntensity, o: bubbleMat.opacity } : null;
     this.liquidBase = liquidMat ? { i: liquidMat.emissiveIntensity, o: liquidMat.opacity } : null;
+    // base real del cristal (casi siempre negro/sin emisivo de fabrica) --
+    // el realce de hover se mezcla hacia el acento de Sala 2 partiendo de
+    // este valor, nunca sustituyendolo.
+    this.glassBaseEmissive = glassMat && glassMat.emissive ? glassMat.emissive.clone() : new THREE.Color(0, 0, 0);
+    this.glassBaseEmissiveIntensity = (glassMat && typeof glassMat.emissiveIntensity === 'number') ? glassMat.emissiveIntensity : 1;
+    this.hoverGlow = 0;   // 0..1, suavizado -- ver tick()
+    this.activePulseAmt = 0;   // 0..1, entra/sale con ACTIVATE -- ver tick()
+    this.activePulse = 0;      // 0..1, activePulseAmt * oscilacion senoidal -- ver tick()
     // altura real de la superficie del cultivo (malla Bioreactor_Liquid_Obj),
     // punto de llegada de las gotas de NUTRIENTS -- ver buildNutrientParticles.
     this.liquidTopY = liquidMesh ? new THREE.Box3().setFromObject(liquidMesh).max.y : null;
@@ -2238,37 +2278,71 @@ AFRAME.registerComponent('reactor-control', {
       03 NUTRIENTS  -> canal totalmente aparte, sin material: ver
                        buildNutrientParticles/updateNutrientParticles
                        (gotas visibles bajando por el tubo real del reactor)
-      04 ACTIVATE   -> un unico refuerzo modesto (activeBoost) aplicado
-                       sobre los tres canales anteriores, nunca un efecto
-                       nuevo y desconectado del resto.
+      04 ACTIVATE   -> ya no es un multiplicador (*1.12) sobre valores que,
+                       con LIGHT/FLOW apagados, ya eran muy bajos -- eso es lo
+                       que hacia que "no se notara nada" al pulsarlo solo.
+                       Ahora ACTIVATE aporta su PROPIO incremento aditivo en
+                       los tres canales (igual que LIGHT/FLOW aportan el
+                       suyo), asi que se nota encendido incluso el solo, y
+                       ademas anade un pulso ritmico propio (ver activePulse
+                       en tick/applyReactorState) que es la señal mas clara
+                       de "actividad biologica" y no se puede confundir con
+                       ningun otro boton (ni LIGHT, ni FLOW, ni NUTRIENTS son
+                       pulsantes).
   */
   recomputeTargets() {
     const s = this.stage;
-    const activeBoost = s.active ? 1.12 : 1;
+    const activeMult = s.active ? 1.15 : 1;
 
-    this.targetSpot = this.spotBase * (0.42 + (s.light ? 0.58 : 0)) * activeBoost;
-    const liquidIFrac = 0.30 + (s.light ? 0.55 : 0);
-    this.targetLiquidI = this.liquidBase ? this.liquidBase.i * liquidIFrac * activeBoost : 0;
+    const spotFrac = 0.34 + (s.light ? 0.50 : 0) + (s.active ? 0.28 : 0);
+    this.targetSpot = this.spotBase * spotFrac * activeMult;
 
-    const bubbleIFrac = 0.22 + (s.flow ? 0.78 : 0);
-    const bubbleOFrac = 0.45 + (s.flow ? 0.55 : 0);
-    this.targetBubbleI = this.bubbleBase ? this.bubbleBase.i * bubbleIFrac * activeBoost : 0;
+    const liquidIFrac = 0.24 + (s.light ? 0.48 : 0) + (s.active ? 0.30 : 0);
+    this.targetLiquidI = this.liquidBase ? this.liquidBase.i * liquidIFrac * activeMult : 0;
+
+    const bubbleIFrac = 0.16 + (s.flow ? 0.68 : 0) + (s.active ? 0.34 : 0);
+    const bubbleOFrac = 0.36 + (s.flow ? 0.48 : 0) + (s.active ? 0.30 : 0);
+    this.targetBubbleI = this.bubbleBase ? this.bubbleBase.i * bubbleIFrac * activeMult : 0;
     this.targetBubbleO = this.bubbleBase ? Math.min(1, this.bubbleBase.o * bubbleOFrac) : 0;
 
     // Velocidad real de la circulacion (ver bioreactorAnim en onLoaded):
-    // parada del todo si FLOW esta apagado (nada que confundir con ningun
-    // otro boton), a velocidad completa -- reforzada un poco mas si ACTIVATE
-    // tambien esta encendido -- si esta encendido. Con brillo/opacidad YA
-    // subiendo con FLOW (arriba) mas este cambio de velocidad real, el
-    // efecto es inconfundible incluso a distancia normal de visitante.
+    // sigue dependiendo solo de FLOW -- si ACTIVATE por si solo tambien
+    // pusiera en marcha la animacion, dejaria de poder distinguirse de
+    // FLOW. ACTIVATE unicamente la refuerza un poco cuando FLOW ya esta on.
     this.targetFlowSpeed = s.flow ? (1 * (s.active ? 1.3 : 1)) : 0;
   },
 
   applyReactorState() {
-    if (this.reactorSpot) this.reactorSpot.intensity = this.curSpot;
-    if (this.bubbleMat) { this.bubbleMat.emissiveIntensity = this.curBubbleI; this.bubbleMat.opacity = this.curBubbleO; }
-    if (this.liquidMat) this.liquidMat.emissiveIntensity = this.curLiquidI;
+    // Realce sutil de hover (ver tick()): un empujon MUY modesto sobre las
+    // dos superficies que ya brillan (liquido/burbujas), independiente del
+    // estado de los botones -- se nota un pelin mas vivo el reactor cuando
+    // el visitante pasa el raton por encima, sin competir con el efecto de
+    // los botones ni resultar exagerado.
+    const hoverBoost = 1 + this.hoverGlow * 0.18;
+    // Pulso de ACTIVATE (ver tick(): this.activePulse, 0..1, ya con su propio
+    // fundido de entrada/salida y oscilacion senoidal): un "latido" lento y
+    // suave sobre foco/liquido/burbujas, solo presente cuando ACTIVATE esta
+    // encendido -- es la señal que hace que el reactor "se sienta vivo" y
+    // operativo, distinta de cualquier cambio estatico de brillo.
+    const activePulseBoost = 1 + (this.activePulse || 0) * 0.22;
+    if (this.reactorSpot) this.reactorSpot.intensity = this.curSpot * activePulseBoost;
+    if (this.bubbleMat) {
+      this.bubbleMat.emissiveIntensity = this.curBubbleI * hoverBoost * activePulseBoost;
+      this.bubbleMat.opacity = this.curBubbleO;
+    }
+    if (this.liquidMat) this.liquidMat.emissiveIntensity = this.curLiquidI * hoverBoost * activePulseBoost;
     if (this.bioreactorAnim && this.bioreactorAnim.mixer) this.bioreactorAnim.mixer.timeScale = this.curFlowSpeed;
+    // Cristal exterior: unico material del reactor que no depende de ningun
+    // boton, asi que es el que mejor comunica "esto se puede seleccionar"
+    // incluso con el reactor todavia apagado -- un tinte muy suave hacia el
+    // acento de Sala 2, nunca un contorno duro ni un brillo tipo sci-fi.
+    // El pulso de ACTIVATE tambien se nota aqui (un halo que respira), para
+    // que el estado "operativo" se lea incluso mirando solo el cristal.
+    if (this.glassMat) {
+      const glowMix = Math.min(1, this.hoverGlow * 0.42 + (this.activePulse || 0) * 0.30);
+      this.glassMat.emissive.copy(this.glassBaseEmissive).lerp(this._room2AccentColor || (this._room2AccentColor = new THREE.Color(ROOM2_ACCENT)), glowMix);
+      this.glassMat.emissiveIntensity = this.glassBaseEmissiveIntensity + this.hoverGlow * 0.55 + (this.activePulse || 0) * 0.35;
+    }
   },
 
   /*
@@ -2295,15 +2369,20 @@ AFRAME.registerComponent('reactor-control', {
     const dotColor = (this.bubbleMat && this.bubbleMat.color) ? this.bubbleMat.color.clone() : new THREE.Color(0xffffff);
     const dotEmissive = (this.bubbleMat && this.bubbleMat.emissive) ? this.bubbleMat.emissive.clone() : dotColor.clone();
 
+    // El brief pide que el efecto "se lea a distancia normal de visitante" --
+    // las 6 gotas de 0.009 m originales resultaban demasiado pequeñas/tenues
+    // para notarse desde fuera de la sala. Mas gotas, mas grandes y mas
+    // brillantes (opacidad tope tambien mas alta, ver updateNutrientParticles)
+    // sin dejar de ser "pequeñas particulas" fieles al brief.
     const group = new THREE.Group();
     group.name = 'reactor-nutrient-dots';
-    const N = 6;
+    const N = 10;
     for (let i = 0; i < N; i++) {
       const mat = new THREE.MeshStandardMaterial({
-        color: dotColor, emissive: dotEmissive, emissiveIntensity: 1.1,
+        color: dotColor, emissive: dotEmissive, emissiveIntensity: 1.8,
         roughness: 0.3, metalness: 0, transparent: true, opacity: 0, depthWrite: false
       });
-      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.009, 6, 6), mat);
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.015, 8, 8), mat);
       dot.position.set(cx, topY, cz);
       group.add(dot);
       this.nutrientDots.push({ mat, mesh: dot, phase: i / N });
@@ -2328,7 +2407,7 @@ AFRAME.registerComponent('reactor-control', {
     const active = this.stage.nutrients;
     const boost = this.stage.active ? 1.25 : 1;
     const travel = this.nutrientTravel;
-    const period = 2.0;
+    const period = 1.7;
     const t = (time || 0) / 1000;
     this.nutrientDots.forEach((d) => {
       if (!active) {
@@ -2339,7 +2418,12 @@ AFRAME.registerComponent('reactor-control', {
       d.mesh.position.set(travel.cx, THREE.MathUtils.lerp(travel.topY, travel.bottomY, cycle), travel.cz);
       const fadeIn = Math.min(1, cycle / 0.18);
       const fadeOut = Math.min(1, (1 - cycle) / 0.30);
-      const target = Math.min(fadeIn, fadeOut) * 0.85 * boost;
+      // ligero "salpicon" al llegar al liquido: la gota crece un poco justo
+      // antes de fundirse, para que el punto de entrada al cultivo tambien
+      // se note, no solo la caida.
+      const splash = 1 + Math.max(0, (cycle - 0.82) / 0.18) * 0.6;
+      d.mesh.scale.setScalar(splash);
+      const target = Math.min(fadeIn, fadeOut) * 1.0 * boost;
       d.mat.opacity += (target - d.mat.opacity) * 0.25;
     });
   },
@@ -2373,9 +2457,21 @@ AFRAME.registerComponent('reactor-control', {
       if (v.y < minY) minY = v.y;
       if (v.y > maxY) maxY = v.y;
     }
-    // solo la "tapa" superior (80% mas alto), para no mezclar los lados
-    // verticales de la peana con su remate real.
-    const thresh = minY + (maxY - minY) * 0.80;
+    // Solo la "tapa" superior, para no mezclar los lados verticales de la
+    // peana con su remate real. PEANA_Alta_B resulto ser una peana ESCALONADA
+    // (varios niveles), no una columna lisa con un unico remate: un umbral
+    // del 80% incluia tambien un puñado de vertices sueltos del canto del
+    // escalon INMEDIATAMENTE debajo del remate real (una tira casi puntual,
+    // de anchura ~0 en un eje) -- verificado midiendo esta malla en crudo
+    // (offline, fuera del navegador): esos pocos puntos bastaban para
+    // sesgar el ajuste de plano (inclinacion medida ~14.7° en vez de la real
+    // ~10.1°) Y, sobre todo, para inflar la huella medida en
+    // computeTopSurface (ver mas abajo) de sus ~0.11 m reales a ~0.33 m --
+    // exactamente lo que hacia que el panel de control se construyera
+    // demasiado grande para la repisa real y sobresaliera por el lado
+    // corto. Con 88% el remate real (un cluster estable de puntos, mismo
+    // resultado en toda la ventana 85%-90%) queda aislado sin ese ruido.
+    const thresh = minY + (maxY - minY) * 0.88;
     const top = pts.filter((p) => p.y > thresh);
     if (top.length < 8) return null;
 
@@ -2541,22 +2637,21 @@ AFRAME.registerComponent('reactor-control', {
     wrapper.object3D.position.copy(pos);
     wrapper.object3D.quaternion.copy(quat);
 
-    // panel mas compacto que el cartel vertical anterior: apoyado plano
-    // sobre el remate real, su "alto" ahora corre a lo largo de la
-    // pendiente medida (mas corta que la altura libre que tenia de pie).
     // WIDTH/HEIGHT se ajustan a la huella REAL del remate (top.extentLong/
-    // extentShort, medida por PCA en computeTopSurface) con un margen del
-    // ~18% para quedar dentro de la piedra, no justo al borde -- antes eran
-    // valores fijos (0.50x0.30) que, emparejados con el eje equivocado,
-    // dejaban el panel sobresaliendo por el lado corto ("floating off the
-    // side"). Los topes (min/max) son la red de seguridad si la medicion
-    // fallara o el remate fuese inusualmente pequeño/grande.
+    // extentShort, medida por PCA en computeTopSurface, ver arriba) con
+    // margen de sobra para quedar bien dentro de la piedra, nunca al borde.
+    // Medido en crudo (offline, sobre el propio glTF): el remate real de
+    // PEANA_Alta_B es una repisa estrecha, ~0.11 m en su eje corto x ~0.88 m
+    // en el largo -- NO los ~0.30-0.50 m que se venian usando (ese valor
+    // mayor viniera de una medicion contaminada, ver nota en el umbral de
+    // computeTopSurface). Con la huella real tan estrecha, el panel tiene
+    // que ser bastante mas pequeño que antes para no sobresalir.
     const WIDTH = (top && top.extentLong)
-      ? THREE.MathUtils.clamp(top.extentLong * 0.82, 0.22, 0.50)
-      : 0.50;
+      ? THREE.MathUtils.clamp(top.extentLong * 0.55, 0.28, 0.44)
+      : 0.40;
     const HEIGHT = (top && top.extentShort)
-      ? THREE.MathUtils.clamp(top.extentShort * 0.82, 0.14, 0.30)
-      : 0.30;
+      ? THREE.MathUtils.clamp(top.extentShort * 0.78, 0.07, 0.11)
+      : 0.09;
     const exhibitInfo = this.el.components['exhibit-info'];
     const paperTex = exhibitInfo && exhibitInfo.getPlacardPaperTexture
       ? exhibitInfo.getPlacardPaperTexture() : null;
@@ -2573,38 +2668,37 @@ AFRAME.registerComponent('reactor-control', {
 
     const TEXT_Z = 0.004;
 
+    // La repisa real es demasiado estrecha para el layout anterior (titulo +
+    // frase de instruccion + numero sobre cada boton + etiqueta debajo, las
+    // 4 filas apiladas): con un alto real de ~0.08-0.11 m ya no cabe todo
+    // eso sin que el texto se salga del propio panel fisico. Se simplifica
+    // a 2 filas -- titulo arriba, boton + su "01 LIGHT" combinado debajo --
+    // todo dimensionado como fraccion de HEIGHT/WIDTH (nunca en metros fijos)
+    // para que encaje sea cual sea el tamaño real medido en cada carga.
     const heading = document.createElement('a-text');
     heading.setAttribute('value', 'BUILD A BIOPROCESS');
     heading.setAttribute('align', 'center');
     heading.setAttribute('baseline', 'center');
-    heading.setAttribute('width', 0.44);
+    heading.setAttribute('width', WIDTH * 0.9);
     heading.setAttribute('wrap-count', 20);
     heading.setAttribute('letter-spacing', 1);
     heading.setAttribute('color', ROOM2_ACCENT);
-    heading.object3D.position.set(0, HEIGHT / 2 - 0.034, TEXT_Z);
+    heading.object3D.position.set(0, HEIGHT / 2 - HEIGHT * 0.16, TEXT_Z);
     wrapper.appendChild(heading);
 
-    const instruction = document.createElement('a-text');
-    instruction.setAttribute('value', 'Activate the reactor step by step.');
-    instruction.setAttribute('align', 'center');
-    instruction.setAttribute('baseline', 'center');
-    instruction.setAttribute('width', 0.38);
-    instruction.setAttribute('wrap-count', 28);
-    instruction.setAttribute('color', '#201A1E');
-    instruction.object3D.position.set(0, HEIGHT / 2 - 0.068, TEXT_Z);
-    wrapper.appendChild(instruction);
-
-    // fila de 4 botones, centrada, con espacio uniforme
+    // fila de 4 botones, centrada, con espacio uniforme -- nunca mas ancha
+    // que un 80% de WIDTH, para que quede margen a los lados.
     const defs = [
       { id: 'light', num: '01', label: 'LIGHT' },
       { id: 'flow', num: '02', label: 'FLOW' },
       { id: 'nutrients', num: '03', label: 'NUTRIENTS' },
       { id: 'active', num: '04', label: 'ACTIVATE' }
     ];
-    const spacing = 0.11;
+    const spacing = Math.min(WIDTH * 0.22, (WIDTH * 0.78) / (defs.length - 1));
     const startX = -spacing * (defs.length - 1) / 2;
-    const BTN_Y = -0.02;
-    const BTN_R = 0.035;
+    const BTN_R = HEIGHT * 0.20;
+    const BTN_Y = HEIGHT / 2 - HEIGHT * 0.30 - BTN_R;
+    const LABEL_Y = BTN_Y - BTN_R - HEIGHT * 0.12;
 
     defs.forEach((d, i) => {
       const bx = startX + i * spacing;
@@ -2626,25 +2720,18 @@ AFRAME.registerComponent('reactor-control', {
       wrapper.object3D.add(btn);
       if (exhibitInfo) exhibitInfo.selectableMeshes.push(btn);
 
-      const num = document.createElement('a-text');
-      num.setAttribute('value', d.num);
-      num.setAttribute('align', 'center');
-      num.setAttribute('baseline', 'center');
-      num.setAttribute('width', 0.075);
-      num.setAttribute('wrap-count', 2);
-      num.setAttribute('color', ROOM2_ACCENT);
-      num.object3D.position.set(bx, BTN_Y + 0.056, TEXT_Z);
-      wrapper.appendChild(num);
-
+      // numero + nombre combinados en una sola linea ("01 LIGHT") debajo del
+      // boton -- antes eran dos lineas separadas (numero encima, nombre
+      // debajo), que ya no caben en el alto real disponible.
       const label = document.createElement('a-text');
-      label.setAttribute('value', d.label);
+      label.setAttribute('value', `${d.num} ${d.label}`);
       label.setAttribute('align', 'center');
       label.setAttribute('baseline', 'center');
-      label.setAttribute('width', 0.115);
-      label.setAttribute('wrap-count', 8);
-      label.setAttribute('letter-spacing', 0.5);
+      label.setAttribute('width', HEIGHT * 1.6);
+      label.setAttribute('wrap-count', 12);
+      label.setAttribute('letter-spacing', 0.3);
       label.setAttribute('color', '#201A1E');
-      label.object3D.position.set(bx, BTN_Y - 0.056, TEXT_Z);
+      label.object3D.position.set(bx, LABEL_Y, TEXT_Z);
       wrapper.appendChild(label);
 
       this.buttons.push({ id: d.id, mesh: btn, material, baseEmissive: material.emissiveIntensity });
@@ -2687,6 +2774,27 @@ AFRAME.registerComponent('reactor-control', {
     const dt = Math.min((delta || 16) / 1000, 0.1);
     const speed = 1 - Math.pow(0.001, dt);   // suavizado exponencial, ~0.6s
 
+    // hover del reactor: mismo hoverId que ya calcula exhibit-info (raycast
+    // sobre selectableMeshes, que ahora incluye el cuerpo real del reactor
+    // -- ver "Bioreactor_" en exhibit-info.onLoaded). Se calcula ANTES de
+    // applyReactorState porque esta lee this.hoverGlow para el realce del
+    // cristal (ver alli).
+    const info = this.el.components['exhibit-info'];
+    const hoverId = info && info.hoverId;
+    const reactorHovered = hoverId === 'reactor01';
+    this.hoverGlow += ((reactorHovered ? 1 : 0) - this.hoverGlow) * 0.12;
+
+    // Pulso de ACTIVATE: entra/sale con un fundido lento (~2-3 s, igual de
+    // suave que el resto de transiciones del reactor -- nunca un chasquido
+    // brusco), y mientras esta encendido oscila con un seno lento (periodo
+    // 1.6 s) entre 0 y 1. El resultado (this.activePulse) es lo que
+    // applyReactorState usa para el "latido" de foco/liquido/burbujas/cristal
+    // -- la señal que distingue ACTIVATE de un simple boton "mas brillo".
+    const activeOn = this.stage.active ? 1 : 0;
+    this.activePulseAmt += (activeOn - this.activePulseAmt) * 0.02;
+    const osc = this.activePulseAmt > 0.001 ? (Math.sin((time || 0) / 1000 * Math.PI * 2 / 1.6) * 0.5 + 0.5) : 0;
+    this.activePulse = osc * this.activePulseAmt;
+
     this.curSpot += (this.targetSpot - this.curSpot) * speed;
     this.curBubbleI += (this.targetBubbleI - this.curBubbleI) * speed;
     this.curBubbleO += (this.targetBubbleO - this.curBubbleO) * speed;
@@ -2697,8 +2805,6 @@ AFRAME.registerComponent('reactor-control', {
 
     // hover de los 4 botones: mismo lenguaje que el resto del museo (escala
     // + brillo muy sutiles), leyendo el hoverId que ya calcula exhibit-info.
-    const info = this.el.components['exhibit-info'];
-    const hoverId = info && info.hoverId;
     this.buttons.forEach((b) => {
       const isHovered = hoverId === `reactorBtn_${b.id}`;
       const t = this._hoverT[b.id] + ((isHovered ? 1 : 0) - this._hoverT[b.id]) * 0.15;
