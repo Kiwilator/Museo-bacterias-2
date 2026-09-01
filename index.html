@@ -54,10 +54,7 @@
       <a-asset-item id="bioreactor" src="./modulos/bioreactor.glb?v=d1dd66e"></a-asset-item>
       <video id="ppb-video-02" src="./assets/videos/scientific-animation.mp4" autoplay loop muted playsinline crossorigin="anonymous"></video>
       <video id="ppb-video-03" src="./assets/videos/cereibacter-sphaeroides-animation.mp4" autoplay loop muted playsinline crossorigin="anonymous"></video>
-      <img id="ppb-image-04" src="./assets/images/rhodobacter-capsulatus-microscopy.jpg" crossorigin="anonymous">
-      <img id="ppb-image-06" src="./assets/images/rhodovulum-electroactivity.jpg" crossorigin="anonymous">
-      <img id="ppb-image-07" src="./assets/images/rubrivivax-gelatinosus-tem.jpg" crossorigin="anonymous">
-      <img id="ppb-image-08" src="./assets/images/b1.png" crossorigin="anonymous">
+      <video id="ppb-video-04" src="./assets/videos/rhodobacter-capsulatus-animation.mp4" autoplay loop muted playsinline crossorigin="anonymous"></video>
     </a-assets>
 
     <!-- Modelo (museo_bacterias.glb?v=d1dd66e"tira de techo" que cruzaba la
@@ -113,11 +110,13 @@
          la rotacion con esa escala no uniforme y los dejaba mal orientados.
          El orden tecnico de PPB_VIDEO_* no coincide con la numeracion de
          las fichas; cada display se asigna aqui a la bacteria que tiene
-         debajo en Blender. -->
-    <a-circle id="PPB_VIDEO_01" place-ppb-circle="id: PPB_VIDEO_01" radius="0.01" material="src: #ppb-image-08; shader: flat; side: double"></a-circle>
-    <a-circle id="PPB_VIDEO_02" place-ppb-circle="id: PPB_VIDEO_02" radius="0.01" material="src: #ppb-image-07; shader: flat; side: double"></a-circle>
-    <a-circle id="PPB_VIDEO_03" place-ppb-circle="id: PPB_VIDEO_03" radius="0.01" material="src: #ppb-image-06; shader: flat; side: double"></a-circle>
-    <a-circle id="PPB_VIDEO_04" place-ppb-circle="id: PPB_VIDEO_04" radius="0.01" material="src: #ppb-image-04; shader: flat; side: double"></a-circle>
+         debajo en Blender. Las ventanas redondas solo muestran videos:
+         cuando todavia no hay pieza animada para una bacteria, se dejan
+         oscuras para no mezclar fotos estaticas dentro de los circulos. -->
+    <a-circle id="PPB_VIDEO_01" place-ppb-circle="id: PPB_VIDEO_01" radius="0.01" material="color: #050415; shader: flat; side: double"></a-circle>
+    <a-circle id="PPB_VIDEO_02" place-ppb-circle="id: PPB_VIDEO_02" radius="0.01" material="color: #050415; shader: flat; side: double"></a-circle>
+    <a-circle id="PPB_VIDEO_03" place-ppb-circle="id: PPB_VIDEO_03" radius="0.01" material="color: #050415; shader: flat; side: double"></a-circle>
+    <a-circle id="PPB_VIDEO_04" place-ppb-circle="id: PPB_VIDEO_04" radius="0.01" material="src: #ppb-video-04; shader: flat; side: double"></a-circle>
     <a-circle id="PPB_VIDEO_05" place-ppb-circle="id: PPB_VIDEO_05" radius="0.01" material="src: #ppb-video-03; shader: flat; side: double"></a-circle>
     <a-circle id="PPB_VIDEO_06" place-ppb-circle="id: PPB_VIDEO_06" radius="0.01" material="src: #ppb-video-02; shader: flat; side: double"></a-circle>
 

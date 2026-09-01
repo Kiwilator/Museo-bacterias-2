@@ -2794,15 +2794,27 @@ AFRAME.registerComponent('reactor-control', {
   },
 
   buildControlPanelTexture(widthM, heightM, defs) {
-    const HPX = 520;
-    const WPX = Math.max(1200, Math.round(HPX * (widthM / heightM)));
+    const HPX = 760;
+    const WPX = Math.max(1800, Math.round(HPX * (widthM / heightM)));
     const c = document.createElement('canvas');
     c.width = WPX; c.height = HPX;
     const ctx = c.getContext('2d');
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    tex.needsUpdate = true;
+    this.controlPanelCanvas = { c, ctx, tex, w: WPX, h: HPX, defs };
+    this.drawControlPanelTexture();
+    return tex;
+  },
+
+  drawControlPanelTexture() {
+    if (!this.controlPanelCanvas) return;
+    const { c, ctx, tex, w: WPX, h: HPX, defs } = this.controlPanelCanvas;
 
     ctx.fillStyle = '#F7F4EE';
     ctx.fillRect(0, 0, WPX, HPX);
-    const grain = Math.round((WPX * HPX) / 650);
+    const grain = Math.round((WPX * HPX) / 900);
     for (let i = 0; i < grain; i++) {
       const v = 205 + Math.floor(Math.random() * 42);
       ctx.fillStyle = `rgba(${v},${v},${v},0.045)`;
@@ -2812,63 +2824,88 @@ AFRAME.registerComponent('reactor-control', {
     const accent = ROOM2_ACCENT;
     const ink = '#201A1E';
     const muted = '#756E69';
-    const padX = WPX * 0.075;
+    const line = '#D8C7BE';
+    const padX = WPX * 0.055;
     const topY = HPX * 0.18;
+    const activeMessage = this.controlMessage || 'Tap any control to change the bioreactor state.';
 
     ctx.fillStyle = accent;
-    ctx.fillRect(padX, HPX * 0.145, WPX - padX * 2, 6);
-    ctx.fillStyle = '#D7D0C8';
-    ctx.fillRect(padX, HPX * 0.765, WPX - padX * 2, 3);
+    ctx.fillRect(padX, HPX * 0.105, WPX - padX * 2, 8);
+    ctx.fillStyle = line;
+    ctx.fillRect(padX, HPX * 0.28, WPX - padX * 2, 3);
+    ctx.fillRect(padX, HPX * 0.74, WPX - padX * 2, 3);
 
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = accent;
-    ctx.font = '700 46px Arial, Helvetica, sans-serif';
+    ctx.font = '800 58px Arial, Helvetica, sans-serif';
     ctx.fillText('02', padX, topY);
 
     ctx.fillStyle = ink;
-    ctx.font = '800 62px Arial, Helvetica, sans-serif';
-    ctx.fillText('BIOREACTOR', padX + 92, topY);
+    ctx.font = '900 86px Arial, Helvetica, sans-serif';
+    ctx.fillText('BIOREACTOR', padX + 116, topY);
 
     ctx.fillStyle = muted;
-    ctx.font = '600 24px Arial, Helvetica, sans-serif';
-    ctx.fillText('CONTROL STATES', padX + 92, topY + 50);
+    ctx.font = '700 34px Arial, Helvetica, sans-serif';
+    ctx.fillText('CONTROL PANEL', padX + 120, topY + 70);
 
     const cols = defs.length;
     const usableW = WPX - padX * 2;
     const colW = usableW / cols;
-    const labelY = HPX * 0.64;
-    const cueY = HPX * 0.82;
+    const statusY = HPX * 0.39;
+    const buttonY = HPX * 0.51;
+    const labelY = HPX * 0.66;
     ctx.textAlign = 'center';
     defs.forEach((d, i) => {
       const x = padX + colW * (i + 0.5);
       const color = `#${new THREE.Color(d.on).getHexString()}`;
-      ctx.fillStyle = color;
+      const isOn = !!(this.stage && this.stage[d.id]);
+      ctx.strokeStyle = 'rgba(132, 111, 103, 0.26)';
+      ctx.lineWidth = 2;
+      if (i > 0) {
+        ctx.beginPath();
+        ctx.moveTo(x - colW * 0.5, HPX * 0.315);
+        ctx.lineTo(x - colW * 0.5, HPX * 0.72);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = isOn ? color : '#B9B0A8';
       ctx.beginPath();
-      ctx.arc(x, HPX * 0.36, 10, 0, Math.PI * 2);
+      ctx.arc(x, statusY, 14, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = 'rgba(44, 140, 130, 0.10)';
-      ctx.fillRect(x - colW * 0.37, HPX * 0.505, colW * 0.74, 2);
+      ctx.fillStyle = isOn ? color : '#D6CDC5';
+      ctx.fillRect(x - colW * 0.27, statusY + 38, colW * 0.54, 6);
+      ctx.strokeStyle = `rgba(${isOn ? '32,26,30' : '120,110,104'},0.18)`;
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.arc(x, buttonY, 56, 0, Math.PI * 2);
+      ctx.stroke();
 
       ctx.fillStyle = accent;
-      ctx.font = '700 30px Arial, Helvetica, sans-serif';
-      ctx.fillText(d.num, x, labelY - 34);
+      ctx.font = '800 38px Arial, Helvetica, sans-serif';
+      ctx.fillText(d.num, x, labelY - 44);
 
       ctx.fillStyle = ink;
-      const labelFont = d.label.length > 8 ? 34 : 40;
-      ctx.font = `800 ${labelFont}px Arial, Helvetica, sans-serif`;
-      ctx.fillText(d.label, x, labelY + 10);
+      const labelFont = d.label.length > 8 ? 46 : 54;
+      ctx.font = `900 ${labelFont}px Arial, Helvetica, sans-serif`;
+      ctx.fillText(d.label, x, labelY + 6);
 
       ctx.fillStyle = muted;
-      ctx.font = '600 20px Arial, Helvetica, sans-serif';
-      ctx.fillText('ON / OFF', x, cueY);
+      ctx.font = '800 24px Arial, Helvetica, sans-serif';
+      ctx.fillText(isOn ? 'ON' : 'OFF', x, labelY + 58);
     });
 
-    const tex = new THREE.CanvasTexture(c);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 4;
+    ctx.fillStyle = '#EFE7DF';
+    ctx.fillRect(padX, HPX * 0.79, WPX - padX * 2, HPX * 0.115);
+    ctx.fillStyle = accent;
+    ctx.fillRect(padX, HPX * 0.79, 10, HPX * 0.115);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = ink;
+    ctx.font = '800 34px Arial, Helvetica, sans-serif';
+    ctx.fillText(activeMessage, padX + 34, HPX * 0.85);
+
+    // fuerza la subida del canvas redibujado a la textura de Three.js.
     tex.needsUpdate = true;
-    return tex;
   },
 
   /*
@@ -2951,26 +2988,48 @@ AFRAME.registerComponent('reactor-control', {
     wrapper.object3D.position.copy(pos);
     wrapper.object3D.quaternion.copy(quat);
 
-    // El brief nuevo es estricto: el panel completo debe quedar dentro del
-    // contorno de la tapa inclinada. Se conserva el tamano anterior como
-    // preferencia, pero el maximo real lo pone la huella medida.
+    // El panel necesita leerse desde la camara en perspectiva: se aprovecha
+    // mucha mas tapa real que antes, manteniendo margen para no salirse del
+    // remate inclinado de la peana.
     const fitWithin = (preferred, minimum, maximum) => {
       const max = Math.max(0.001, maximum);
       return Math.min(Math.max(preferred, Math.min(minimum, max)), max);
     };
     const WIDTH = (top && top.extentLong)
-      ? fitWithin(0.60, 0.50, top.extentLong * 0.84)
-      : 0.60;
+      ? fitWithin(0.74, 0.62, top.extentLong * 0.94)
+      : 0.74;
     const HEIGHT = (top && top.extentShort)
-      ? fitWithin(0.13, 0.105, top.extentShort * 0.72)
-      : 0.13;
+      ? fitWithin(0.24, 0.18, top.extentShort * 0.82)
+      : 0.24;
     const exhibitInfo = this.el.components['exhibit-info'];
     const defs = [
-      { id: 'light', num: '01', label: 'LIGHT', symbol: 'LUX', off: 0xe8f7f5, on: 0x59e7e0 },
-      { id: 'flow', num: '02', label: 'FLOW', symbol: 'FLOW', off: 0xe5f3ef, on: 0x35d5d3 },
-      { id: 'nutrients', num: '03', label: 'NUTRIENTS', symbol: 'FEED', off: 0xeaf4de, on: 0xa9dc69 },
-      { id: 'active', num: '04', label: 'ACTIVATE', symbol: 'BIO', off: 0xeee4f4, on: 0xb06ce8 }
+      {
+        id: 'light', num: '01', label: 'LIGHT', symbol: 'LUX',
+        off: 0xe8f7f5, on: 0x59e7e0,
+        onText: 'Light on: the culture receives photosynthetic energy.',
+        offText: 'Light off: the illumination fades back down.'
+      },
+      {
+        id: 'flow', num: '02', label: 'FLOW', symbol: 'FLOW',
+        off: 0xe5f3ef, on: 0x35d5d3,
+        onText: 'Flow on: circulation moves through the reactor.',
+        offText: 'Flow off: the liquid returns to a calm state.'
+      },
+      {
+        id: 'nutrients', num: '03', label: 'NUTRIENTS', symbol: 'FEED',
+        off: 0xeaf4de, on: 0xa9dc69,
+        onText: 'Nutrients on: feeding raises the culture level.',
+        offText: 'Nutrients off: feeding particles disappear.'
+      },
+      {
+        id: 'active', num: '04', label: 'ACTIVATE', symbol: 'BIO',
+        off: 0xeee4f4, on: 0xb06ce8,
+        onText: 'Activate on: bubbles reveal metabolic activity.',
+        offText: 'Activate off: the activity signal settles.'
+      }
     ];
+    this.controlDefs = defs;
+    this.controlMessage = 'Tap a control: the bioreactor reacts in real time.';
     const controlTex = this.buildControlPanelTexture(WIDTH, HEIGHT, defs);
     const panel = new THREE.Mesh(
       new THREE.PlaneGeometry(WIDTH, HEIGHT),
@@ -2983,14 +3042,13 @@ AFRAME.registerComponent('reactor-control', {
     // el panel de fondo no es "una pieza": no abre nada ni se registra en
     // selectableMeshes, solo los 4 botones son interactivos.
 
-    const DETAIL_Z = 0.003;
     const BUTTON_Z = 0.008;
 
-    const spacing = Math.min(WIDTH * 0.24, (WIDTH * 0.86) / (defs.length - 1));
+    const spacing = Math.min(WIDTH * 0.23, (WIDTH * 0.84) / (defs.length - 1));
     const startX = -spacing * (defs.length - 1) / 2;
-    const BTN_R = HEIGHT * 0.145;
+    const BTN_R = Math.min(HEIGHT * 0.115, WIDTH * 0.045);
     const BTN_Y = -HEIGHT * 0.03;
-    const STATUS_Y = BTN_Y + BTN_R + HEIGHT * 0.085;
+    const STATUS_Y = BTN_Y + BTN_R + HEIGHT * 0.12;
 
     defs.forEach((d, i) => {
       const bx = startX + i * spacing;
@@ -3057,8 +3115,11 @@ AFRAME.registerComponent('reactor-control', {
   onButtonClick(id) {
     if (!(id in this.stage)) return;
     this.stage[id] = !this.stage[id];
+    const def = this.controlDefs && this.controlDefs.find((d) => d.id === id);
+    if (def) this.controlMessage = this.stage[id] ? def.onText : def.offText;
     this.recomputeTargets();
     this.updateButtonLooks();
+    this.drawControlPanelTexture();
   },
 
   updateButtonLooks() {
