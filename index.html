@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <title>PURPLE BACTERIA</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <link rel="stylesheet" href="./style.css?v=a0d41f8">
+  <link rel="stylesheet" href="./style.css?v=08f6fa5">
 </head>
 <body>
 
@@ -14,9 +14,23 @@
     <div id="loading-spinner"></div>
   </div>
 
+  <!-- Texto de ayuda segun dispositivo: is-mobile (ver script.js, deteccion
+       arriba del todo del fichero) decide via CSS cual de los dos pares de
+       <span> se muestra -- nunca los dos a la vez, para no mostrar
+       instrucciones de teclado a quien no tiene teclado. -->
   <div id="controls-help">
-    <span><b>WASD</b> Moverse</span>
-    <span><b>Arrastrar</b> Mirar</span>
+    <span class="hint-desktop"><b>WASD</b> Moverse</span>
+    <span class="hint-desktop"><b>Arrastrar</b> Mirar</span>
+    <span class="hint-mobile"><b>Joystick</b> Moverse</span>
+    <span class="hint-mobile"><b>Deslizar</b> Mirar</span>
+  </div>
+
+  <!-- Joystick tactil de movimiento: solo visible en moviles (is-mobile).
+       Logica en script.js (setupMobileJoystick); nunca anidado dentro del
+       canvas de a-scene, para que sus toques no compitan con drag-look-
+       controls (mirar) ni con el tap-to-select sobre las piezas. -->
+  <div id="mobile-controls" aria-hidden="true">
+    <div id="joystick-base"><div id="joystick-nub"></div></div>
   </div>
 
   <a-scene
@@ -26,22 +40,22 @@
     fog="type: linear; color: #8c748e; near: 9; far: 24"
   >
     <a-assets timeout="60000">
-      <a-asset-item id="museum_floor" src="./modulos/museum_floor.glb?v=a0d41f8"></a-asset-item>
-      <a-asset-item id="museum_walls" src="./modulos/museum_walls.glb?v=a0d41f8"></a-asset-item>
-      <a-asset-item id="museum_neons" src="./modulos/museum_neons.glb?v=a0d41f8"></a-asset-item>
-      <a-asset-item id="bacteria_large_01" src="./modulos/bacteria_large_01.glb?v=a0d41f8"></a-asset-item>
-      <a-asset-item id="bacteria_large_02" src="./modulos/bacteria_large_02.glb?v=a0d41f8"></a-asset-item>
-      <a-asset-item id="bacteria_small_01" src="./modulos/bacteria_small_01.glb?v=a0d41f8"></a-asset-item>
-      <a-asset-item id="bacteria_small_02" src="./modulos/bacteria_small_02.glb?v=a0d41f8"></a-asset-item>
-      <a-asset-item id="bacteria_small_03" src="./modulos/bacteria_small_03.glb?v=a0d41f8"></a-asset-item>
-      <a-asset-item id="bacteria_small_04" src="./modulos/bacteria_small_04.glb?v=a0d41f8"></a-asset-item>
-      <a-asset-item id="bacteria_small_05" src="./modulos/bacteria_small_05.glb?v=a0d41f8"></a-asset-item>
-      <a-asset-item id="bacteria_small_06" src="./modulos/bacteria_small_06.glb?v=a0d41f8"></a-asset-item>
-      <a-asset-item id="bioreactor" src="./modulos/bioreactor.glb?v=a0d41f8"></a-asset-item>
+      <a-asset-item id="museum_floor" src="./modulos/museum_floor.glb?v=08f6fa5"></a-asset-item>
+      <a-asset-item id="museum_walls" src="./modulos/museum_walls.glb?v=08f6fa5"></a-asset-item>
+      <a-asset-item id="museum_neons" src="./modulos/museum_neons.glb?v=08f6fa5"></a-asset-item>
+      <a-asset-item id="bacteria_large_01" src="./modulos/bacteria_large_01.glb?v=08f6fa5"></a-asset-item>
+      <a-asset-item id="bacteria_large_02" src="./modulos/bacteria_large_02.glb?v=08f6fa5"></a-asset-item>
+      <a-asset-item id="bacteria_small_01" src="./modulos/bacteria_small_01.glb?v=08f6fa5"></a-asset-item>
+      <a-asset-item id="bacteria_small_02" src="./modulos/bacteria_small_02.glb?v=08f6fa5"></a-asset-item>
+      <a-asset-item id="bacteria_small_03" src="./modulos/bacteria_small_03.glb?v=08f6fa5"></a-asset-item>
+      <a-asset-item id="bacteria_small_04" src="./modulos/bacteria_small_04.glb?v=08f6fa5"></a-asset-item>
+      <a-asset-item id="bacteria_small_05" src="./modulos/bacteria_small_05.glb?v=08f6fa5"></a-asset-item>
+      <a-asset-item id="bacteria_small_06" src="./modulos/bacteria_small_06.glb?v=08f6fa5"></a-asset-item>
+      <a-asset-item id="bioreactor" src="./modulos/bioreactor.glb?v=08f6fa5"></a-asset-item>
       <video id="ppb-video-01" src="./assets/videos/rhodospirillum-rubrum-pha.mp4" autoplay loop muted playsinline crossorigin="anonymous"></video>
     </a-assets>
 
-    <!-- Modelo (museo_bacterias.glb?v=a0d41f8"tira de techo" que cruzaba la
+    <!-- Modelo (museo_bacterias.glb?v=08f6fa5"tira de techo" que cruzaba la
          sala como una curva flotante. El resto de neones sí está pegado a
          bordes reales (ventana, nicho, peana, junta) y se exporta intacto.
          Suelo y pared llevan ahora textura horneada (antes eran nodos
@@ -142,7 +156,8 @@
        ventana, reutilizados por todas las piezas desde museumContent -->
   <div id="intro-msg">
     <p>MOVE THROUGH THE SPACE AND APPROACH THE EXHIBITS TO DISCOVER MORE</p>
-    <span><b>WASD</b> — MOVE &nbsp;&nbsp; <b>DRAG</b> — LOOK</span>
+    <span class="hint-desktop"><b>WASD</b> — MOVE &nbsp;&nbsp; <b>DRAG</b> — LOOK</span>
+    <span class="hint-mobile"><b>JOYSTICK</b> — MOVE &nbsp;&nbsp; <b>SWIPE</b> — LOOK</span>
   </div>
 
   <!-- Grafismo de sala: una sola pieza, muy tenue, como señaletica de museo -->
@@ -171,6 +186,6 @@
   </aside>
 
 
-  <script src="./script.js?v=a0d41f8"></script>
+  <script src="./script.js?v=08f6fa5"></script>
 </body>
 </html>

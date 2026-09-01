@@ -77,6 +77,56 @@ html, body {
   opacity: 0.28;
 }
 
+/* ---------- Ayuda / instrucciones segun dispositivo ----------
+   is-mobile la añade script.js a <body> nada mas cargar (deteccion por
+   user-agent + puntero "coarse", ver MUSEO_IS_MOBILE). Sin esa clase
+   (escritorio) se ven las instrucciones de teclado; con ella, las tactiles.
+   Nunca las dos a la vez. */
+.hint-mobile { display: none; }
+.is-mobile .hint-mobile { display: inline; }
+.is-mobile .hint-desktop { display: none; }
+
+/* ---------- Joystick tactil de movimiento (solo moviles) ---------- */
+#mobile-controls {
+  display: none;
+  position: fixed;
+  left: 24px;
+  bottom: 24px;
+  z-index: 400;
+}
+.is-mobile #mobile-controls { display: block; }
+/* con una ficha abierta no hace falta seguir moviendose, y en pantallas
+   pequeñas el panel puede solapar esta esquina -- ver exhibit-info.open/close */
+.is-mobile.panel-open #mobile-controls { display: none; }
+
+/* el canvas de A-Frame no debe heredar gestos tactiles del navegador
+   (scroll/zoom/refresh-al-tirar) mientras se arrastra para mirar alrededor
+   -- drag-look-controls ya hace preventDefault() en el toque que arrastra,
+   esto es solo la señal a nivel de CSS para que el navegador no compita. */
+a-scene canvas { touch-action: none; }
+
+#joystick-base {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: rgba(20, 16, 12, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  touch-action: none;
+}
+#joystick-nub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 42px;
+  height: 42px;
+  margin: -21px 0 0 -21px;
+  border-radius: 50%;
+  background: rgba(245, 239, 228, 0.88);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
 /* ==========================================================================
    Capa curatorial: aviso de proximidad, panel de informacion y ficha de
    ventana. Interfaz de museo contemporaneo, separada del diseño del espacio.
@@ -143,6 +193,12 @@ html, body {
   font-size: 20px; line-height: 1; color: var(--mus-tinta); opacity: 0.5;
 }
 #exhibit-panel .panel-close:hover { opacity: 1; }
+/* zona tactil comoda (min. ~44px recomendados) sin agrandar el glifo visual
+   -- el padding negativo en el margen compensa para que siga viendose en el
+   mismo sitio */
+.is-mobile #exhibit-panel .panel-close {
+  top: 4px; right: 6px; padding: 10px 12px;
+}
 
 /* cabecera fija: numero, imagen, nombre cientifico, subtitulo. Nunca se
    desplaza -- ver panel-scroll-wrap mas abajo, que solo envuelve el cuerpo
@@ -172,6 +228,11 @@ html, body {
   padding-bottom: 10px;
   scrollbar-width: thin;
   scrollbar-color: var(--mus-morado) transparent;
+  /* scroll tactil suave (momentum) en iOS antiguo, y evita que un gesto que
+     llega al final del texto "se escape" y arrastre la camara/pagina detras */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 #exhibit-panel .panel-scroll::-webkit-scrollbar { width: 5px; }
 #exhibit-panel .panel-scroll::-webkit-scrollbar-track { background: transparent; }

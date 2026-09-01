@@ -12,6 +12,105 @@
 // de simplemente mirar alrededor.
 const CLICK_MAX_MOVE_PX = 6;
 
+/* ==========================================================================
+   Soporte movil: en un telefono/tablet no hay teclado, asi que WASD (unica
+   forma de moverse hasta ahora) simplemente no existe -- mirar alrededor y
+   tocar piezas YA funcionaban en tactil (drag-look-controls, mas abajo,
+   escucha touchstart/move/end desde el principio), pero avanzar/retroceder/
+   strafe no tenian ningun equivalente tactil. Se detecta el dispositivo una
+   sola vez al cargar (AFRAME.utils.device.isMobile ya cubre los casos
+   habituales por user-agent; se combina con una comprobacion de puntero
+   "coarse" + soporte tactil como red de seguridad en dispositivos raros que
+   ese user-agent-sniffing no reconozca) y se marca con una clase en <body>
+   -- todo lo demas (mostrar el joystick, cambiar el texto de ayuda de WASD
+   a instrucciones tactiles) es CSS puro sobre esa clase, ver style.css.
+   ========================================================================== */
+const MUSEO_IS_MOBILE = (function () {
+  try {
+    const byUA = !!(AFRAME.utils && AFRAME.utils.device && AFRAME.utils.device.isMobile());
+    const touch = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
+    const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    return byUA || (touch && coarse);
+  } catch (e) { return false; }
+})();
+// En <body>, no en <html>: exhibit-info.open()/close() tambien marca
+// "panel-open" sobre document.body (ver mas abajo) para ocultar el joystick
+// mientras se lee una ficha -- ambas clases deben vivir en el mismo
+// elemento para que el selector combinado .is-mobile.panel-open funcione.
+if (MUSEO_IS_MOBILE) document.body.classList.add('is-mobile');
+
+/*
+  Joystick tactil de movimiento (solo visible en moviles, ver CSS): un
+  circulo base fijo abajo a la izquierda de la pantalla con un nucleo que
+  sigue al dedo, desplazamiento limitado a un radio maximo. Mientras se
+  mantiene pulsado, window.MUSEO_MOVE_VECTOR guarda la direccion normalizada
+  (-1..1 en x/z, mismos ejes de pantalla que WASD) que museum-movement suma
+  a las teclas -- es literalmente "otra fuente de entrada" para el mismo
+  sistema de movimiento, no uno nuevo. Es un elemento HTML aparte por encima
+  del canvas (mobile-controls en index.html): sus toques nunca llegan al
+  canvas, asi que nunca compiten con el arrastre de camara de drag-look-
+  controls, y viceversa (ver el seguimiento por touch.identifier alli).
+*/
+window.MUSEO_MOVE_VECTOR = { x: 0, z: 0 };
+(function setupMobileJoystick() {
+  const base = document.getElementById('joystick-base');
+  const nub = document.getElementById('joystick-nub');
+  if (!base || !nub) return;
+
+  let active = false;
+  let touchId = null;
+  let cx = 0, cy = 0;
+  const MAX_R = 38; // px, radio maximo de desplazamiento del nucleo
+
+  const setNub = (dx, dy) => { nub.style.transform = `translate(${dx}px, ${dy}px)`; };
+  const reset = () => {
+    active = false;
+    touchId = null;
+    window.MUSEO_MOVE_VECTOR.x = 0;
+    window.MUSEO_MOVE_VECTOR.z = 0;
+    setNub(0, 0);
+  };
+  const update = (px, py) => {
+    let dx = px - cx, dy = py - cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist > MAX_R) { dx = (dx / dist) * MAX_R; dy = (dy / dist) * MAX_R; }
+    setNub(dx, dy);
+    // pantalla: x+ = derecha, y+ = abajo -- mismos signos que W/A/S/D en
+    // museum-movement.tick (right-left en x, backward-forward en z).
+    window.MUSEO_MOVE_VECTOR.x = dx / MAX_R;
+    window.MUSEO_MOVE_VECTOR.z = dy / MAX_R;
+  };
+
+  const start = (e) => {
+    const t = e.changedTouches[0];
+    touchId = t.identifier;
+    const rect = base.getBoundingClientRect();
+    cx = rect.left + rect.width / 2;
+    cy = rect.top + rect.height / 2;
+    active = true;
+    update(t.clientX, t.clientY);
+    e.preventDefault();
+  };
+  const move = (e) => {
+    if (!active) return;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const t = e.changedTouches[i];
+      if (t.identifier === touchId) { update(t.clientX, t.clientY); e.preventDefault(); break; }
+    }
+  };
+  const end = (e) => {
+    if (!active) return;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === touchId) { reset(); break; }
+    }
+  };
+
+  base.addEventListener('touchstart', start, { passive: false });
+  window.addEventListener('touchmove', move, { passive: false });
+  window.addEventListener('touchend', end);
+  window.addEventListener('touchcancel', end);
+})();
+
 AFRAME.registerComponent('drag-look-controls', {
   schema: {
     sensitivity: { type: 'number', default: 0.2 } // degrees per pixel of drag
@@ -67,9 +166,44 @@ AFRAME.registerComponent('drag-look-controls', {
     this.onMouseDown = (e) => { if (e.button === 0) start(e.clientX, e.clientY); };
     this.onMouseMove = (e) => move(e.clientX, e.clientY);
     this.onMouseUp = () => end();
-    this.onTouchStart = (e) => { if (e.touches.length === 1) start(e.touches[0].clientX, e.touches[0].clientY); };
-    this.onTouchMove = (e) => { if (e.touches.length === 1) { move(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault(); } };
-    this.onTouchEnd = () => end();
+
+    /*
+      Toque en movil: se identifica el "dedo de mirar" por su touch.identifier
+      (this._touchId), no por "cuantos dedos hay en total en la pantalla"
+      como antes. Con el criterio antiguo (e.touches.length === 1) un segundo
+      dedo en cualquier otro sitio -- el joystick de movimiento en moviles
+      (ver mobile-controls mas abajo), o simplemente otro toque accidental --
+      hacia que el gesto de mirar dejara de funcionar mientras ese segundo
+      dedo estuviera apoyado. Ademas, al ser un listener en window, el
+      propio preventDefault() se llamaba para CUALQUIER touchmove de un solo
+      dedo en toda la pagina, aunque no fuera el que empezo a arrastrar
+      sobre el canvas -- eso es lo que bloqueaba el scroll tactil dentro del
+      panel de informacion (panel-scroll): un dedo deslizando el texto
+      tambien disparaba este preventDefault() y el navegador nunca llegaba a
+      hacer scroll. Ahora solo se sigue el toque que EMPEZO sobre el propio
+      canvas (this._touchId) y solo ESE toque llama a preventDefault();
+      cualquier otro toque (panel, joystick) pasa de largo sin tocarse.
+    */
+    this._touchId = null;
+    this.onTouchStart = (e) => {
+      if (this._touchId !== null) return;   // ya hay un toque de "mirar" en curso
+      const t = e.changedTouches[0];
+      this._touchId = t.identifier;
+      start(t.clientX, t.clientY);
+    };
+    this.onTouchMove = (e) => {
+      if (this._touchId === null) return;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        if (t.identifier === this._touchId) { move(t.clientX, t.clientY); e.preventDefault(); break; }
+      }
+    };
+    this.onTouchEnd = (e) => {
+      if (this._touchId === null) return;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === this._touchId) { this._touchId = null; end(); break; }
+      }
+    };
 
     const canvas = this.el.sceneEl.canvas;
     const attach = () => {
@@ -179,6 +313,12 @@ AFRAME.registerComponent('museum-movement', {
     const right = (this.keys.KeyD || this.keys.ArrowRight) ? 1 : 0;
 
     this.moveVector.set(right - left, 0, backward - forward);
+    // Joystick tactil (moviles, ver MUSEO_MOVE_VECTOR mas arriba): misma
+    // convencion de ejes que las teclas, asi que basta con sumarlo antes de
+    // normalizar -- otra fuente de entrada para el mismo vector, no un
+    // sistema de movimiento aparte.
+    const joy = window.MUSEO_MOVE_VECTOR;
+    if (joy && (joy.x || joy.z)) { this.moveVector.x += joy.x; this.moveVector.z += joy.z; }
     if (this.moveVector.lengthSq() > 0) this.moveVector.normalize();
 
     // BUG FIX: this only read the camera's own local yaw (from mouse look),
@@ -2006,12 +2146,18 @@ AFRAME.registerComponent('exhibit-info', {
     if (scroll) scroll.scrollTop = 0;   // cada ficha nueva empieza arriba, no donde quedo la anterior
     this.openId = id;
     this.hideIntro();
+    // En movil, el panel puede solapar la esquina donde vive el joystick de
+    // movimiento (ver mobile-controls) en pantallas pequeñas: se oculta
+    // mientras se lee una ficha (con la ficha abierta no hace falta seguir
+    // moviendose) y vuelve a aparecer al cerrarla, ver style.css.
+    document.body.classList.add('panel-open');
   },
 
   close() {
     if (!this.openId || !this.panel) return;
     this.panel.classList.remove('visible');
     this.openId = null;
+    document.body.classList.remove('panel-open');
   },
 
   hideIntro() {
@@ -2638,20 +2784,24 @@ AFRAME.registerComponent('reactor-control', {
     wrapper.object3D.quaternion.copy(quat);
 
     // WIDTH/HEIGHT se ajustan a la huella REAL del remate (top.extentLong/
-    // extentShort, medida por PCA en computeTopSurface, ver arriba) con
-    // margen de sobra para quedar bien dentro de la piedra, nunca al borde.
-    // Medido en crudo (offline, sobre el propio glTF): el remate real de
-    // PEANA_Alta_B es una repisa estrecha, ~0.11 m en su eje corto x ~0.88 m
-    // en el largo -- NO los ~0.30-0.50 m que se venian usando (ese valor
-    // mayor viniera de una medicion contaminada, ver nota en el umbral de
-    // computeTopSurface). Con la huella real tan estrecha, el panel tiene
-    // que ser bastante mas pequeño que antes para no sobresalir.
+    // extentShort, medida por PCA en computeTopSurface, ver arriba), pero ya
+    // no al valor mas ajustado posible: eso fue lo que hizo que los 4
+    // botones se redujeran a puntos casi invisibles y el texto ilegible (el
+    // remate real es una repisa estrecha, ~0.11 m en su eje corto x ~0.88 m
+    // en el largo, y ajustar el panel al milimetro a esos 0.11 m dejaba muy
+    // poco sitio para nada). Ahora se usa el WIDTH casi al completo del eje
+    // largo (mucho margen de sobra en esa direccion) y el HEIGHT se permite
+    // superar ligeramente la medida exacta del eje corto -- un pequeño
+    // vuelo de ~1-2 cm sobre el borde de la repisa, aceptable a cambio de
+    // que los controles vuelvan a verse con claridad, que es el requisito
+    // explicito. Panel siempre centrado y orientado igual que antes (mismo
+    // origin/normal/eje corto de computeTopSurface), solo mas grande.
     const WIDTH = (top && top.extentLong)
-      ? THREE.MathUtils.clamp(top.extentLong * 0.55, 0.28, 0.44)
-      : 0.40;
+      ? THREE.MathUtils.clamp(top.extentLong * 0.74, 0.55, 0.66)
+      : 0.60;
     const HEIGHT = (top && top.extentShort)
-      ? THREE.MathUtils.clamp(top.extentShort * 0.78, 0.07, 0.11)
-      : 0.09;
+      ? THREE.MathUtils.clamp(top.extentShort * 1.15, 0.11, 0.135)
+      : 0.13;
     const exhibitInfo = this.el.components['exhibit-info'];
     const paperTex = exhibitInfo && exhibitInfo.getPlacardPaperTexture
       ? exhibitInfo.getPlacardPaperTexture() : null;
@@ -2668,37 +2818,44 @@ AFRAME.registerComponent('reactor-control', {
 
     const TEXT_Z = 0.004;
 
-    // La repisa real es demasiado estrecha para el layout anterior (titulo +
-    // frase de instruccion + numero sobre cada boton + etiqueta debajo, las
-    // 4 filas apiladas): con un alto real de ~0.08-0.11 m ya no cabe todo
-    // eso sin que el texto se salga del propio panel fisico. Se simplifica
-    // a 2 filas -- titulo arriba, boton + su "01 LIGHT" combinado debajo --
+    // 2 filas -- titulo arriba, boton + su "01 LIGHT" combinado debajo --
     // todo dimensionado como fraccion de HEIGHT/WIDTH (nunca en metros fijos)
     // para que encaje sea cual sea el tamaño real medido en cada carga.
+    // Fracciones mas ajustadas que antes (menos hueco reservado a margenes/
+    // separaciones) para dejar el maximo espacio posible al circulo del
+    // boton, que es lo que el brief pide "claramente visible, no un punto".
     const heading = document.createElement('a-text');
     heading.setAttribute('value', 'BUILD A BIOPROCESS');
     heading.setAttribute('align', 'center');
     heading.setAttribute('baseline', 'center');
-    heading.setAttribute('width', WIDTH * 0.9);
-    heading.setAttribute('wrap-count', 20);
+    heading.setAttribute('width', WIDTH * 0.78);
+    heading.setAttribute('wrap-count', 23);
     heading.setAttribute('letter-spacing', 1);
     heading.setAttribute('color', ROOM2_ACCENT);
     heading.object3D.position.set(0, HEIGHT / 2 - HEIGHT * 0.16, TEXT_Z);
     wrapper.appendChild(heading);
 
     // fila de 4 botones, centrada, con espacio uniforme -- nunca mas ancha
-    // que un 80% de WIDTH, para que quede margen a los lados.
+    // que un 80% de WIDTH, para que quede margen a los lados. Con el WIDTH
+    // mucho mayor que antes, cada columna dispone de mucho mas ancho real:
+    // eso es lo que permite botones y texto notablemente mas grandes sin
+    // arriesgar que se salgan del panel ni se toquen entre si.
     const defs = [
       { id: 'light', num: '01', label: 'LIGHT' },
       { id: 'flow', num: '02', label: 'FLOW' },
       { id: 'nutrients', num: '03', label: 'NUTRIENTS' },
       { id: 'active', num: '04', label: 'ACTIVATE' }
     ];
-    const spacing = Math.min(WIDTH * 0.22, (WIDTH * 0.78) / (defs.length - 1));
+    const spacing = Math.min(WIDTH * 0.24, (WIDTH * 0.86) / (defs.length - 1));
     const startX = -spacing * (defs.length - 1) / 2;
-    const BTN_R = HEIGHT * 0.20;
-    const BTN_Y = HEIGHT / 2 - HEIGHT * 0.30 - BTN_R;
-    const LABEL_Y = BTN_Y - BTN_R - HEIGHT * 0.12;
+    // Radio del boton: fraccion de HEIGHT (limite fisico real, el eje corto
+    // de la repisa), pero notablemente mayor que antes -- ya no "un punto"
+    // (verificado con /tmp/verify_panel_layout.js: ~6 cm de diametro, con
+    // margen de sobra tanto para el titulo arriba como para la etiqueta
+    // debajo, sin que ninguno de los dos se salga del panel).
+    const BTN_R = HEIGHT * 0.24;
+    const BTN_Y = HEIGHT / 2 - HEIGHT * 0.26 - BTN_R;
+    const LABEL_Y = BTN_Y - BTN_R - HEIGHT * 0.10;
 
     defs.forEach((d, i) => {
       const bx = startX + i * spacing;
@@ -2721,14 +2878,22 @@ AFRAME.registerComponent('reactor-control', {
       if (exhibitInfo) exhibitInfo.selectableMeshes.push(btn);
 
       // numero + nombre combinados en una sola linea ("01 LIGHT") debajo del
-      // boton -- antes eran dos lineas separadas (numero encima, nombre
-      // debajo), que ya no caben en el alto real disponible.
+      // boton. El ancho del cuadro de texto se calcula a partir del hueco
+      // real disponible por columna (spacing), no de HEIGHT como antes --
+      // con HEIGHT ya no era mas que ~0.09-0.11 m, ese ancho de texto
+      // acababa siendo mayor que el propio hueco entre botones y las
+      // etiquetas vecinas se solapaban. wrap-count = longitud exacta de
+      // cada texto (no un 12 fijo) para que la fuente aproveche todo el
+      // ancho de su columna sea cual sea la longitud de esa etiqueta en
+      // concreto ("02 FLOW" se ve mas grande que "03 NUTRIENTS", ambas
+      // llenan su columna igual).
+      const txt = `${d.num} ${d.label}`;
       const label = document.createElement('a-text');
-      label.setAttribute('value', `${d.num} ${d.label}`);
+      label.setAttribute('value', txt);
       label.setAttribute('align', 'center');
       label.setAttribute('baseline', 'center');
-      label.setAttribute('width', HEIGHT * 1.6);
-      label.setAttribute('wrap-count', 12);
+      label.setAttribute('width', spacing * 0.96);
+      label.setAttribute('wrap-count', txt.length);
       label.setAttribute('letter-spacing', 0.3);
       label.setAttribute('color', '#201A1E');
       label.object3D.position.set(bx, LABEL_Y, TEXT_Z);
