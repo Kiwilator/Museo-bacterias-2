@@ -2363,6 +2363,8 @@ AFRAME.registerComponent('reactor-control', {
     this.glassMat = glassMat;
     this.bubbleBase = bubbleMat ? { i: bubbleMat.emissiveIntensity, o: bubbleMat.opacity } : null;
     this.liquidBase = liquidMat ? { i: liquidMat.emissiveIntensity, o: liquidMat.opacity } : null;
+    this.liquidMesh = liquidMesh;
+    this.captureLiquidLevel(liquidMesh);
     // base real del cristal (casi siempre negro/sin emisivo de fabrica) --
     // el realce de hover se mezcla hacia el acento de Sala 2 partiendo de
     // este valor, nunca sustituyendolo.
@@ -2397,6 +2399,7 @@ AFRAME.registerComponent('reactor-control', {
     this.curBubbleO = this.bubbleBase ? this.bubbleBase.o : 0;
     this.curLiquidI = this.liquidBase ? this.liquidBase.i : 0;
     this.curFlowSpeed = 0;
+    this.curNutrientLevel = 0;
     this.recomputeTargets();
     // arranca ya en el estado 0 (inactivo), sin animar desde el valor de fabrica
     this.curSpot = this.targetSpot;
@@ -2407,6 +2410,7 @@ AFRAME.registerComponent('reactor-control', {
     this.applyReactorState();
 
     this.buildNutrientParticles(mesh);
+    this.buildActivityBubbles(mesh);
     this.buildControlStand();
     console.log('[reactor-control] listo -- estado 0 (reactor inactivo)');
   },
@@ -2440,10 +2444,10 @@ AFRAME.registerComponent('reactor-control', {
     const s = this.stage;
     const activeMult = s.active ? 1.15 : 1;
 
-    const spotFrac = 0.34 + (s.light ? 0.50 : 0) + (s.active ? 0.28 : 0);
-    this.targetSpot = this.spotBase * spotFrac * activeMult;
+    const spotFrac = 0.34 + (s.light ? 0.54 : 0);
+    this.targetSpot = this.spotBase * spotFrac;
 
-    const liquidIFrac = 0.24 + (s.light ? 0.48 : 0) + (s.active ? 0.30 : 0);
+    const liquidIFrac = 0.22 + (s.light ? 0.56 : 0) + (s.active ? 0.24 : 0);
     this.targetLiquidI = this.liquidBase ? this.liquidBase.i * liquidIFrac * activeMult : 0;
 
     const bubbleIFrac = 0.16 + (s.flow ? 0.68 : 0) + (s.active ? 0.34 : 0);
@@ -2456,6 +2460,7 @@ AFRAME.registerComponent('reactor-control', {
     // pusiera en marcha la animacion, dejaria de poder distinguirse de
     // FLOW. ACTIVATE unicamente la refuerza un poco cuando FLOW ya esta on.
     this.targetFlowSpeed = s.flow ? (1 * (s.active ? 1.3 : 1)) : 0;
+    this.targetNutrientLevel = s.nutrients ? 1 : 0;
   },
 
   applyReactorState() {
@@ -2478,6 +2483,7 @@ AFRAME.registerComponent('reactor-control', {
     }
     if (this.liquidMat) this.liquidMat.emissiveIntensity = this.curLiquidI * hoverBoost * activePulseBoost;
     if (this.bioreactorAnim && this.bioreactorAnim.mixer) this.bioreactorAnim.mixer.timeScale = this.curFlowSpeed;
+    this.applyLiquidLevel(this.curNutrientLevel || 0);
     // Cristal exterior: unico material del reactor que no depende de ningun
     // boton, asi que es el que mejor comunica "esto se puede seleccionar"
     // incluso con el reactor todavia apagado -- un tinte muy suave hacia el
@@ -2540,6 +2546,98 @@ AFRAME.registerComponent('reactor-control', {
     this.nutrientGroup = group;
   },
 
+  captureLiquidLevel(liquidMesh) {
+    if (!liquidMesh || !liquidMesh.geometry) { this.liquidLevel = null; return; }
+    liquidMesh.geometry.computeBoundingBox();
+    const box = liquidMesh.geometry.boundingBox;
+    if (!box) { this.liquidLevel = null; return; }
+    this.liquidLevel = {
+      mesh: liquidMesh,
+      baseScaleY: liquidMesh.scale.y,
+      basePosY: liquidMesh.position.y,
+      minY: box.min.y,
+      maxY: box.max.y,
+      low: 0.92,
+      high: 1.0
+    };
+  },
+
+  applyLiquidLevel(amount) {
+    const level = this.liquidLevel;
+    if (!level) return;
+    const t = THREE.MathUtils.clamp(amount, 0, 1);
+    const factor = THREE.MathUtils.lerp(level.low, level.high, t);
+    const nextScaleY = level.baseScaleY * factor;
+    level.mesh.scale.y = nextScaleY;
+    level.mesh.position.y = level.basePosY - level.minY * (nextScaleY - level.baseScaleY);
+    level.mesh.updateWorldMatrix(true, false);
+    const top = new THREE.Vector3(0, level.maxY, 0).applyMatrix4(level.mesh.matrixWorld);
+    this.currentLiquidTopY = top.y;
+  },
+
+  buildActivityBubbles(mesh) {
+    this.activityBubbles = [];
+    if (!this.liquidMesh) return;
+    const liquidBox = new THREE.Box3().setFromObject(this.liquidMesh);
+    const sx = Math.max(0.02, liquidBox.max.x - liquidBox.min.x);
+    const sy = Math.max(0.02, liquidBox.max.y - liquidBox.min.y);
+    const sz = Math.max(0.02, liquidBox.max.z - liquidBox.min.z);
+    const cx = (liquidBox.min.x + liquidBox.max.x) * 0.5;
+    const cz = (liquidBox.min.z + liquidBox.max.z) * 0.5;
+    const group = new THREE.Group();
+    group.name = 'reactor-active-culture-bubbles';
+    const color = this.bubbleMat && this.bubbleMat.color ? this.bubbleMat.color.clone() : new THREE.Color(0x73e2dc);
+    const emissive = this.bubbleMat && this.bubbleMat.emissive ? this.bubbleMat.emissive.clone() : color.clone();
+    const N = 18;
+    for (let i = 0; i < N; i++) {
+      const mat = new THREE.MeshStandardMaterial({
+        color, emissive, emissiveIntensity: 1.2,
+        roughness: 0.2, metalness: 0, transparent: true, opacity: 0, depthWrite: false
+      });
+      const bubble = new THREE.Mesh(new THREE.SphereGeometry(0.012 + (i % 3) * 0.004, 10, 8), mat);
+      const px = cx + (((i * 37) % 100) / 100 - 0.5) * sx * 0.46;
+      const pz = cz + (((i * 61) % 100) / 100 - 0.5) * sz * 0.46;
+      bubble.position.set(px, liquidBox.min.y + sy * 0.12, pz);
+      group.add(bubble);
+      this.activityBubbles.push({
+        mesh: bubble, mat,
+        baseX: px, baseZ: pz,
+        phase: i / N,
+        radius: 0.006 + ((i * 17) % 5) * 0.001
+      });
+    }
+    this.activityTravel = { minY: liquidBox.min.y + sy * 0.10, maxY: liquidBox.max.y - sy * 0.08, height: sy };
+    this.el.sceneEl.object3D.add(group);
+    this.activityGroup = group;
+  },
+
+  updateActivityBubbles(time) {
+    if (!this.activityBubbles || !this.activityBubbles.length) return;
+    const active = this.stage.active;
+    const t = (time || 0) / 1000;
+    const travel = this.activityTravel;
+    const amount = this.activePulseAmt || 0;
+    this.activityBubbles.forEach((b) => {
+      if (!active && b.mat.opacity < 0.01) {
+        b.mat.opacity = 0;
+        return;
+      }
+      const cycle = ((t * 0.33) + b.phase) % 1;
+      const wobble = Math.sin(t * 1.7 + b.phase * Math.PI * 2);
+      const rise = THREE.MathUtils.lerp(travel.minY, travel.maxY, cycle);
+      b.mesh.position.set(
+        b.baseX + Math.sin(t * 1.1 + b.phase * 9) * b.radius,
+        rise,
+        b.baseZ + wobble * b.radius
+      );
+      const fadeIn = Math.min(1, cycle / 0.18);
+      const fadeOut = Math.min(1, (1 - cycle) / 0.22);
+      const target = active ? Math.min(fadeIn, fadeOut) * 0.78 * Math.max(0.35, amount) : 0;
+      b.mat.opacity += (target - b.mat.opacity) * 0.16;
+      b.mat.emissiveIntensity = 1.1 + (this.activePulse || 0) * 0.8;
+    });
+  },
+
   /*
     Bucle de caida de las gotas de nutrientes: solo se mueven/se ven cuando
     NUTRIENTS esta activo (si no, se desvanecen a opacidad 0 y quedan
@@ -2560,8 +2658,9 @@ AFRAME.registerComponent('reactor-control', {
         d.mat.opacity += (0 - d.mat.opacity) * 0.08;
         return;
       }
+      const bottomY = this.currentLiquidTopY || travel.bottomY;
       const cycle = ((t / period) + d.phase) % 1;
-      d.mesh.position.set(travel.cx, THREE.MathUtils.lerp(travel.topY, travel.bottomY, cycle), travel.cz);
+      d.mesh.position.set(travel.cx, THREE.MathUtils.lerp(travel.topY, bottomY, cycle), travel.cz);
       const fadeIn = Math.min(1, cycle / 0.18);
       const fadeOut = Math.min(1, (1 - cycle) / 0.30);
       // ligero "salpicon" al llegar al liquido: la gota crece un poco justo
@@ -2575,82 +2674,68 @@ AFRAME.registerComponent('reactor-control', {
   },
 
   /*
-    Ajuste de un plano (y = a*x + b*z + c) por minimos cuadrados a la nube
-    de puntos del remate superior de una malla REAL, en espacio de mundo
-    (matrixWorld, que ya lleva aplicada la escala no uniforme del museo).
-    Un Box3 es siempre recto -- no puede revelar que un remate esta
-    inclinado. Muestreando la geometria real se obtiene la normal real de
-    esa superficie, se este inclinada o no. Se usa para apoyar el panel de
-    control EN el remate real de PEANA_Alta_B (que resulto tener ~15° de
-    inclinacion), en vez de adivinar que es plano y horizontal.
+    Encuentra la cara superior REAL de PEANA_Alta_B agrupando triangulos
+    coplanares con normal ascendente. Para una tapa inclinada no sirve
+    filtrar por "vertices con Y maxima": eso captura solo el borde alto y
+    pierde el plano completo. Aqui se elige la mayor superficie ascendente
+    coplanar de la peana, se mide su normal y su huella dentro del propio
+    plano, y el panel se apoya ahi.
   */
   computeTopSurface(obj) {
-    let target = obj;
-    if (!target.isMesh) {
-      target = null;
-      obj.traverse((o) => { if (!target && o.isMesh) target = o; });
-    }
-    if (!target || !target.geometry || !target.geometry.attributes.position) return null;
-    target.updateWorldMatrix(true, false);
-    const posAttr = target.geometry.attributes.position;
-    const world = target.matrixWorld;
-    const pts = [];
-    const v = new THREE.Vector3();
-    let minY = Infinity, maxY = -Infinity;
-    for (let i = 0; i < posAttr.count; i++) {
-      v.fromBufferAttribute(posAttr, i).applyMatrix4(world);
-      pts.push(v.clone());
-      if (v.y < minY) minY = v.y;
-      if (v.y > maxY) maxY = v.y;
-    }
-    // Solo la "tapa" superior, para no mezclar los lados verticales de la
-    // peana con su remate real. PEANA_Alta_B resulto ser una peana ESCALONADA
-    // (varios niveles), no una columna lisa con un unico remate: un umbral
-    // del 80% incluia tambien un puñado de vertices sueltos del canto del
-    // escalon INMEDIATAMENTE debajo del remate real (una tira casi puntual,
-    // de anchura ~0 en un eje) -- verificado midiendo esta malla en crudo
-    // (offline, fuera del navegador): esos pocos puntos bastaban para
-    // sesgar el ajuste de plano (inclinacion medida ~14.7° en vez de la real
-    // ~10.1°) Y, sobre todo, para inflar la huella medida en
-    // computeTopSurface (ver mas abajo) de sus ~0.11 m reales a ~0.33 m --
-    // exactamente lo que hacia que el panel de control se construyera
-    // demasiado grande para la repisa real y sobresaliera por el lado
-    // corto. Con 88% el remate real (un cluster estable de puntos, mismo
-    // resultado en toda la ventana 85%-90%) queda aislado sin ese ruido.
-    const thresh = minY + (maxY - minY) * 0.88;
-    const top = pts.filter((p) => p.y > thresh);
-    if (top.length < 8) return null;
-
-    let Sxx = 0, Sxz = 0, Szz = 0, Sxy = 0, Szy = 0, Sx = 0, Sz = 0, Sy = 0;
-    const n = top.length;
-    top.forEach((p) => {
-      Sxx += p.x * p.x; Sxz += p.x * p.z; Szz += p.z * p.z;
-      Sxy += p.x * p.y; Szy += p.z * p.y;
-      Sx += p.x; Sz += p.z; Sy += p.y;
-    });
-    // [Sxx Sxz Sx; Sxz Szz Sz; Sx Sz n] * [a;b;c] = [Sxy;Szy;Sy]
-    const M = [[Sxx, Sxz, Sx], [Sxz, Szz, Sz], [Sx, Sz, n]];
-    const R = [Sxy, Szy, Sy];
-    for (let i = 0; i < 3; i++) {
-      let piv = i;
-      for (let k = i + 1; k < 3; k++) if (Math.abs(M[k][i]) > Math.abs(M[piv][i])) piv = k;
-      if (piv !== i) { [M[i], M[piv]] = [M[piv], M[i]]; [R[i], R[piv]] = [R[piv], R[i]]; }
-      if (Math.abs(M[i][i]) < 1e-9) return null;
-      for (let k = i + 1; k < 3; k++) {
-        const f = M[k][i] / M[i][i];
-        for (let j = i; j < 3; j++) M[k][j] -= f * M[i][j];
-        R[k] -= f * R[i];
+    const tris = [];
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    const ab = new THREE.Vector3(), ac = new THREE.Vector3();
+    obj.traverse((target) => {
+      if (!target.isMesh || !target.geometry || !target.geometry.attributes.position) return;
+      target.updateWorldMatrix(true, false);
+      const pos = target.geometry.attributes.position;
+      const idx = target.geometry.index;
+      const read = (i, out) => out.fromBufferAttribute(pos, i).applyMatrix4(target.matrixWorld);
+      const triCount = idx ? idx.count / 3 : pos.count / 3;
+      for (let t = 0; t < triCount; t++) {
+        const ia = idx ? idx.getX(t * 3) : t * 3;
+        const ib = idx ? idx.getX(t * 3 + 1) : t * 3 + 1;
+        const ic = idx ? idx.getX(t * 3 + 2) : t * 3 + 2;
+        read(ia, a); read(ib, b); read(ic, c);
+        ab.subVectors(b, a); ac.subVectors(c, a);
+        const cross = new THREE.Vector3().crossVectors(ab, ac);
+        const area = cross.length() * 0.5;
+        if (area < 1e-7) continue;
+        const normal = cross.normalize();
+        if (normal.y < 0) normal.negate();
+        if (normal.y < 0.35) continue;
+        const center = new THREE.Vector3().addVectors(a, b).add(c).multiplyScalar(1 / 3);
+        tris.push({ normal, area, center, d: normal.dot(center), pts: [a.clone(), b.clone(), c.clone()] });
       }
-    }
-    const abc = [0, 0, 0];
-    for (let i = 2; i >= 0; i--) {
-      let s = R[i];
-      for (let j = i + 1; j < 3; j++) s -= M[i][j] * abc[j];
-      abc[i] = s / M[i][i];
-    }
-    const normal = new THREE.Vector3(-abc[0], 1, -abc[1]).normalize();
+    });
+    if (!tris.length) return null;
+
+    const groups = [];
+    const maxAngle = Math.cos(THREE.MathUtils.degToRad(4));
+    tris.forEach((tri) => {
+      let group = groups.find((g) => tri.normal.dot(g.normal) > maxAngle && Math.abs(tri.d - g.d) < 0.018);
+      if (!group) {
+        group = { normal: tri.normal.clone(), d: tri.d, area: 0, weightedY: 0, pts: [] };
+        groups.push(group);
+      }
+      const nextArea = group.area + tri.area;
+      group.normal.multiplyScalar(group.area).addScaledVector(tri.normal, tri.area).divideScalar(nextArea).normalize();
+      group.d = (group.d * group.area + tri.d * tri.area) / nextArea;
+      group.area = nextArea;
+      group.weightedY += tri.center.y * tri.area;
+      group.pts.push(...tri.pts);
+    });
+    groups.forEach((g) => { g.avgY = g.weightedY / Math.max(g.area, 1e-9); });
+    const maxArea = Math.max(...groups.map((g) => g.area));
+    const candidates = groups.filter((g) => g.area >= maxArea * 0.28);
+    const best = candidates.sort((g1, g2) => (g2.avgY - g1.avgY) || (g2.area - g1.area))[0];
+    if (!best || best.pts.length < 3) return null;
+
+    const normal = best.normal.clone();
     if (normal.y < 0) normal.negate();
-    const centroid = new THREE.Vector3(Sx / n, Sy / n, Sz / n);
+    const planePoint = new THREE.Vector3();
+    best.pts.forEach((p) => planePoint.add(p));
+    planePoint.multiplyScalar(1 / best.pts.length);
 
     // PCA 2D DENTRO del plano ajustado: la huella real de este remate no es
     // cuadrada (PEANA_Alta_B mide ~0.32 m en su lado corto y ~0.88 m en el
@@ -2668,12 +2753,12 @@ AFRAME.registerComponent('reactor-control', {
 
     let Suu = 0, Suv = 0, Svv = 0;
     const rel = new THREE.Vector3();
-    top.forEach((p) => {
-      rel.subVectors(p, centroid);
+    best.pts.forEach((p) => {
+      rel.subVectors(p, planePoint);
       const pu = rel.dot(uAxis), pv = rel.dot(vAxis);
       Suu += pu * pu; Suv += pu * pv; Svv += pv * pv;
     });
-    Suu /= top.length; Suv /= top.length; Svv /= top.length;
+    Suu /= best.pts.length; Suv /= best.pts.length; Svv /= best.pts.length;
 
     const trace = Suu + Svv;
     const det = Suu * Svv - Suv * Suv;
@@ -2688,12 +2773,17 @@ AFRAME.registerComponent('reactor-control', {
     const axisShort = new THREE.Vector3().crossVectors(normal, axisLong).normalize();
 
     let longMin = Infinity, longMax = -Infinity, shortMin = Infinity, shortMax = -Infinity;
-    top.forEach((p) => {
-      rel.subVectors(p, centroid);
+    let maxY = -Infinity;
+    best.pts.forEach((p) => {
+      rel.subVectors(p, planePoint);
       const dl = rel.dot(axisLong), ds = rel.dot(axisShort);
       if (dl < longMin) longMin = dl; if (dl > longMax) longMax = dl;
       if (ds < shortMin) shortMin = ds; if (ds > shortMax) shortMax = ds;
+      if (p.y > maxY) maxY = p.y;
     });
+    const centroid = planePoint.clone()
+      .addScaledVector(axisLong, (longMin + longMax) * 0.5)
+      .addScaledVector(axisShort, (shortMin + shortMax) * 0.5);
 
     return {
       normal, centroid, topY: maxY,
@@ -2776,31 +2866,25 @@ AFRAME.registerComponent('reactor-control', {
     const basis = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
     const quat = new THREE.Quaternion().setFromRotationMatrix(basis);
 
-    const STANDOFF = 0.006;   // apenas separado de la piedra, sin flotar
+    const STANDOFF = 0.002;   // separacion minima para evitar z-fighting, pegado a la tapa
     const pos = origin.clone().addScaledVector(zAxis, STANDOFF);
 
     const wrapper = document.createElement('a-entity');
     wrapper.object3D.position.copy(pos);
     wrapper.object3D.quaternion.copy(quat);
 
-    // WIDTH/HEIGHT se ajustan a la huella REAL del remate (top.extentLong/
-    // extentShort, medida por PCA en computeTopSurface, ver arriba), pero ya
-    // no al valor mas ajustado posible: eso fue lo que hizo que los 4
-    // botones se redujeran a puntos casi invisibles y el texto ilegible (el
-    // remate real es una repisa estrecha, ~0.11 m en su eje corto x ~0.88 m
-    // en el largo, y ajustar el panel al milimetro a esos 0.11 m dejaba muy
-    // poco sitio para nada). Ahora se usa el WIDTH casi al completo del eje
-    // largo (mucho margen de sobra en esa direccion) y el HEIGHT se permite
-    // superar ligeramente la medida exacta del eje corto -- un pequeño
-    // vuelo de ~1-2 cm sobre el borde de la repisa, aceptable a cambio de
-    // que los controles vuelvan a verse con claridad, que es el requisito
-    // explicito. Panel siempre centrado y orientado igual que antes (mismo
-    // origin/normal/eje corto de computeTopSurface), solo mas grande.
+    // El brief nuevo es estricto: el panel completo debe quedar dentro del
+    // contorno de la tapa inclinada. Se conserva el tamano anterior como
+    // preferencia, pero el maximo real lo pone la huella medida.
+    const fitWithin = (preferred, minimum, maximum) => {
+      const max = Math.max(0.001, maximum);
+      return Math.min(Math.max(preferred, Math.min(minimum, max)), max);
+    };
     const WIDTH = (top && top.extentLong)
-      ? THREE.MathUtils.clamp(top.extentLong * 0.74, 0.55, 0.66)
+      ? fitWithin(0.60, 0.50, top.extentLong * 0.84)
       : 0.60;
     const HEIGHT = (top && top.extentShort)
-      ? THREE.MathUtils.clamp(top.extentShort * 1.15, 0.11, 0.135)
+      ? fitWithin(0.13, 0.105, top.extentShort * 0.72)
       : 0.13;
     const exhibitInfo = this.el.components['exhibit-info'];
     const paperTex = exhibitInfo && exhibitInfo.getPlacardPaperTexture
@@ -2841,10 +2925,10 @@ AFRAME.registerComponent('reactor-control', {
     // eso es lo que permite botones y texto notablemente mas grandes sin
     // arriesgar que se salgan del panel ni se toquen entre si.
     const defs = [
-      { id: 'light', num: '01', label: 'LIGHT' },
-      { id: 'flow', num: '02', label: 'FLOW' },
-      { id: 'nutrients', num: '03', label: 'NUTRIENTS' },
-      { id: 'active', num: '04', label: 'ACTIVATE' }
+      { id: 'light', num: '01', label: 'LIGHT', symbol: 'LUX', off: 0xe8f7f5, on: 0x59e7e0 },
+      { id: 'flow', num: '02', label: 'FLOW', symbol: '~', off: 0xe5f3ef, on: 0x35d5d3 },
+      { id: 'nutrients', num: '03', label: 'NUTRIENTS', symbol: '+', off: 0xeaf4de, on: 0xa9dc69 },
+      { id: 'active', num: '04', label: 'ACTIVATE', symbol: 'BIO', off: 0xeee4f4, on: 0xb06ce8 }
     ];
     const spacing = Math.min(WIDTH * 0.24, (WIDTH * 0.86) / (defs.length - 1));
     const startX = -spacing * (defs.length - 1) / 2;
@@ -2864,9 +2948,9 @@ AFRAME.registerComponent('reactor-control', {
       // tres esten encendidos, asi que ya no lleva el aspecto "apagado/
       // deshabilitado" (gris oscuro, brillo minimo) que tenia antes -- los
       // 4 arrancan con el mismo aspecto neutro.
-      const btnColor = new THREE.Color(0xece4f2);
+      const btnColor = new THREE.Color(d.off);
       const material = new THREE.MeshStandardMaterial({
-        color: btnColor, emissive: new THREE.Color(ROOM2_ACCENT),
+        color: btnColor, emissive: new THREE.Color(d.on),
         emissiveIntensity: 0.16,
         roughness: 0.55, metalness: 0.05, side: THREE.DoubleSide
       });
@@ -2876,6 +2960,17 @@ AFRAME.registerComponent('reactor-control', {
       btn.userData.museoAction = () => this.onButtonClick(d.id);
       wrapper.object3D.add(btn);
       if (exhibitInfo) exhibitInfo.selectableMeshes.push(btn);
+
+      const icon = document.createElement('a-text');
+      icon.setAttribute('value', d.symbol);
+      icon.setAttribute('align', 'center');
+      icon.setAttribute('baseline', 'center');
+      icon.setAttribute('width', BTN_R * 2.2);
+      icon.setAttribute('wrap-count', Math.max(1, d.symbol.length));
+      icon.setAttribute('letter-spacing', 0);
+      icon.setAttribute('color', '#201A1E');
+      icon.object3D.position.set(bx, BTN_Y, TEXT_Z + 0.014);
+      wrapper.appendChild(icon);
 
       // numero + nombre combinados en una sola linea ("01 LIGHT") debajo del
       // boton. El ancho del cuadro de texto se calcula a partir del hueco
@@ -2899,7 +2994,11 @@ AFRAME.registerComponent('reactor-control', {
       label.object3D.position.set(bx, LABEL_Y, TEXT_Z);
       wrapper.appendChild(label);
 
-      this.buttons.push({ id: d.id, mesh: btn, material, baseEmissive: material.emissiveIntensity });
+      this.buttons.push({
+        id: d.id, mesh: btn, material, icon,
+        offColor: d.off, onColor: d.on,
+        baseEmissive: material.emissiveIntensity
+      });
       this._hoverT[d.id] = 0;
     });
 
@@ -2929,8 +3028,10 @@ AFRAME.registerComponent('reactor-control', {
   updateButtonLooks() {
     this.buttons.forEach((b) => {
       const on = this.stage[b.id];
-      b.material.color.set(on ? ROOM2_ACCENT : 0xece4f2);
-      b.baseEmissive = on ? 0.34 : 0.16;
+      b.material.color.set(on ? b.onColor : b.offColor);
+      b.material.emissive.set(b.onColor);
+      if (b.icon) b.icon.setAttribute('color', on ? '#ffffff' : '#201A1E');
+      b.baseEmissive = on ? 0.42 : 0.14;
     });
   },
 
@@ -2965,8 +3066,10 @@ AFRAME.registerComponent('reactor-control', {
     this.curBubbleO += (this.targetBubbleO - this.curBubbleO) * speed;
     this.curLiquidI += (this.targetLiquidI - this.curLiquidI) * speed;
     this.curFlowSpeed += (this.targetFlowSpeed - this.curFlowSpeed) * speed;
+    this.curNutrientLevel += ((this.targetNutrientLevel || 0) - this.curNutrientLevel) * speed;
     this.applyReactorState();
     this.updateNutrientParticles(time);
+    this.updateActivityBubbles(time);
 
     // hover de los 4 botones: mismo lenguaje que el resto del museo (escala
     // + brillo muy sutiles), leyendo el hoverId que ya calcula exhibit-info.
