@@ -862,6 +862,9 @@ const museumContent = {
     lead: 'Much more than photosynthesis', tags: ['PHOTOSYNTHESIS', 'METABOLIC DIVERSITY', 'PHA'], icon: 'cell',
     tier: 'primary', anchor: 'BACTERIA_MASTER',
     section: '01', title: 'PURPLE PHOTOTROPHIC BACTERIA', label: 'EXPLORE +',
+    // Microscopia real de bacterias purpuras (fluorescencia + SEM), tomada de
+    // los documentos fuente del proyecto -- ver brief punto 5.
+    images: ['./assets/images/ppb-microscopy-overview.jpg'],
     body: 'Purple phototrophic bacteria (PPB) are a diverse group of microorganisms capable of using light as a source of energy. What makes them particularly interesting, however, is not only their photosynthetic ability, but also the extraordinary variety of metabolic strategies they can develop.\n\nDepending on the species and environmental conditions, these bacteria can modify their metabolism, fix nitrogen, transform organic compounds, use certain gases, exchange electrons with minerals or electrodes, and store carbon in the form of PHA (biopolymers with potential applications in the production of bio-based plastics). Some strains are also particularly efficient at producing hydrogen, while the biomass obtained from their cultivation is being investigated for food and feed applications.\n\nThis diversity makes purple phototrophic bacteria important both for understanding fundamental biological processes (such as the conversion of light into energy and cellular adaptation to environmental conditions) and for investigating more sustainable biotechnological processes. Their cultivation opens possibilities related to hydrogen production, bioplastics, biomass and bioelectrochemical systems.\n\nBut they do not all behave in the same way.\n\nFrom this point onwards, the exhibition focuses on eight specific strains, revealing the characteristics and capabilities that distinguish each one.\n\n01. RHODOSPIRILLUM RUBRUM\nA key bacterium for understanding photosynthesis\n\nRhodospirillum rubrum has played an important role in the history of bacterial photosynthesis research. Its relatively simple photosynthetic apparatus made it one of the first model organisms used to investigate how energy from light is transformed, through electron transfer, into energy that the cell can use.\n\nIts study has also helped researchers understand the relationship between energy production, nitrogen fixation and carbon metabolism, showing how a bacterium can coordinate different processes depending on its needs and environmental conditions.\n\nIts relevance is not limited to fundamental research. R. rubrum can accumulate PHA in the form of intracellular granules. These compounds act as carbon reserves for the bacterium and can be used in the production of bio-based and biodegradable materials. The species is also currently being investigated as a potential nutritious ingredient for food and feed applications.'
   },
   bacteriaSmall01: {
@@ -887,6 +890,9 @@ const museumContent = {
     lead: 'A different way to reproduce', tags: ['HYPHAE', 'BUDDING', 'LIFE CYCLE'], icon: 'transform',
     tier: 'primary', anchor: 'Exhibit_Mesh0_Capsule',
     section: '05', title: 'RHODOMICROBIUM VANNIELII', label: 'EXPLORE +',
+    // Microscopia de contraste de fase real, celulas con apendices polares
+    // -- coherente con la budding/hifas descritas en el cuerpo del texto.
+    images: ['./assets/images/rhodomicrobium-budding.jpg'],
     body: 'We often imagine bacteria reproducing through a simple division in which one cell produces two almost identical cells. Rhodomicrobium vannielii shows that bacterial reproduction can be considerably more complex.\n\nThis bacterium develops filamentous extensions known as hyphae. New cells are formed by budding from the tips of these structures. A small bud appears, gradually grows and eventually separates to form a new cell.\n\nThis life cycle includes processes of cellular differentiation and unusual multicellular stages, making R. vannielii an important organism for studying the evolution of complex bacterial life cycles.\n\nIts distinctive morphology also provides a striking example of the extraordinary diversity found among photosynthetic bacteria.'
   },
   bacteriaSmall04: {
@@ -922,6 +928,9 @@ const museumContent = {
     tags: ['CULTIVATION', 'CONTROLLED CONDITIONS', 'PROCESS'], icon: 'reactor',
     tier: 'primary', anchor: 'PEANA_Bioreactor',
     title: 'PHOTOBIOREACTOR', label: 'VIEW PROCESS +',
+    // Fotobiorreactores reales de laboratorio, tomados de los documentos
+    // fuente del proyecto -- ver brief punto 5 (nunca inventadas).
+    images: ['./assets/images/reactor-cultivation-01.jpg', './assets/images/reactor-cultivation-02.jpg'],
     body: 'FROM BACTERIA TO BIOPROCESS\n\nIn the previous room, we discovered the remarkable metabolic diversity of purple phototrophic bacteria.\n\nBut understanding what these microorganisms can do is only the beginning. To use their capabilities, researchers need to create controlled environments where bacteria receive the appropriate light, nutrients and operating conditions. Photobioreactors make this possible.\n\nInside these systems, microorganisms can be cultivated under controlled conditions, allowing researchers to study and develop processes related to hydrogen production, bioplastics, biomass and bioelectrochemical applications.\n\nIn this room, the focus moves from the microorganism itself to the process.\n\nPHOTOBIOREACTOR\n\nA photobioreactor provides a controlled environment for cultivating photosynthetic microorganisms.\n\nThe system allows key conditions such as light, nutrient supply and circulation to be managed while the culture grows. By controlling these variables, researchers can investigate how purple phototrophic bacteria transform resources and produce compounds of potential interest.\n\nThe reactor therefore represents the transition between understanding the biology of these microorganisms and using their capabilities in technological processes.'
   },
 
@@ -933,22 +942,32 @@ const museumContent = {
   window01: { display: false, tier: 'tertiary', windowIndex: 0, openable: true, icon: 'wave',
     section: '01', title: 'FROM LIGHT TO HYDROGEN', lead: 'Photofermentation',
     tags: ['HYDROGEN', 'PHOTOFERMENTATION'],
+    images: ['./assets/images/photofermentation-culture.jpg'],
     body: 'Some purple phototrophic bacteria can use light energy to produce hydrogen through a process known as photofermentation.\n\nRhodopseudomonas palustris is particularly relevant in this field, with certain strains showing high hydrogen productivity.\n\nThis process illustrates how the metabolism of a microorganism can become the basis of a potential renewable energy pathway.' },
   window02: { display: false, tier: 'tertiary', windowIndex: 1, openable: true, icon: 'form',
     section: '02', title: 'FROM CARBON TO BIOPLASTIC', lead: 'PHA production',
     tags: ['PHA', 'BIOPLASTIC'],
+    // Micrografia TEM real de una bacteria con granulos de PHA visibles.
+    images: ['./assets/images/pha-granules-tem.jpg'],
     body: 'Some purple phototrophic bacteria can accumulate carbon inside their cells in the form of PHA.\n\nFor the microorganism, these compounds function as carbon and energy reserves. For biotechnology, however, PHA is especially interesting because it can be used as a basis for producing bio-based and biodegradable materials.\n\nThe process creates a direct connection between microbial metabolism and the development of alternative materials.' },
   window03: { display: false, tier: 'tertiary', windowIndex: 2, openable: true, icon: 'scale',
     section: '03', title: 'FROM CULTURE TO BIOMASS', lead: 'Food and feed applications',
     tags: ['BIOMASS', 'FOOD & FEED'],
+    images: ['./assets/images/biomass-concentration.jpg'],
     body: 'Cultivating purple phototrophic bacteria also produces microbial biomass.\n\nThis biomass contains compounds of nutritional interest and is being investigated for possible applications in food and animal feed.\n\nThe challenge is not only to produce biomass, but also to develop cultivation systems capable of generating it efficiently and at an appropriate scale.' },
   window04: { display: false, tier: 'tertiary', windowIndex: 3, openable: true, icon: 'grid',
     section: '04', title: 'BIOELECTRICITY', lead: 'Microorganisms and electrodes',
     tags: ['ELECTROACTIVITY', 'BIOELECTROCHEMISTRY'],
+    // SEM+EDS de un electrodo/mineral y trabajo de laboratorio con sondas de
+    // electrodo -- ambas reales, de los documentos fuente del proyecto.
+    images: ['./assets/images/electroactivity-electrode-sem.jpg', './assets/images/electroactivity-electrode-lab.jpg'],
     body: 'Some purple phototrophic bacteria are electroactive.\n\nThis means that they can exchange electrons with external materials, including electrodes.\n\nThese interactions allow researchers to investigate bioelectrochemical systems in which living microorganisms and conductive materials become part of the same process.\n\nElectroactivity opens new possibilities for connecting microbial metabolism with technological systems.' },
   window05: { display: false, tier: 'tertiary', windowIndex: 4, openable: true, icon: 'surface',
     section: '05', title: 'SCALE UP', lead: 'From laboratory to larger production',
     tags: ['SCALE-UP', 'PRODUCTION'],
+    // Reactores de bolsa de plastico reales, en estanteria -- exactamente el
+    // "low-cost plastic bag reactor" que describe el cuerpo del texto.
+    images: ['./assets/images/scaleup-bag-reactors-01.jpg', './assets/images/scaleup-bag-reactors-02.jpg'],
     body: 'A successful biological process must eventually move beyond the laboratory.\n\nOne strategy for reducing production and installation costs is to cultivate purple phototrophic bacteria in low-cost plastic bag reactors using food-grade equipment.\n\nInstead of building one increasingly large reactor, production capacity can be expanded by operating several reactors in parallel.\n\nThis approach offers a flexible way of increasing cultivation capacity while keeping the system relatively simple.' },
   /* Ultima ventana del recorrido: cierra con la sintesis de la sala
      (BACTERIA -> PROCESS -> RESULT), igual que bacteriaLarge01/bacteriaSmall06
@@ -956,6 +975,9 @@ const museumContent = {
   window06: { display: false, tier: 'tertiary', windowIndex: 5, openable: true, icon: 'transform',
     section: '06', title: 'ONE MICROORGANISM, MANY OUTPUTS', lead: 'Different processes, different possibilities',
     tags: ['HYDROGEN', 'PHA', 'BIOMASS', 'ELECTRON EXCHANGE'],
+    // Infografia real del proceso completo (fermentacion -> filtracion ->
+    // cultivo PPB -> separacion de biomasa), sintesis visual del recorrido.
+    images: ['./assets/images/process-overview.jpg'],
     body: 'Purple phototrophic bacteria do not lead to a single product or application.\n\nDepending on the strain, cultivation conditions and process, their metabolism can be connected to different outcomes.\n\nHYDROGEN\nPHA\nBIOMASS\nELECTRON EXCHANGE\n\nThe value of these microorganisms lies precisely in this diversity.\n\nDifferent bacteria, different processes and different possibilities.\n\nBACTERIA → PROCESS → RESULT\n\nUnderstanding the microorganism is the first step. Controlling the process is what allows its capabilities to be explored at a larger scale.' }
 };
 
@@ -1446,86 +1468,81 @@ AFRAME.registerComponent('exhibit-info', {
     pasar el cursor, sin codigo nuevo en tick().
   */
   setupWindowTag(it) {
-    // Antes: direccion "hacia el punto de partida del visitante". Esa
-    // formula da un angulo DISTINTO por cada ventana (varia con su z),
-    // asi que ninguna quedaba realmente paralela al muro -- de ahi el
-    // aspecto "de lado" reportado. Las 6 ventanas estan en el MISMO muro
-    // real (confirmado por geometria: todas caen del lado x>=1.2 del
-    // recinto), asi que lo correcto es la normal real de ESE muro
-    // (perpendicular, hacia dentro de la sala), no un punto de mira que
-    // cambia con la posicion de cada pieza. wallFacingDir() calcula esa
-    // normal real a partir del rectangulo de la sala (MUSEO_BOUNDS).
+    // Direccion real del muro (normal hacia dentro de la sala), no un punto
+    // de mira que cambia con la posicion de cada pieza -- ver wallFacingDir.
     const dir = this.wallFacingDir(it.pos);
     const dirX = dir.x, dirZ = dir.z;
     const yaw = Math.atan2(dirX, dirZ);
 
-    const OFFSET = 0.05;                                   // separada del marco, no pegada
-    const px = it.pos.x + dirX * OFFSET;
-    const py = (it.bottomY !== null ? it.bottomY : it.pos.y) - 0.18;   // justo bajo el nicho real
-    const pz = it.pos.z + dirZ * OFFSET;
+    // Mismo tamaño/proporcion que las cartelas moradas de peana secundaria
+    // (Sala 1: PLACARD_HEIGHT=0.26, cuerda de arco ~0.28) -- antes esta
+    // placa era mas ancha y mucho mas baja (0.30x0.165), lo que la hacia
+    // sentir mas grande/torpe y desproporcionada frente al sistema morado.
+    const WIDTH = 0.28, HEIGHT = 0.26;
+
+    // Soporte de pared -> soporte de poste independiente del muro. Alinear
+    // una placa exactamente al ras de un muro curvo, sin poder verificarlo
+    // en un render en vivo, es fragil: la mas minima imprecision en la
+    // normal real deja la placa flotando, de lado o a medio pegar (el
+    // problema reportado). Un poste fino desde el suelo hasta la altura de
+    // lectura, con la placa rectangular en su extremo, es el propio
+    // "soporte museistico" que pide el brief y no depende de esa precision:
+    // se apoya en el suelo real (MUSEO_SPAWN.y) y se separa del muro hacia
+    // el interior de la sala, nunca sobre el.
+    const spawn = window.MUSEO_SPAWN;
+    const floorY = (spawn && typeof spawn.y === 'number')
+      ? spawn.y
+      : (it.bottomY !== null ? it.bottomY - 1.0 : it.pos.y - 1.2);
+    const STAND_OUT = 0.40;                 // hacia el interior de la sala, lejos del muro
+    const SIGN_CENTER_Y = floorY + 1.15;    // altura de lectura comoda
+    const POLE_RADIUS = 0.012;
+    const poleH = Math.max(0.3, SIGN_CENTER_Y - floorY - HEIGHT * 0.5);
+
+    const px = it.pos.x + dirX * STAND_OUT;
+    const pz = it.pos.z + dirZ * STAND_OUT;
 
     const wrapper = document.createElement('a-entity');
-    wrapper.object3D.position.set(px, py, pz);
+    wrapper.object3D.position.set(px, floorY, pz);
     wrapper.object3D.rotation.set(0, yaw, 0);
 
-    const WIDTH = 0.30, HEIGHT = 0.165;
-    // Sala 2: acento verde/turquesa, no el morado de la Sala 1 (ver ROOM2_ACCENT*).
-    const tagColor = new THREE.Color(ROOM2_ACCENT);
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(POLE_RADIUS, POLE_RADIUS, poleH, 12),
+      new THREE.MeshStandardMaterial({ color: 0x2a2622, roughness: 0.5, metalness: 0.35 })
+    );
+    pole.position.set(0, poleH / 2, 0);
+    wrapper.object3D.add(pole);
+
+    // Mismo metodo de texto horneado que las 8 cartelas de bacteria (un
+    // unico canvas con numero + nombre + cita, aplicado como textura),
+    // solo que en Sala 2 con los colores verde/turquesa (ROOM2_ACCENT*) en
+    // vez del morado por defecto -- misma jerarquia, misma tipografia,
+    // mismo "lenguaje museo", solo cambia el acento de color.
+    const texture = this.buildPlacardTextTexture(
+      it.data.section || '', (it.data.title || '').toUpperCase(), 'CLICK TO EXPLORE',
+      HEIGHT, WIDTH, ROOM2_ACCENT, ROOM2_ACCENT_LIGHT
+    );
     const plane = new THREE.Mesh(
       new THREE.PlaneGeometry(WIDTH, HEIGHT),
       new THREE.MeshStandardMaterial({
-        color: 0xf7f4ee, map: this.getPlacardPaperTexture(),
-        emissive: tagColor, emissiveIntensity: 0.10,
+        color: 0xffffff, map: texture,
+        emissive: new THREE.Color(ROOM2_ACCENT), emissiveIntensity: 0.08,
         roughness: 0.9, metalness: 0, side: THREE.DoubleSide
       })
     );
+    plane.position.set(0, poleH + HEIGHT * 0.5, 0.001);
     plane.userData.museoExhibitId = it.id;
     wrapper.object3D.add(plane);
     this.selectableMeshes.push(plane);
 
-    const TEXT_Z = 0.004;
-
-    const section = document.createElement('a-text');
-    section.setAttribute('value', it.data.section || '');
-    section.setAttribute('align', 'center');
-    section.setAttribute('baseline', 'center');
-    section.setAttribute('width', 0.13);
-    section.setAttribute('wrap-count', 3);
-    section.setAttribute('letter-spacing', 1);
-    section.setAttribute('color', ROOM2_ACCENT);
-    section.object3D.position.set(0, HEIGHT / 2 - 0.032, TEXT_Z);
-    wrapper.appendChild(section);
-
-    const title = document.createElement('a-text');
-    title.setAttribute('value', (it.data.title || '').toUpperCase());
-    title.setAttribute('align', 'center');
-    title.setAttribute('baseline', 'center');
-    title.setAttribute('width', 0.27);
-    title.setAttribute('wrap-count', 22);
-    title.setAttribute('line-height', 32);
-    title.setAttribute('color', '#201A1E');
-    title.object3D.position.set(0, 0.006, TEXT_Z);
-    wrapper.appendChild(title);
-
-    const cue = document.createElement('a-text');
-    cue.setAttribute('value', 'CLICK TO EXPLORE');
-    cue.setAttribute('align', 'center');
-    cue.setAttribute('baseline', 'center');
-    cue.setAttribute('width', 0.24);
-    cue.setAttribute('wrap-count', 17);
-    cue.setAttribute('letter-spacing', 0.5);
-    cue.setAttribute('color', ROOM2_ACCENT_LIGHT);
-    cue.object3D.position.set(0, -HEIGHT / 2 + 0.026, TEXT_Z);
-    wrapper.appendChild(cue);
-
     this.el.sceneEl.appendChild(wrapper);
 
     // el pivote/emisivo son los mismos campos que usa el bucle de hover de
-    // tick() para las 8 cepas -- aqui el "pivote" es la placa entera.
+    // tick() para las 8 cepas -- aqui el "pivote" es el soporte entero
+    // (poste + placa), asi que el hover lo realza como conjunto.
     it.pivot = wrapper.object3D;
     it.hoverT = 0;
     it.emissiveMats = [{ mat: plane.material, base: plane.material.emissiveIntensity }];
-    it.tag = { wrapper, plane, section, title, cue };
+    it.tag = { wrapper, plane, pole };
   },
 
   /*
@@ -1590,7 +1607,16 @@ AFRAME.registerComponent('exhibit-info', {
     en la grande del pedestal principal (mucho mas baja) -- se ven a
     familia aunque su tamaño fisico absoluto sea distinto.
   */
-  buildPlacardTextTexture(section, title, cueText, heightM, widthM) {
+  buildPlacardTextTexture(section, title, cueText, heightM, widthM, accentColor, cueColor) {
+    // accentColor/cueColor opcionales: por defecto el morado de la Sala 1
+    // (unicos valores usados hasta ahora, por las 8 cartelas de bacteria),
+    // asi ese llamador no cambia. La Sala 2 (setupWindowTag) pasa
+    // ROOM2_ACCENT/ROOM2_ACCENT_LIGHT para compartir EXACTAMENTE el mismo
+    // metodo de texto horneado -- misma proporcion, jerarquia y tipografia
+    // que las cartelas moradas -- en vez de una construccion aparte con
+    // <a-text> sueltos, que es lo que las hacia sentir desproporcionadas.
+    const numberColor = accentColor || '#74349A';
+    const cueTextColor = cueColor || '#805096';
     const HPX = 640;
     const WPX = Math.max(64, Math.round(HPX * (widthM / heightM)));
     const c = document.createElement('canvas');
@@ -1637,7 +1663,7 @@ AFRAME.registerComponent('exhibit-info', {
 
     if (section) {
       ctx.font = `600 ${numberSizePx}px Helvetica, Arial, sans-serif`;
-      ctx.fillStyle = '#74349A';
+      ctx.fillStyle = numberColor;
       cy += numberSizePx * 0.85;
       ctx.fillText(section, WPX / 2, cy);
       cy += numberSizePx * 0.15 + gap1Px;
@@ -1654,7 +1680,7 @@ AFRAME.registerComponent('exhibit-info', {
     if (cueText) {
       cy += gap2Px - titleSizePx * (lineSpacing - 0.85);
       ctx.font = `600 ${cueSizePx}px Helvetica, Arial, sans-serif`;
-      ctx.fillStyle = '#805096';
+      ctx.fillStyle = cueTextColor;
       cy += cueSizePx * 0.85;
       ctx.fillText(cueText, WPX / 2, cy);
     }
@@ -1875,6 +1901,17 @@ AFRAME.registerComponent('exhibit-info', {
       const breathe = 0.5 + 0.5 * Math.sin(time * 0.0016);
       const scale = 1 + it.hoverT * (0.015 + 0.015 * breathe);   // ~1.00 -> ~1.03
       it.pivot.scale.setScalar(scale);
+
+      // Piezas "large" (Sala 1): su cartela fisica (it.placard) vivia fuera
+      // del pivote y nunca se tocaba en hover ("la cartela es estatica" --
+      // ver nota historica arriba), asi que al agrandarse la bacteria la
+      // cartela se quedaba atras y la interaccion se sentia rota/desconectada.
+      // Se le aplica el MISMO factor de escala, centrado en su propio
+      // wrapper (ya posicionado junto a la peana real), para que bacteria y
+      // cartela crezcan juntas y la cartela nunca desaparezca.
+      if (it.data.tier === 'primary' && it.placard && it.placard.wrapper) {
+        it.placard.wrapper.object3D.scale.setScalar(scale);
+      }
 
       if (it.emissiveMats.length) {
         const boost = 1 + it.hoverT * 0.35;
@@ -2152,6 +2189,17 @@ AFRAME.registerComponent('reactor-control', {
     // punto de llegada de las gotas de NUTRIENTS -- ver buildNutrientParticles.
     this.liquidTopY = liquidMesh ? new THREE.Box3().setFromObject(liquidMesh).max.y : null;
 
+    // 02 FLOW necesita un efecto "legible a distancia normal", no solo un
+    // cambio de brillo/opacidad de las burbujas (que a distancia se nota
+    // poco). Las burbujas ya llevan una animacion horneada en el propio GLB
+    // (Bioreactor_Bubbles.000-030, reproducida en bucle por gltf-animations
+    // sobre el modulo del bioreactor) -- FLOW controla directamente la
+    // VELOCIDAD real de esa animacion (AnimationMixer.timeScale), asi que
+    // encender FLOW hace que la circulacion se vea moverse de verdad, y
+    // apagarlo la detiene, en vez de solo atenuar su brillo.
+    const bioreactorEl = this.el.querySelector('[gltf-model="#bioreactor"]');
+    this.bioreactorAnim = bioreactorEl && bioreactorEl.components && bioreactorEl.components['gltf-animations'];
+
     // Foco de exposicion que exhibit-lighting ya crea sobre PEANA_Bioreactor.
     const lightingComp = this.el.components['exhibit-lighting'];
     this.reactorSpot = lightingComp && lightingComp.spotsByAnchor && lightingComp.spotsByAnchor['PEANA_Bioreactor'];
@@ -2162,12 +2210,14 @@ AFRAME.registerComponent('reactor-control', {
     this.curBubbleI = this.bubbleBase ? this.bubbleBase.i : 0;
     this.curBubbleO = this.bubbleBase ? this.bubbleBase.o : 0;
     this.curLiquidI = this.liquidBase ? this.liquidBase.i : 0;
+    this.curFlowSpeed = 0;
     this.recomputeTargets();
     // arranca ya en el estado 0 (inactivo), sin animar desde el valor de fabrica
     this.curSpot = this.targetSpot;
     this.curBubbleI = this.targetBubbleI;
     this.curBubbleO = this.targetBubbleO;
     this.curLiquidI = this.targetLiquidI;
+    this.curFlowSpeed = this.targetFlowSpeed;
     this.applyReactorState();
 
     this.buildNutrientParticles(mesh);
@@ -2204,12 +2254,21 @@ AFRAME.registerComponent('reactor-control', {
     const bubbleOFrac = 0.45 + (s.flow ? 0.55 : 0);
     this.targetBubbleI = this.bubbleBase ? this.bubbleBase.i * bubbleIFrac * activeBoost : 0;
     this.targetBubbleO = this.bubbleBase ? Math.min(1, this.bubbleBase.o * bubbleOFrac) : 0;
+
+    // Velocidad real de la circulacion (ver bioreactorAnim en onLoaded):
+    // parada del todo si FLOW esta apagado (nada que confundir con ningun
+    // otro boton), a velocidad completa -- reforzada un poco mas si ACTIVATE
+    // tambien esta encendido -- si esta encendido. Con brillo/opacidad YA
+    // subiendo con FLOW (arriba) mas este cambio de velocidad real, el
+    // efecto es inconfundible incluso a distancia normal de visitante.
+    this.targetFlowSpeed = s.flow ? (1 * (s.active ? 1.3 : 1)) : 0;
   },
 
   applyReactorState() {
     if (this.reactorSpot) this.reactorSpot.intensity = this.curSpot;
     if (this.bubbleMat) { this.bubbleMat.emissiveIntensity = this.curBubbleI; this.bubbleMat.opacity = this.curBubbleO; }
     if (this.liquidMat) this.liquidMat.emissiveIntensity = this.curLiquidI;
+    if (this.bioreactorAnim && this.bioreactorAnim.mixer) this.bioreactorAnim.mixer.timeScale = this.curFlowSpeed;
   },
 
   /*
@@ -2350,7 +2409,56 @@ AFRAME.registerComponent('reactor-control', {
     const normal = new THREE.Vector3(-abc[0], 1, -abc[1]).normalize();
     if (normal.y < 0) normal.negate();
     const centroid = new THREE.Vector3(Sx / n, Sy / n, Sz / n);
-    return { normal, centroid, topY: maxY };
+
+    // PCA 2D DENTRO del plano ajustado: la huella real de este remate no es
+    // cuadrada (PEANA_Alta_B mide ~0.32 m en su lado corto y ~0.88 m en el
+    // largo), asi que ademas de la normal se mide aqui su propio eje largo/
+    // corto real -- axisLong/axisShort, ortogonales entre si y a la normal,
+    // con su extension real (extentLong/extentShort) -- para que
+    // buildControlStand pueda ensanchar el panel por el eje que de verdad
+    // tiene sitio, en vez de adivinar la orientacion con un heuristico
+    // generico. Se proyecta cada punto de la "tapa" (top[], ya calculado
+    // arriba) sobre una base 2D cualquiera del plano (uAxis/vAxis) y se
+    // diagonaliza su matriz de covarianza 2x2 (forma cerrada, sin libreria).
+    const uHelp = Math.abs(normal.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+    const uAxis = new THREE.Vector3().crossVectors(uHelp, normal).normalize();
+    const vAxis = new THREE.Vector3().crossVectors(normal, uAxis).normalize();
+
+    let Suu = 0, Suv = 0, Svv = 0;
+    const rel = new THREE.Vector3();
+    top.forEach((p) => {
+      rel.subVectors(p, centroid);
+      const pu = rel.dot(uAxis), pv = rel.dot(vAxis);
+      Suu += pu * pu; Suv += pu * pv; Svv += pv * pv;
+    });
+    Suu /= top.length; Suv /= top.length; Svv /= top.length;
+
+    const trace = Suu + Svv;
+    const det = Suu * Svv - Suv * Suv;
+    const disc = Math.sqrt(Math.max(0, (trace * trace) / 4 - det));
+    const lambda1 = trace / 2 + disc;   // autovalor mayor -> direccion del eje largo
+    let ex, ey;
+    if (Math.abs(Suv) > 1e-9) { ex = lambda1 - Svv; ey = Suv; }
+    else { ex = 1; ey = 0; }
+    const eLen = Math.hypot(ex, ey) || 1;
+    ex /= eLen; ey /= eLen;
+    const axisLong = new THREE.Vector3().addScaledVector(uAxis, ex).addScaledVector(vAxis, ey).normalize();
+    const axisShort = new THREE.Vector3().crossVectors(normal, axisLong).normalize();
+
+    let longMin = Infinity, longMax = -Infinity, shortMin = Infinity, shortMax = -Infinity;
+    top.forEach((p) => {
+      rel.subVectors(p, centroid);
+      const dl = rel.dot(axisLong), ds = rel.dot(axisShort);
+      if (dl < longMin) longMin = dl; if (dl > longMax) longMax = dl;
+      if (ds < shortMin) shortMin = ds; if (ds > shortMax) shortMax = ds;
+    });
+
+    return {
+      normal, centroid, topY: maxY,
+      axisLong, axisShort,
+      extentLong: longMax - longMin,
+      extentShort: shortMax - shortMin
+    };
   },
 
   /*
@@ -2384,9 +2492,16 @@ AFRAME.registerComponent('reactor-control', {
       zAxis = new THREE.Vector3(0, 1, 0);
     }
 
-    // misma formula generica de siempre ("hacia el punto de partida del
-    // visitante"), pero proyectada sobre el plano real -- da el eje
-    // "arriba" del panel, no su normal.
+    // direccion generica "hacia el punto de partida del visitante": antes
+    // decidia DIRECTAMENTE cual eje del panel era "ancho" y cual "alto"
+    // (proyectandola sobre el plano), lo que podia emparejar el ancho del
+    // panel con el lado CORTO real del remate (~0.32 m de PEANA_Alta_B,
+    // frente a ~0.88 m del lado largo) -- de ahi que quedara "de lado",
+    // sobresaliendo por los bordes y sin apoyo completo. Ahora solo se usa
+    // para fijar el SIGNO del eje corto (para que el texto quede del
+    // derecho, mirando al visitante); que eje es "ancho" y cual es "alto"
+    // lo decide la geometria real medida (top.axisLong/axisShort, PCA en
+    // computeTopSurface), nunca este heuristico.
     let dirX = 0, dirZ = 1;
     const spawn = window.MUSEO_SPAWN;
     const bounds = window.MUSEO_BOUNDS;
@@ -2398,9 +2513,20 @@ AFRAME.registerComponent('reactor-control', {
       const len = Math.hypot(dx, dz);
       if (len > 0.001) { dirX = dx / len; dirZ = dz / len; }
     }
-    let yAxis = new THREE.Vector3(dirX, 0, dirZ);
-    yAxis.addScaledVector(zAxis, -yAxis.dot(zAxis));
-    if (yAxis.lengthSq() < 1e-6) yAxis.set(0, 1, 0).addScaledVector(zAxis, -zAxis.y);
+    const towardVisitor = new THREE.Vector3(dirX, 0, dirZ);
+
+    let yAxis;
+    if (top && top.axisShort) {
+      yAxis = top.axisShort.clone();
+      if (yAxis.dot(towardVisitor) < 0) yAxis.negate();
+    } else {
+      // red de seguridad si por lo que sea no hubo PCA (mesh sin geometria
+      // legible en computeTopSurface): mismo comportamiento generico de
+      // siempre, proyectando "hacia el visitante" sobre el plano.
+      yAxis = towardVisitor.clone();
+      yAxis.addScaledVector(zAxis, -yAxis.dot(zAxis));
+      if (yAxis.lengthSq() < 1e-6) yAxis.set(0, 1, 0).addScaledVector(zAxis, -zAxis.y);
+    }
     yAxis.normalize();
     const xAxis = new THREE.Vector3().crossVectors(yAxis, zAxis).normalize();
     yAxis.crossVectors(zAxis, xAxis).normalize();
@@ -2418,7 +2544,19 @@ AFRAME.registerComponent('reactor-control', {
     // panel mas compacto que el cartel vertical anterior: apoyado plano
     // sobre el remate real, su "alto" ahora corre a lo largo de la
     // pendiente medida (mas corta que la altura libre que tenia de pie).
-    const WIDTH = 0.50, HEIGHT = 0.30;
+    // WIDTH/HEIGHT se ajustan a la huella REAL del remate (top.extentLong/
+    // extentShort, medida por PCA en computeTopSurface) con un margen del
+    // ~18% para quedar dentro de la piedra, no justo al borde -- antes eran
+    // valores fijos (0.50x0.30) que, emparejados con el eje equivocado,
+    // dejaban el panel sobresaliendo por el lado corto ("floating off the
+    // side"). Los topes (min/max) son la red de seguridad si la medicion
+    // fallara o el remate fuese inusualmente pequeño/grande.
+    const WIDTH = (top && top.extentLong)
+      ? THREE.MathUtils.clamp(top.extentLong * 0.82, 0.22, 0.50)
+      : 0.50;
+    const HEIGHT = (top && top.extentShort)
+      ? THREE.MathUtils.clamp(top.extentShort * 0.82, 0.14, 0.30)
+      : 0.30;
     const exhibitInfo = this.el.components['exhibit-info'];
     const paperTex = exhibitInfo && exhibitInfo.getPlacardPaperTexture
       ? exhibitInfo.getPlacardPaperTexture() : null;
@@ -2470,10 +2608,15 @@ AFRAME.registerComponent('reactor-control', {
 
     defs.forEach((d, i) => {
       const bx = startX + i * spacing;
-      const btnColor = new THREE.Color(d.id === 'active' ? 0xb9b3bd : 0xece4f2);
+      // Los 4 botones son ahora interruptores independientes (ver
+      // onButtonClick): ACTIVATE ya no esta bloqueado hasta que los otros
+      // tres esten encendidos, asi que ya no lleva el aspecto "apagado/
+      // deshabilitado" (gris oscuro, brillo minimo) que tenia antes -- los
+      // 4 arrancan con el mismo aspecto neutro.
+      const btnColor = new THREE.Color(0xece4f2);
       const material = new THREE.MeshStandardMaterial({
         color: btnColor, emissive: new THREE.Color(ROOM2_ACCENT),
-        emissiveIntensity: d.id === 'active' ? 0.06 : 0.16,
+        emissiveIntensity: 0.16,
         roughness: 0.55, metalness: 0.05, side: THREE.DoubleSide
       });
       const btn = new THREE.Mesh(new THREE.CircleGeometry(BTN_R, 28), material);
@@ -2517,19 +2660,16 @@ AFRAME.registerComponent('reactor-control', {
   },
 
   /*
-    01 LIGHT / 02 FLOW / 03 NUTRIENTS activan de forma independiente, en
-    cualquier orden, y no se pueden deshacer ("paso a paso"). 04 ACTIVATE
-    solo hace algo cuando los tres anteriores ya estan activos -- es la
-    activacion final del proceso completo, no un cuarto efecto suelto.
+    Los 4 botones (LIGHT / FLOW / NUTRIENTS / ACTIVATE) son interruptores
+    independientes: cada clic invierte SU PROPIO estado, en cualquier orden,
+    sin bloqueos entre ellos. Antes solo podian encenderse (nunca apagarse)
+    y ACTIVATE quedaba ademas bloqueado hasta que los otros tres estuvieran
+    ya activos -- el brief pide justo lo contrario ("each button must toggle
+    ON and OFF; clicking again must deactivate that state").
   */
   onButtonClick(id) {
-    if (id === 'active') {
-      if (!(this.stage.light && this.stage.flow && this.stage.nutrients) || this.stage.active) return;
-      this.stage.active = true;
-    } else {
-      if (this.stage[id]) return;
-      this.stage[id] = true;
-    }
+    if (!(id in this.stage)) return;
+    this.stage[id] = !this.stage[id];
     this.recomputeTargets();
     this.updateButtonLooks();
   },
@@ -2537,9 +2677,8 @@ AFRAME.registerComponent('reactor-control', {
   updateButtonLooks() {
     this.buttons.forEach((b) => {
       const on = this.stage[b.id];
-      const unlocked = b.id !== 'active' || (this.stage.light && this.stage.flow && this.stage.nutrients);
-      b.material.color.set(on ? ROOM2_ACCENT : (unlocked ? 0xece4f2 : 0xb9b3bd));
-      b.baseEmissive = on ? 0.34 : (unlocked ? 0.16 : 0.06);
+      b.material.color.set(on ? ROOM2_ACCENT : 0xece4f2);
+      b.baseEmissive = on ? 0.34 : 0.16;
     });
   },
 
@@ -2552,6 +2691,7 @@ AFRAME.registerComponent('reactor-control', {
     this.curBubbleI += (this.targetBubbleI - this.curBubbleI) * speed;
     this.curBubbleO += (this.targetBubbleO - this.curBubbleO) * speed;
     this.curLiquidI += (this.targetLiquidI - this.curLiquidI) * speed;
+    this.curFlowSpeed += (this.targetFlowSpeed - this.curFlowSpeed) * speed;
     this.applyReactorState();
     this.updateNutrientParticles(time);
 
