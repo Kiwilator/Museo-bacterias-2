@@ -1065,7 +1065,7 @@ AFRAME.registerComponent('exhibit-info', {
   },
   init() {
     this.items = [];
-    this.active = null;      // pieza con el aviso visible
+    this.active = null;      // pieza mas cercana en rango (solo para el atajo "E")
     this.openId = null;      // panel abierto
     this.nextCheck = 0;
     this.tmp = new THREE.Vector3();
@@ -1085,7 +1085,9 @@ AFRAME.registerComponent('exhibit-info', {
 
     this.onKey = (e) => {
       if (e.key === 'Escape') this.close();
-      // E abre la pieza mas cercana; no interfiere con WASD
+      // E abre la pieza mas cercana; no interfiere con WASD. Ya no hay
+      // ningun boton flotante -- this.active se sigue calculando en tick()
+      // solo para que este atajo de teclado siga funcionando.
       if ((e.key === 'e' || e.key === 'E') && this.active && !this.openId) this.open(this.active.id);
     };
     window.addEventListener('keydown', this.onKey);
@@ -1097,17 +1099,15 @@ AFRAME.registerComponent('exhibit-info', {
     El HTML del panel va despues de <a-scene>, asi que cuando A-Frame llama a
     init() el navegador todavia no lo ha parseado y getElementById devuelve
     null. Por eso las referencias se resuelven aqui, de forma perezosa, en vez
-    de en init().
+    de en init(). Ya no depende de #exhibit-prompt (retirado): la ficha
+    funciona con solo el panel de informacion.
   */
   wireUI() {
     if (this.ui) return true;
-    this.prompt  = document.getElementById('exhibit-prompt');
-    this.panel   = document.getElementById('exhibit-panel');
-    this.intro   = document.getElementById('intro-msg');
-    if (!this.prompt || !this.panel) return false;
+    this.panel = document.getElementById('exhibit-panel');
+    this.intro = document.getElementById('intro-msg');
+    if (!this.panel) return false;
 
-    this.onPromptClick = () => this.open(this.active && this.active.id);
-    this.prompt.addEventListener('click', this.onPromptClick);
     this.panel.querySelector('.panel-close').addEventListener('click', () => this.close());
     setTimeout(() => this.hideIntro(), 6500);
     this.ui = true;
@@ -1170,7 +1170,22 @@ AFRAME.registerComponent('exhibit-info', {
     this.selectableMeshes = [];
     mesh.traverse((o) => { if (o.isMesh && o.userData.museoExhibitId) this.selectableMeshes.push(o); });
 
-    // Lenguaje visual de interaccion (etiqueta flotante "VIEW +" + hover) en
+    // Peanas reales (mismo prefijo que usa setup-museum-model para los
+    // obstaculos de colision), medidas aqui de forma independiente: cada
+    // placa fisica (createPedestalPlacard) necesita el radio y el centro
+    // REAL de la peana de su propia pieza, no un valor supuesto, para
+    // apoyarse justo en su superficie sin flotar ni hundirse.
+    this.peanaBoxes = [];
+    mesh.traverse((o) => {
+      if (o.isMesh && o.name.startsWith('PEANA_')) {
+        const b = new THREE.Box3().setFromObject(o);
+        const c = b.getCenter(new THREE.Vector3());
+        const s = b.getSize(new THREE.Vector3());
+        this.peanaBoxes.push({ center: c, radius: Math.max(s.x, s.z) / 2 });
+      }
+    });
+
+    // Lenguaje visual de interaccion (hover + placa fisica en la peana) en
     // las 8 cepas de la Sala 1 (ids que empiezan por "bacteria"). No toca el
     // reactor (Sala 2) ni las ventanas de imagen (pasivas, sin ficha).
     this.items.forEach((it) => {
@@ -1222,7 +1237,6 @@ AFRAME.registerComponent('exhibit-info', {
 
     it.pivot = pivot;
     it.hoverT = 0;       // 0..1, suavizado (ease) de entrada/salida del hover
-    it.labelOpacity = 0; // 0..1, suavizado de aparicion por proximidad
 
     // materiales emisivos de esta pieza (brillo violeta de la bacteria/
     // capsula), para el realce muy sutil al pasar el raton por encima
@@ -1235,213 +1249,137 @@ AFRAME.registerComponent('exhibit-info', {
     });
     it.emissiveMats = Array.from(mats).map((mat) => ({ mat, base: mat.emissiveIntensity }));
 
-    // Las 6 cepas pequeñas (tier "secondary") usan el popup nuevo, compacto
-    // y desplazado delante de la vitrina; las 2 piezas grandes conservan la
-    // ficha ya existente, que no tenia el problema reportado.
-    // Las 8 cepas usan el mismo popup compacto: la ficha antigua (create
-    // Label, ver abajo) quedaba centrada en el eje X/Z de la propia pieza y
-    // por eso se leia pegada o encima de la bacteria grande -- el mismo
-    // problema que ya se corrigio para las 6 pequeñas, asi que aqui se
-    // aplica el mismo popup a las 8.
-    it.label = this.createSmallPopup(it);
+    // Una unica placa fisica para las 8 cepas (ver createPedestalPlacard).
+    it.placard = this.createPedestalPlacard(it);
   },
 
   /*
-    Ficha compacta junto a la peana: numero de seccion, nombre de la pieza y,
-    debajo y mas pequeño, "VIEW +" -- la misma jerarquia numero/titulo que ya
-    usa el panel grande (.panel-section/.panel-title), en miniatura, pegada
-    a la exhibicion en vez de flotando arriba en el hueco. Placa crema muy
-    tenue detras para que se lea sobre cualquier fondo. Siempre orientada a
-    la camara, hija de la escena (no del pivote, para que el escalado del
-    hover no la deforme). Arranca invisible; tick() la enciende/apaga segun
-    la distancia y el hover, igual que antes.
+    Textura de papel muy barata (un solo canvas en escala de grises,
+    reutilizado por las 8 placas): ruido suave a baja opacidad sobre blanco,
+    solo para romper la superficie perfectamente lisa de un
+    MeshStandardMaterial de color plano. No es un efecto de luz -- es grano
+    de papel, se ve igual con cualquier iluminacion de la sala.
   */
-  createLabel(it) {
-    const baseY = (it.bottomY !== null ? it.bottomY : it.pos.y - 0.4) + 0.13;
-
-    const wrapper = document.createElement('a-entity');
-    wrapper.setAttribute('face-camera', '');
-    wrapper.object3D.position.set(it.pos.x, baseY, it.pos.z);
-
-    const bg = document.createElement('a-plane');
-    bg.setAttribute('width', 0.34);
-    bg.setAttribute('height', 0.21);
-    bg.setAttribute('material', 'color: #faf6f0; shader: flat; opacity: 0; transparent: true; side: double');
-    wrapper.appendChild(bg);
-
-    const section = document.createElement('a-text');
-    section.setAttribute('value', it.data.section || '');
-    section.setAttribute('align', 'center');
-    section.setAttribute('baseline', 'center');
-    section.setAttribute('width', 0.5);
-    section.setAttribute('letter-spacing', 3);
-    section.setAttribute('color', '#7d3fa8');
-    section.setAttribute('opacity', 0);
-    section.object3D.position.set(0, 0.07, 0.003);
-    wrapper.appendChild(section);
-
-    const title = document.createElement('a-text');
-    title.setAttribute('value', it.data.title || '');
-    title.setAttribute('align', 'center');
-    title.setAttribute('baseline', 'center');
-    title.setAttribute('width', 0.62);
-    title.setAttribute('wrap-count', 16);
-    title.setAttribute('color', '#2a2622');
-    title.setAttribute('opacity', 0);
-    title.object3D.position.set(0, 0.015, 0.003);
-    wrapper.appendChild(title);
-
-    const cue = document.createElement('a-text');
-    cue.setAttribute('value', 'VIEW +');
-    cue.setAttribute('align', 'center');
-    cue.setAttribute('baseline', 'center');
-    cue.setAttribute('width', 0.42);
-    cue.setAttribute('letter-spacing', 3);
-    cue.setAttribute('color', '#7d3fa8');
-    cue.setAttribute('opacity', 0);
-    cue.object3D.position.set(0, -0.065, 0.003);
-    wrapper.appendChild(cue);
-
-    this.el.sceneEl.appendChild(wrapper);
-    return { wrapper, bg, section, title, cue };
-  },
-
-  /*
-    Textura compartida (un solo canvas, reutilizado por las 6 cepas
-    pequeñas) para el resplandor suave que sustituye a la placa rectangular
-    de fondo: un degradado radial, sin bordes duros, para que el popup se
-    lea como luz sobre la peana en vez de como una tarjeta de interfaz.
-  */
-  getPopupGlowTexture() {
-    if (this._popupGlowTexture) return this._popupGlowTexture;
+  getPlacardPaperTexture() {
+    if (this._placardPaperTexture) return this._placardPaperTexture;
     const c = document.createElement('canvas');
-    c.width = c.height = 128;
+    c.width = c.height = 96;
     const ctx = c.getContext('2d');
-    const g = ctx.createRadialGradient(64, 64, 2, 64, 64, 64);
-    g.addColorStop(0, 'rgba(250,244,234,0.95)');
-    g.addColorStop(0.5, 'rgba(250,244,234,0.5)');
-    g.addColorStop(1, 'rgba(250,244,234,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 128, 128);
-    this._popupGlowTexture = new THREE.CanvasTexture(c);
-    return this._popupGlowTexture;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 96, 96);
+    for (let i = 0; i < 900; i++) {
+      const v = 210 + Math.floor(Math.random() * 45);
+      ctx.fillStyle = `rgba(${v},${v},${v},0.10)`;
+      ctx.fillRect(Math.random() * 96, Math.random() * 96, 1, 1);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(3, 2);
+    this._placardPaperTexture = t;
+    return this._placardPaperTexture;
   },
 
   /*
-    Popup compacto para las 8 cepas. Sustituye a la ficha rectangular
-    anterior (createLabel, mas abajo, ya sin uso), que quedaba centrada en
-    el mismo eje X/Z que la propia bacteria -- por eso se leia pegada o
-    encima de la pieza grande, dentro del hueco de la vitrina. Aqui el popup
-    se desplaza desde el centro de la pieza hacia el centro de la sala
-    (mismo criterio ya usado para orientar los circulos de video: la
-    normal/direccion "hacia el centro" es la que de verdad mira al
-    visitante), asi que aparece delante del cristal, nunca detras ni sobre
-    la bacteria.
+    Cartela fisica de museo, unica para las 8 cepas. Sustituye a los dos
+    sistemas anteriores (createLabel + createSmallPopup, ya retirados): un
+    plano rectangular opaco, papel crema mate, PEGADO al frente real de la
+    peana -- no un popup flotante ni con resplandor.
 
-    La altura se mide desde el SUELO real (window.MUSEO_SPAWN.y, calculado
-    en setup-museum-model), no desde la base de la propia bacteria: esa
-    malla ya empieza bastante por encima del suelo (se apoya en la peana),
-    asi que anclar la altura ahi dejaba el popup a la altura del cristal en
-    vez de a la altura del pie de la peana. Medio metro sobre el suelo real
-    lo deja pegado a la base solida de la peana, por debajo de la campana de
-    cristal.
+    Posicion: se busca la peana (PEANA_*) real mas cercana a la pieza (ver
+    this.peanaBoxes, calculado en onLoaded) y se usa su radio real + un
+    margen de unos 8 mm como unica separacion -- ya no es una distancia
+    inventada, es la superficie real de esa peana concreta. La direccion de
+    ese empujon (y la orientacion de la cartela) es la misma que ya se usaba
+    para los circulos de video: del centro de la peana hacia el centro de
+    la sala, que es el lado por el que pasa el visitante.
 
-    Visualmente es deliberadamente ligero: sin placa opaca, solo el
-    resplandor radial de getPopupGlowTexture() detras de tres lineas de
-    texto pequeñas (numero / nombre / "Click to explore"). El disparo por
-    proximidad es mucho mas corto que el de la ficha grande antigua (ver
-    tick()) -- debe leerse como un gesto de interaccion al llegar a esa
-    peana concreta, no como un rotulo fijo visible desde el centro de la
-    sala.
+    Orientacion: NO face-camera. Se calcula una unica rotacion en Y (yaw)
+    tangente a la peana en el momento de crearla y ya no se vuelve a tocar
+    -- la cartela pertenece a la arquitectura, no gira con la camara.
+
+    Altura: igual que antes, medio metro sobre el suelo real de la sala
+    (window.MUSEO_SPAWN.y), centrada ahi.
   */
-  createSmallPopup(it) {
+  createPedestalPlacard(it) {
+    let dirX = 0, dirZ = 1, peanaRadius = 0.22;
+    let nearest = null, nearestD = Infinity;
+    (this.peanaBoxes || []).forEach((pb) => {
+      const d = Math.hypot(pb.center.x - it.pos.x, pb.center.z - it.pos.z);
+      if (d < nearestD) { nearestD = d; nearest = pb; }
+    });
+    if (nearest) peanaRadius = nearest.radius;
+
     const bounds = window.MUSEO_BOUNDS;
-    let ox = 0, oz = 1;
     if (bounds) {
       const cx = (bounds.minX + bounds.maxX) / 2;
       const cz = (bounds.minZ + bounds.maxZ) / 2;
       const dx = cx - it.pos.x, dz = cz - it.pos.z;
       const len = Math.hypot(dx, dz);
-      if (len > 0.001) { ox = dx / len; oz = dz / len; }
+      if (len > 0.001) { dirX = dx / len; dirZ = dz / len; }
     }
-    // Empujon claro hacia el frente de la peana: tiene que leerse delante
-    // del tubo, no metido/fundido en su superficie. Sigue siendo la misma
-    // direccion (centro de la sala), solo mas generoso que el primer ajuste.
-    const OFFSET = 0.17;
+
+    const OFFSET = peanaRadius + 0.008;   // superficie real de la peana + 8 mm
     const spawn = window.MUSEO_SPAWN;
     const floorY = (spawn && typeof spawn.y === 'number')
       ? spawn.y
       : (it.bottomY !== null ? it.bottomY - 0.9 : it.pos.y - 1.2);
-    const baseY = floorY + 0.5;
-    const px = it.pos.x + ox * OFFSET;
-    const pz = it.pos.z + oz * OFFSET;
+    const px = it.pos.x + dirX * OFFSET;
+    const py = floorY + 0.5;
+    const pz = it.pos.z + dirZ * OFFSET;
+    const yaw = Math.atan2(dirX, dirZ);   // tangente a la peana, hacia el visitante
 
     const wrapper = document.createElement('a-entity');
-    wrapper.setAttribute('face-camera', '');
-    wrapper.object3D.position.set(px, baseY, pz);
+    wrapper.object3D.position.set(px, py, pz);
+    wrapper.object3D.rotation.set(0, yaw, 0);
 
-    /*
-      Placa con volumen real, no un plano 2D: una porcion curva de cilindro
-      (un "semi-tubo" muy abierto, como una cartela de museo ligeramente
-      combada) en vez de PlaneGeometry. El arco se centra en el eje -Z local
-      (delante de la camara tras el face-camera) y se retrasa su propio
-      radio para que el punto mas hundido del arco quede en z=0 y los bordes
-      se curven ligeramente hacia el visitante -- de ahi que el texto (mas
-      abajo) se adelante un poco mas en Z que la placa.
-    */
-    const PLAQUE_RADIUS = 0.55;
-    const PLAQUE_ARC = THREE.MathUtils.degToRad(34);
-    const bgGeo = new THREE.CylinderGeometry(
-      PLAQUE_RADIUS, PLAQUE_RADIUS, 0.20, 20, 1, true,
-      -Math.PI / 2 - PLAQUE_ARC / 2, PLAQUE_ARC
-    );
-    const bg = new THREE.Mesh(
-      bgGeo,
-      new THREE.MeshBasicMaterial({
-        map: this.getPopupGlowTexture(), transparent: true, opacity: 0,
-        color: 0xe6d8c2, depthWrite: false, toneMapped: false, side: THREE.DoubleSide
+    const WIDTH = 0.50;
+    const HEIGHT = 0.27;
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(WIDTH, HEIGHT),
+      new THREE.MeshStandardMaterial({
+        color: 0xf2ece3, map: this.getPlacardPaperTexture(),
+        roughness: 0.92, metalness: 0, side: THREE.FrontSide
       })
     );
-    bg.position.z = PLAQUE_RADIUS;
-    wrapper.object3D.add(bg);
+    plane.userData.museoExhibitId = it.id;
+    wrapper.object3D.add(plane);
+    this.selectableMeshes.push(plane);
 
-    const TEXT_Z = 0.035;   // delante del punto mas saliente de la curva
+    const TEXT_Z = 0.006;   // apenas delante del papel, evita z-fighting
 
     const section = document.createElement('a-text');
     section.setAttribute('value', it.data.section || '');
     section.setAttribute('align', 'center');
     section.setAttribute('baseline', 'center');
-    section.setAttribute('width', 0.34);
-    section.setAttribute('letter-spacing', 2);
+    section.setAttribute('width', 0.22);
+    section.setAttribute('letter-spacing', 1);
     section.setAttribute('color', '#7d3fa8');
-    section.setAttribute('opacity', 0);
-    section.object3D.position.set(0, 0.052, TEXT_Z);
+    section.object3D.position.set(0, HEIGHT / 2 - 0.065, TEXT_Z);
     wrapper.appendChild(section);
 
     const title = document.createElement('a-text');
-    title.setAttribute('value', it.data.title || '');
+    title.setAttribute('value', (it.data.title || '').toUpperCase());
     title.setAttribute('align', 'center');
     title.setAttribute('baseline', 'center');
-    title.setAttribute('width', 0.40);
-    title.setAttribute('wrap-count', 20);
-    title.setAttribute('color', '#3a3530');
-    title.setAttribute('opacity', 0);
-    title.object3D.position.set(0, 0.006, TEXT_Z);
+    title.setAttribute('width', 0.46);
+    title.setAttribute('wrap-count', 16);
+    title.setAttribute('line-height', 46);
+    title.setAttribute('color', '#3a2f28');
+    title.object3D.position.set(0, -0.005, TEXT_Z);
     wrapper.appendChild(title);
 
     const cue = document.createElement('a-text');
-    cue.setAttribute('value', 'Click to explore');
+    cue.setAttribute('value', 'CLICK TO EXPLORE');
     cue.setAttribute('align', 'center');
     cue.setAttribute('baseline', 'center');
-    cue.setAttribute('width', 0.30);
-    cue.setAttribute('letter-spacing', 0.5);
+    cue.setAttribute('width', 0.42);
+    cue.setAttribute('letter-spacing', 1);
     cue.setAttribute('color', '#8a6a9c');
-    cue.setAttribute('opacity', 0);
-    cue.object3D.position.set(0, -0.048, TEXT_Z);
+    cue.object3D.position.set(0, -HEIGHT / 2 + 0.045, TEXT_Z);
     wrapper.appendChild(cue);
 
     this.el.sceneEl.appendChild(wrapper);
-    return { wrapper, bg, section, title, cue, isPopup: true };
+    return { wrapper, plane, section, title, cue };
   },
 
   /*
@@ -1492,30 +1430,13 @@ AFRAME.registerComponent('exhibit-info', {
     if (!rig) return;
     const p = rig.object3D.getWorldPosition(this.tmp);
 
-    // Lenguaje visual de hover/proximidad de las 8 cepas: sin throttle (se
-    // anima cada frame para que el fundido y la respiracion se vean suaves).
-    // Muy barato -- 8 items como mucho, sin raycasts aqui.
+    // Hover de las 8 cepas: sin throttle (se anima cada frame para que la
+    // respiracion se vea suave). Muy barato -- 8 items como mucho, sin
+    // raycasts aqui. La cartela fisica (it.placard) es estatica y ya no se
+    // toca en cada frame -- solo la propia bacteria (pivote/emisivo).
     this.items.forEach((it) => {
       if (!it.pivot) return;
-      const d = Math.hypot(it.pos.x - p.x, it.pos.z - p.z);
       const isHovered = this.hoverId === it.id;
-      const isPopup = !!(it.label && it.label.isPopup);
-
-      // 1) fundido de la etiqueta segun distancia. El popup compacto de las
-      // 6 cepas pequeñas usa un radio mucho mas corto que la ficha grande:
-      // debe leerse como un gesto de interaccion al llegar a esa peana en
-      // concreto (o al señalarla con el raton), nunca como un rotulo fijo
-      // visible ya desde el centro de la sala.
-      const showDist = isPopup ? 0.95 : this.data.show;
-      const closeDist = isPopup ? 1.7 : this.data.close;
-      const range = Math.max(0.001, closeDist - showDist);
-      let targetOpacity = THREE.MathUtils.clamp((closeDist - d) / range, 0, 1);
-      if (isPopup && isHovered) targetOpacity = 1;
-      it.labelOpacity += (targetOpacity - it.labelOpacity) * 0.12;
-      if (it.labelOpacity < 0.004) it.labelOpacity = 0;
-
-      // 2) hover: entra/sale con una curva lenta (nada de saltos), y con una
-      // respiracion muy leve mientras se mantiene el raton encima.
       it.hoverT += ((isHovered ? 1 : 0) - it.hoverT) * 0.08;
 
       const breathe = 0.5 + 0.5 * Math.sin(time * 0.0016);
@@ -1526,65 +1447,27 @@ AFRAME.registerComponent('exhibit-info', {
         const boost = 1 + it.hoverT * 0.35;
         it.emissiveMats.forEach(({ mat, base }) => { mat.emissiveIntensity = base * boost; });
       }
-
-      if (it.label) {
-        // En el popup pequeño, el hover ademas crece un poco y se aclara
-        // hacia blanco -- señal clara de "esto es seleccionable" sin tocar
-        // el tamaño de letra ni añadir movimiento brusco.
-        const bgOpacity = isPopup
-          ? it.labelOpacity * (0.55 + it.hoverT * 0.35)
-          : it.labelOpacity * 0.82;
-        const textOpacity = it.labelOpacity * (isPopup ? 0.95 : 0.9);
-        const cueOpacity = isPopup
-          ? it.labelOpacity * 0.75
-          : it.labelOpacity * (0.82 + it.hoverT * 0.18);  // "VIEW +" algo mas brillante en hover
-        if (isPopup) {
-          it.label.bg.material.opacity = bgOpacity;
-          if (!this._popupBaseColor) {
-            this._popupBaseColor = new THREE.Color(0xe6d8c2);
-            this._popupHoverColor = new THREE.Color(0xffffff);
-          }
-          it.label.bg.material.color.copy(this._popupBaseColor).lerp(this._popupHoverColor, it.hoverT);
-          it.label.wrapper.object3D.scale.setScalar(1 + it.hoverT * 0.12);
-        } else {
-          it.label.bg.setAttribute('material', 'opacity', bgOpacity);
-        }
-        it.label.section.setAttribute('opacity', textOpacity);
-        it.label.title.setAttribute('opacity', textOpacity);
-        it.label.cue.setAttribute('opacity', cueOpacity);
-        it.label.wrapper.object3D.visible = it.labelOpacity > 0.003;
-      }
     });
 
     if (time < this.nextCheck) return;
     this.nextCheck = time + 180;
     if (!this.wireUI()) return;
 
+    // Ya no hay ningun boton flotante que actualizar: esto solo alimenta
+    // this.active para el atajo de teclado "E" (abrir la pieza mas cercana).
     let mejor = null, mejorD = Infinity;
     this.items.forEach((it) => {
       if (it.data.tier === 'tertiary') return;   // las ventanas no abren panel
       const d = Math.hypot(it.pos.x - p.x, it.pos.z - p.z);
       if (d < mejorD) { mejorD = d; mejor = it; }
     });
-
-    // aviso de interaccion
-    if (mejor && mejorD <= this.data.show) {
-      if (!this.active || this.active.id !== mejor.id) {
-        this.active = mejor;
-        this.prompt.textContent = mejor.data.label;
-        this.prompt.classList.add('visible');
-      }
-    } else if (this.active) {
-      this.active = null;
-      this.prompt.classList.remove('visible');
-    }
+    this.active = (mejor && mejorD <= this.data.show) ? mejor : null;
 
     // cerrar el panel si el visitante se aleja
     if (this.openId) {
       const abierto = this.items.find((i) => i.id === this.openId);
       if (abierto && Math.hypot(abierto.pos.x - p.x, abierto.pos.z - p.z) > this.data.close) this.close();
     }
-
   },
 
   open(id) {
@@ -1600,13 +1483,24 @@ AFRAME.registerComponent('exhibit-info', {
     lead.textContent = d.lead || '';
     lead.style.display = d.lead ? 'block' : 'none';
     this.panel.querySelector('.panel-body').textContent = d.body;
+    // imagenes de apoyo opcionales (museumContent[id].images = ['./ruta.jpg', ...]);
+    // vacio por defecto, no se muestra nada si la pieza no las trae.
+    const imagesEl = this.panel.querySelector('.panel-images');
+    if (imagesEl) {
+      imagesEl.innerHTML = '';
+      (d.images || []).forEach((src) => {
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = d.title || '';
+        imagesEl.appendChild(img);
+      });
+    }
     const tags = this.panel.querySelector('.panel-tags');
     tags.textContent = (d.tags || []).join(' · ');
     tags.style.display = (d.tags && d.tags.length) ? 'block' : 'none';
     this.panel.classList.toggle('secondary', d.tier === 'secondary');
     this.panel.classList.add('visible');
     this.openId = id;
-    this.prompt.classList.remove('visible');
     this.hideIntro();
   },
 
@@ -1623,7 +1517,6 @@ AFRAME.registerComponent('exhibit-info', {
   remove() {
     window.removeEventListener('keydown', this.onKey);
     window.removeEventListener('mousemove', this.onMouseMove);
-    if (this.prompt) this.prompt.removeEventListener('click', this.onPromptClick);
   }
 });
 
