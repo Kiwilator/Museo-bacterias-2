@@ -1181,9 +1181,41 @@ AFRAME.registerComponent('exhibit-info', {
         const b = new THREE.Box3().setFromObject(o);
         const c = b.getCenter(new THREE.Vector3());
         const s = b.getSize(new THREE.Vector3());
-        this.peanaBoxes.push({ center: c, radius: Math.max(s.x, s.z) / 2 });
+        this.peanaBoxes.push({ center: c, radius: Math.max(s.x, s.z) / 2, minY: b.min.y, maxY: b.max.y });
       }
     });
+
+    // Orientacion compartida para la fila de las 6 piezas secundarias: UNA
+    // sola direccion (no una calculada por pieza), desde el centro de esa
+    // fila hacia la bacteria grande central. Las 6 peanas estan sobre una
+    // pared curva -- calcular "hacia el centro de la sala" por separado para
+    // cada una (como se hacia antes) da un angulo distinto por pieza y las
+    // placas terminan mirando "de lado" unas respecto a otras. Con una unica
+    // direccion compartida, las 6 quedan paralelas entre si, como una fila
+    // coherente vista desde el paso del visitante. Las 2 piezas grandes no
+    // forman fila: cada una calcula su propio frente hacia MUSEO_SPAWN (ver
+    // createPedestalPlacard).
+    this._placardRowDir = null;
+    {
+      const secondary = this.items.filter((i) => i.data.tier === 'secondary' && i.id.startsWith('bacteria'));
+      if (secondary.length) {
+        let avgX = 0, avgZ = 0;
+        secondary.forEach((i) => { avgX += i.pos.x; avgZ += i.pos.z; });
+        avgX /= secondary.length; avgZ /= secondary.length;
+        const hero = this.items.find((i) => i.id === 'bacteriaLarge01');
+        const spawn = window.MUSEO_SPAWN;
+        const bounds = window.MUSEO_BOUNDS;
+        let tx = null, tz = null;
+        if (hero) { tx = hero.pos.x; tz = hero.pos.z; }
+        else if (spawn && typeof spawn.x === 'number') { tx = spawn.x; tz = spawn.z; }
+        else if (bounds) { tx = (bounds.minX + bounds.maxX) / 2; tz = (bounds.minZ + bounds.maxZ) / 2; }
+        if (tx !== null) {
+          const dx = tx - avgX, dz = tz - avgZ;
+          const len = Math.hypot(dx, dz);
+          if (len > 0.001) this._placardRowDir = { x: dx / len, z: dz / len };
+        }
+      }
+    }
 
     // Lenguaje visual de interaccion (hover + placa fisica en la peana) en
     // las 8 cepas de la Sala 1 (ids que empiezan por "bacteria"). No toca el
@@ -1280,106 +1312,138 @@ AFRAME.registerComponent('exhibit-info', {
   },
 
   /*
-    Cartela fisica de museo, unica para las 8 cepas. Sustituye a los dos
-    sistemas anteriores (createLabel + createSmallPopup, ya retirados): un
-    plano rectangular opaco, papel crema mate, PEGADO al frente real de la
-    peana -- no un popup flotante ni con resplandor.
+    Cartela fisica de museo, unica para las 8 cepas. Un segmento de cilindro
+    parcial -- una etiqueta de papel envuelta solo en el frente de la peana,
+    no un plano plano ni un tubo completo -- centrado en el propio eje de la
+    peana real mas cercana (this.peanaBoxes, medido en onLoaded), con radio
+    = radio real de esa peana + 8 mm. Al compartir eje con la peana, la
+    cartela queda pegada a su superficie curva en vez de flotar delante.
 
-    Posicion: se busca la peana (PEANA_*) real mas cercana a la pieza (ver
-    this.peanaBoxes, calculado en onLoaded) y se usa su radio real + un
-    margen de unos 8 mm como unica separacion -- ya no es una distancia
-    inventada, es la superficie real de esa peana concreta. La direccion de
-    ese empujon (y la orientacion de la cartela) es la misma que ya se usaba
-    para los circulos de video: del centro de la peana hacia el centro de
-    la sala, que es el lado por el que pasa el visitante.
+    Orientacion: NO face-camera, no se vuelve a tocar tras crearla. Las 6
+    piezas secundarias comparten una unica direccion (this._placardRowDir,
+    calculada una vez en onLoaded) para quedar todas paralelas, como una
+    fila coherente -- la pared donde estan es curva, asi que calcular el
+    frente pieza a pieza (como se hacia antes) producia angulos distintos y
+    parecian torcidas. Las 2 piezas grandes no son fila: cada una mira hacia
+    MUSEO_SPAWN (el punto real por el que entra el visitante).
 
-    Orientacion: NO face-camera. Se calcula una unica rotacion en Y (yaw)
-    tangente a la peana en el momento de crearla y ya no se vuelve a tocar
-    -- la cartela pertenece a la arquitectura, no gira con la camara.
-
-    Altura: igual que antes, medio metro sobre el suelo real de la sala
-    (window.MUSEO_SPAWN.y), centrada ahi.
+    Altura: fraccion de la altura REAL de esa peana concreta (peanaMinY/
+    peanaMaxY), no un valor absoluto sobre el suelo -- así queda a la altura
+    del cuerpo del pedestal (tercio medio/medio-alto), con peana visible por
+    encima y por debajo, en vez de cerca de la cupula de cristal.
   */
   createPedestalPlacard(it) {
-    let dirX = 0, dirZ = 1, peanaRadius = 0.22;
+    let peanaRadius = 0.22, peanaMinY = null, peanaMaxY = null;
+    let px = it.pos.x, pz = it.pos.z;
     let nearest = null, nearestD = Infinity;
     (this.peanaBoxes || []).forEach((pb) => {
       const d = Math.hypot(pb.center.x - it.pos.x, pb.center.z - it.pos.z);
       if (d < nearestD) { nearestD = d; nearest = pb; }
     });
-    if (nearest) peanaRadius = nearest.radius;
-
-    const bounds = window.MUSEO_BOUNDS;
-    if (bounds) {
-      const cx = (bounds.minX + bounds.maxX) / 2;
-      const cz = (bounds.minZ + bounds.maxZ) / 2;
-      const dx = cx - it.pos.x, dz = cz - it.pos.z;
-      const len = Math.hypot(dx, dz);
-      if (len > 0.001) { dirX = dx / len; dirZ = dz / len; }
+    if (nearest) {
+      peanaRadius = nearest.radius;
+      peanaMinY = nearest.minY;
+      peanaMaxY = nearest.maxY;
+      px = nearest.center.x;   // centrada en el eje REAL de la peana, no en
+      pz = nearest.center.z;   // el centroide de la bacteria que lleva encima
     }
 
-    const OFFSET = peanaRadius + 0.008;   // superficie real de la peana + 8 mm
+    // Direccion frontal: fila compartida para las 6 secundarias, calculo
+    // propio hacia MUSEO_SPAWN para las 2 grandes (ver comentario arriba).
+    let dirX = 0, dirZ = 1;
+    if (it.data.tier === 'secondary' && this._placardRowDir) {
+      dirX = this._placardRowDir.x;
+      dirZ = this._placardRowDir.z;
+    } else {
+      const spawn = window.MUSEO_SPAWN;
+      const bounds = window.MUSEO_BOUNDS;
+      let tx = null, tz = null;
+      if (spawn && typeof spawn.x === 'number') { tx = spawn.x; tz = spawn.z; }
+      else if (bounds) { tx = (bounds.minX + bounds.maxX) / 2; tz = (bounds.minZ + bounds.maxZ) / 2; }
+      if (tx !== null) {
+        const dx = tx - px, dz = tz - pz;
+        const len = Math.hypot(dx, dz);
+        if (len > 0.001) { dirX = dx / len; dirZ = dz / len; }
+      }
+    }
+    const yaw = Math.atan2(dirX, dirZ);
+
     const spawn = window.MUSEO_SPAWN;
     const floorY = (spawn && typeof spawn.y === 'number')
       ? spawn.y
       : (it.bottomY !== null ? it.bottomY - 0.9 : it.pos.y - 1.2);
-    const px = it.pos.x + dirX * OFFSET;
-    const py = floorY + 0.5;
-    const pz = it.pos.z + dirZ * OFFSET;
-    const yaw = Math.atan2(dirX, dirZ);   // tangente a la peana, hacia el visitante
+    const py = (peanaMinY !== null && peanaMaxY !== null)
+      ? peanaMinY + (peanaMaxY - peanaMinY) * 0.58   // tercio medio/medio-alto del cuerpo real
+      : floorY + 0.55;
 
     const wrapper = document.createElement('a-entity');
     wrapper.object3D.position.set(px, py, pz);
     wrapper.object3D.rotation.set(0, yaw, 0);
 
-    const WIDTH = 0.50;
-    const HEIGHT = 0.27;
-    const plane = new THREE.Mesh(
-      new THREE.PlaneGeometry(WIDTH, HEIGHT),
+    // Geometria: medio cilindro abierto, arco centrado en el frente local
+    // (+Z, misma convencion que ya usan los circulos de video: yaw =
+    // atan2(dirX,dirZ) apunta +Z hacia la direccion de mundo elegida).
+    const CURVE_RADIUS = peanaRadius + 0.008;   // superficie real de la peana + 8 mm
+    const ARC = 82 * Math.PI / 180;             // 70-100 grados: curva sutil pero visible
+    const PLACARD_HEIGHT = 0.26;
+    const segs = Math.max(10, Math.round((ARC * 180 / Math.PI) / 6));
+    const curve = new THREE.Mesh(
+      new THREE.CylinderGeometry(CURVE_RADIUS, CURVE_RADIUS, PLACARD_HEIGHT, segs, 1, true, -ARC / 2, ARC),
       new THREE.MeshStandardMaterial({
-        color: 0xf2ece3, map: this.getPlacardPaperTexture(),
-        roughness: 0.92, metalness: 0, side: THREE.FrontSide
+        color: 0xf7f4ee, map: this.getPlacardPaperTexture(),
+        roughness: 0.9, metalness: 0, side: THREE.DoubleSide
       })
     );
-    plane.userData.museoExhibitId = it.id;
-    wrapper.object3D.add(plane);
-    this.selectableMeshes.push(plane);
+    curve.userData.museoExhibitId = it.id;
+    wrapper.object3D.add(curve);
+    this.selectableMeshes.push(curve);
 
-    const TEXT_Z = 0.006;   // apenas delante del papel, evita z-fighting
+    const TEXT_Z = CURVE_RADIUS + 0.004;   // apenas delante del papel, evita z-fighting
 
+    // Numero de seccion: ahora es identidad visual, no un dato pequeño --
+    // wrap-count bajo (en vez del valor por defecto, 40, que lo dejaba
+    // minusculo) para que "01".."08" se vean grandes de verdad.
     const section = document.createElement('a-text');
     section.setAttribute('value', it.data.section || '');
     section.setAttribute('align', 'center');
     section.setAttribute('baseline', 'center');
-    section.setAttribute('width', 0.22);
+    section.setAttribute('width', 0.24);
+    section.setAttribute('wrap-count', 3);
     section.setAttribute('letter-spacing', 1);
-    section.setAttribute('color', '#7d3fa8');
-    section.object3D.position.set(0, HEIGHT / 2 - 0.065, TEXT_Z);
+    section.setAttribute('color', '#74349A');
+    section.object3D.position.set(0, PLACARD_HEIGHT / 2 - 0.065, TEXT_Z);
     wrapper.appendChild(section);
 
+    // Nombre de la especie: el texto mas fuerte de la cartela, hasta 2
+    // lineas. wrap-count 20 corta por palabra completa (nunca a mitad de
+    // palabra) justo donde lo pide el guion: "PURPLE PHOTOTROPHIC" (19
+    // caracteres) cabe entera en una linea y "BACTERIA" baja a la segunda;
+    // "RHODOPSEUDOMONAS" / "PALUSTRIS", "RUBRIVIVAX" / "GELATINOSUS" y
+    // "RHODOMICROBIUM" / "VANNIELII" se parten igual, por palabra.
     const title = document.createElement('a-text');
     title.setAttribute('value', (it.data.title || '').toUpperCase());
     title.setAttribute('align', 'center');
     title.setAttribute('baseline', 'center');
-    title.setAttribute('width', 0.46);
-    title.setAttribute('wrap-count', 16);
-    title.setAttribute('line-height', 46);
-    title.setAttribute('color', '#3a2f28');
-    title.object3D.position.set(0, -0.005, TEXT_Z);
+    title.setAttribute('width', 0.62);
+    title.setAttribute('wrap-count', 20);
+    title.setAttribute('line-height', 60);
+    title.setAttribute('color', '#201A1E');
+    title.object3D.position.set(0, 0.008, TEXT_Z);
     wrapper.appendChild(title);
 
     const cue = document.createElement('a-text');
     cue.setAttribute('value', 'CLICK TO EXPLORE');
     cue.setAttribute('align', 'center');
     cue.setAttribute('baseline', 'center');
-    cue.setAttribute('width', 0.42);
+    cue.setAttribute('width', 0.40);
+    cue.setAttribute('wrap-count', 17);
     cue.setAttribute('letter-spacing', 1);
-    cue.setAttribute('color', '#8a6a9c');
-    cue.object3D.position.set(0, -HEIGHT / 2 + 0.045, TEXT_Z);
+    cue.setAttribute('color', '#805096');
+    cue.object3D.position.set(0, -PLACARD_HEIGHT / 2 + 0.048, TEXT_Z);
     wrapper.appendChild(cue);
 
     this.el.sceneEl.appendChild(wrapper);
-    return { wrapper, plane, section, title, cue };
+    return { wrapper, curve, section, title, cue };
   },
 
   /*
