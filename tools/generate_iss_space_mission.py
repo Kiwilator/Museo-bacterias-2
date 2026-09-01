@@ -272,7 +272,7 @@ class GLBBuilder:
         )
         align4(self.binary)
         gltf = {
-            "asset": {"version": "2.0", "generator": "Purple Museum ISS generator 1.0"},
+            "asset": {"version": "2.0", "generator": "Purple Museum ISS generator 1.1"},
             "scene": 0,
             "scenes": [{"name": "ISS Space Mission", "nodes": [root_index]}],
             "nodes": self.nodes,
@@ -303,75 +303,85 @@ def build_model() -> GLBBuilder:
 
     white = b.add_material("ISS_Ceramic_White", (0.82, 0.84, 0.86), metallic=0.15, roughness=0.45)
     warm_white = b.add_material("ISS_Warm_White", (0.94, 0.91, 0.86), metallic=0.05, roughness=0.62)
-    grey = b.add_material("ISS_Structure_Grey", (0.30, 0.32, 0.36), metallic=0.72, roughness=0.32)
-    dark = b.add_material("ISS_Dark_Structure", (0.055, 0.045, 0.075), metallic=0.74, roughness=0.28)
-    solar = b.add_material("Solar_Cell_Indigo", (0.035, 0.045, 0.13), metallic=0.35, roughness=0.24, emissive=(0.012, 0.016, 0.07))
-    copper = b.add_material("Solar_Frame_Copper", (0.47, 0.25, 0.12), metallic=0.78, roughness=0.28)
+    grey = b.add_material("ISS_Structure_Gunmetal", (0.24, 0.25, 0.25), metallic=0.82, roughness=0.27)
+    dark = b.add_material("ISS_Dark_Bronze", (0.095, 0.060, 0.035), metallic=0.88, roughness=0.24)
+    solar_deep = b.add_material("Solar_Cell_Deep_Green", (0.018, 0.075, 0.068), metallic=0.48, roughness=0.20, emissive=(0.006, 0.035, 0.026))
+    solar_mid = b.add_material("Solar_Cell_Petrol", (0.025, 0.13, 0.105), metallic=0.43, roughness=0.22, emissive=(0.008, 0.055, 0.040))
+    bronze_dark = b.add_material("Bronze_Shadow", (0.22, 0.105, 0.038), metallic=0.91, roughness=0.30)
+    bronze_mid = b.add_material("Bronze_Mid", (0.50, 0.255, 0.085), metallic=0.88, roughness=0.24)
+    bronze_light = b.add_material("Bronze_Highlight", (0.78, 0.49, 0.17), metallic=0.86, roughness=0.20, emissive=(0.025, 0.010, 0.002))
     violet = b.add_material("Museum_Violet", (0.38, 0.07, 0.55), metallic=0.12, roughness=0.34, emissive=(0.32, 0.03, 0.55))
     violet_soft = b.add_material("Culture_Violet", (0.70, 0.18, 0.92), metallic=0.0, roughness=0.42, emissive=(0.48, 0.07, 0.72))
-    turquoise = b.add_material("Status_Turquoise", (0.08, 0.58, 0.55), metallic=0.1, roughness=0.30, emissive=(0.03, 0.42, 0.40))
-    glass = b.add_material("Sample_Capsule_Glass", (0.48, 0.32, 0.62), metallic=0.0, roughness=0.08, emissive=(0.035, 0.012, 0.07), alpha=0.22, double_sided=True)
+    green = b.add_material("Museum_Green_Light", (0.08, 0.70, 0.42), metallic=0.18, roughness=0.23, emissive=(0.025, 0.52, 0.22))
+    green_soft = b.add_material("Museum_Green_Soft", (0.20, 0.50, 0.29), metallic=0.52, roughness=0.28, emissive=(0.012, 0.18, 0.06))
+    glass = b.add_material("Sample_Capsule_Glass", (0.28, 0.48, 0.34), metallic=0.0, roughness=0.08, emissive=(0.018, 0.055, 0.025), alpha=0.22, double_sided=True)
 
     q_x = quaternion_from_euler(rz=math.pi / 2)  # cylinder Y -> X
     q_z = quaternion_from_euler(rx=math.pi / 2)  # cylinder Y -> Z
 
     # Main truss and braces.
-    b.add_instance("ISS_Truss_Main", "UnitBox", dark, translation=(0, 0.04, 0), scale=(1.28, 0.045, 0.050))
+    b.add_instance("ISS_Truss_Main", "UnitBox", bronze_dark, translation=(0, 0.04, 0), scale=(1.28, 0.045, 0.050))
     for x in (-0.42, -0.21, 0.21, 0.42):
-        b.add_instance(f"ISS_Truss_Node_{x:+.2f}", "UnitSphere", grey, translation=(x, 0.04, 0), scale=(0.075, 0.075, 0.075))
+        node_material = bronze_light if abs(x) < 0.3 else bronze_mid
+        b.add_instance(f"ISS_Truss_Node_{x:+.2f}", "UnitSphere", node_material, translation=(x, 0.04, 0), scale=(0.075, 0.075, 0.075))
     for x in (-0.54, -0.27, 0.27, 0.54):
-        b.add_instance(f"ISS_Truss_Brace_{x:+.2f}", "UnitBox", grey, translation=(x, 0.04, 0), rotation=quaternion_from_euler(rx=0.58), scale=(0.016, 0.12, 0.016))
-        b.add_instance(f"ISS_Truss_Brace_Mirror_{x:+.2f}", "UnitBox", grey, translation=(x, 0.04, 0), rotation=quaternion_from_euler(rx=-0.58), scale=(0.016, 0.12, 0.016))
+        brace_material = bronze_mid if abs(x) < 0.4 else bronze_dark
+        b.add_instance(f"ISS_Truss_Brace_{x:+.2f}", "UnitBox", brace_material, translation=(x, 0.04, 0), rotation=quaternion_from_euler(rx=0.58), scale=(0.016, 0.12, 0.016))
+        b.add_instance(f"ISS_Truss_Brace_Mirror_{x:+.2f}", "UnitBox", brace_material, translation=(x, 0.04, 0), rotation=quaternion_from_euler(rx=-0.58), scale=(0.016, 0.12, 0.016))
 
     # Eight recognisable solar-panel rectangles: four pylons, upper/lower.
     panel_xs = (-0.52, -0.79, 0.52, 0.79)
     for px in panel_xs:
         pylon_side = "L" if px < 0 else "R"
-        b.add_instance(f"Solar_Pylon_{pylon_side}_{abs(px):.2f}", "UnitCylinder", grey, translation=(px, 0.04, 0), scale=(0.022, 0.54, 0.022))
+        b.add_instance(f"Solar_Pylon_{pylon_side}_{abs(px):.2f}", "UnitCylinder", bronze_mid, translation=(px, 0.04, 0), scale=(0.022, 0.54, 0.022))
         for row, py in [("Upper", 0.19), ("Lower", -0.11)]:
             prefix = f"SolarArray_{pylon_side}_{abs(px):.2f}_{row}"
-            b.add_instance(prefix + "_Cell", "UnitBox", solar, translation=(px, py, 0), scale=(0.205, 0.27, 0.018))
-            # Copper perimeter.
-            b.add_instance(prefix + "_FrameTop", "UnitBox", copper, translation=(px, py + 0.135, 0.012), scale=(0.22, 0.012, 0.014))
-            b.add_instance(prefix + "_FrameBottom", "UnitBox", copper, translation=(px, py - 0.135, 0.012), scale=(0.22, 0.012, 0.014))
-            b.add_instance(prefix + "_FrameLeft", "UnitBox", copper, translation=(px - 0.108, py, 0.012), scale=(0.012, 0.282, 0.014))
-            b.add_instance(prefix + "_FrameRight", "UnitBox", copper, translation=(px + 0.108, py, 0.012), scale=(0.012, 0.282, 0.014))
+            cell_material = solar_mid if row == "Upper" else solar_deep
+            b.add_instance(prefix + "_Cell", "UnitBox", cell_material, translation=(px, py, 0), scale=(0.205, 0.27, 0.018))
+            # Three bronze values fake a warm metallic gradient without textures.
+            b.add_instance(prefix + "_FrameTop", "UnitBox", bronze_light, translation=(px, py + 0.135, 0.012), scale=(0.22, 0.012, 0.014))
+            b.add_instance(prefix + "_FrameBottom", "UnitBox", bronze_dark, translation=(px, py - 0.135, 0.012), scale=(0.22, 0.012, 0.014))
+            b.add_instance(prefix + "_FrameLeft", "UnitBox", bronze_mid, translation=(px - 0.108, py, 0.012), scale=(0.012, 0.282, 0.014))
+            b.add_instance(prefix + "_FrameRight", "UnitBox", bronze_light, translation=(px + 0.108, py, 0.012), scale=(0.012, 0.282, 0.014))
             for j in (-0.045, 0.045):
-                b.add_instance(prefix + f"_GridV_{j:+.3f}", "UnitBox", copper, translation=(px + j, py, 0.014), scale=(0.006, 0.255, 0.008))
+                grid_material = bronze_mid if j < 0 else bronze_light
+                b.add_instance(prefix + f"_GridV_{j:+.3f}", "UnitBox", grid_material, translation=(px + j, py, 0.014), scale=(0.006, 0.255, 0.008))
             for j, offset in enumerate((-0.09, -0.045, 0.0, 0.045, 0.09)):
-                b.add_instance(prefix + f"_GridH_{j}", "UnitBox", copper, translation=(px, py + offset, 0.014), scale=(0.195, 0.004, 0.008))
+                grid_material = (bronze_dark, bronze_mid, bronze_mid, bronze_light, bronze_light)[j]
+                b.add_instance(prefix + f"_GridH_{j}", "UnitBox", grid_material, translation=(px, py + offset, 0.014), scale=(0.195, 0.004, 0.008))
 
     # Central scientific modules. Cylinders use named parts so A-Frame can
     # highlight them later without touching the solar arrays.
     b.add_instance("ISS_Lab_Module_Main", "UnitCylinder", warm_white, translation=(0, -0.015, 0.015), rotation=q_z, scale=(0.20, 0.42, 0.20))
-    b.add_instance("ISS_Lab_Module_Ring_Front", "UnitTorus", violet, translation=(0, -0.015, 0.225), rotation=q_z, scale=(0.24, 0.24, 0.24))
-    b.add_instance("ISS_Lab_Module_Ring_Back", "UnitTorus", grey, translation=(0, -0.015, -0.195), rotation=q_z, scale=(0.24, 0.24, 0.24))
+    b.add_instance("ISS_Lab_Module_Ring_Front", "UnitTorus", bronze_light, translation=(0, -0.015, 0.225), rotation=q_z, scale=(0.24, 0.24, 0.24))
+    b.add_instance("ISS_Lab_Module_Ring_Back", "UnitTorus", bronze_dark, translation=(0, -0.015, -0.195), rotation=q_z, scale=(0.24, 0.24, 0.24))
     b.add_instance("ISS_Node_Left", "UnitCylinder", white, translation=(-0.20, -0.015, 0.01), rotation=q_x, scale=(0.14, 0.33, 0.14))
     b.add_instance("ISS_Node_Right", "UnitCylinder", white, translation=(0.20, -0.015, 0.01), rotation=q_x, scale=(0.14, 0.33, 0.14))
     b.add_instance("ISS_Service_Module", "UnitBox", grey, translation=(0, 0.105, -0.02), scale=(0.23, 0.12, 0.18))
     b.add_instance("ISS_Cupola", "UnitSphere", glass, translation=(0, 0.175, -0.02), scale=(0.13, 0.08, 0.13))
     b.add_instance("ISS_Docking_Port", "UnitCylinder", dark, translation=(0, -0.015, 0.275), rotation=q_z, scale=(0.11, 0.08, 0.11))
-    b.add_instance("ISS_Docking_Ring", "UnitTorus", turquoise, translation=(0, -0.015, 0.315), rotation=q_z, scale=(0.18, 0.18, 0.18))
+    b.add_instance("ISS_Docking_Ring", "UnitTorus", green, translation=(0, -0.015, 0.315), rotation=q_z, scale=(0.18, 0.18, 0.18))
 
     # Radiators and antenna accents, behind the main modules.
     for i, (x, z) in enumerate(((-0.23, -0.16), (0.23, -0.16), (-0.23, 0.17), (0.23, 0.17))):
         b.add_instance(f"ISS_Radiator_{i+1}", "UnitBox", white, translation=(x, -0.02, z), rotation=quaternion_from_euler(ry=0.14 if x < 0 else -0.14), scale=(0.24, 0.10, 0.014))
     b.add_instance("ISS_Antenna_Dish", "UnitSphere", warm_white, translation=(0.16, 0.14, 0.12), scale=(0.13, 0.045, 0.13))
-    b.add_instance("ISS_Antenna_Stem", "UnitCylinder", grey, translation=(0.16, 0.09, 0.12), scale=(0.015, 0.10, 0.015))
+    b.add_instance("ISS_Antenna_Stem", "UnitCylinder", bronze_mid, translation=(0.16, 0.09, 0.12), scale=(0.015, 0.10, 0.015))
+    b.add_instance("ISS_Antenna_Status", "UnitSphere", green, translation=(0.16, 0.155, 0.12), scale=(0.024, 0.024, 0.024))
 
     # Suspension hardware. Dynamic cables are created in A-Frame from these
     # anchors to the ceiling; the short rods make the attachment believable.
     for side, x in (("Left", -0.28), ("Right", 0.28)):
         b.add_instance(f"CableHook_{side}_Rod", "UnitCylinder", dark, translation=(x, 0.27, 0), scale=(0.018, 0.40, 0.018), extras={"role": "suspensionHook"})
-        b.add_instance(f"CableHook_{side}_Eye", "UnitTorus", violet, translation=(x, 0.475, 0), scale=(0.075, 0.075, 0.075), extras={"role": "suspensionHook"})
+        b.add_instance(f"CableHook_{side}_Eye", "UnitTorus", bronze_light, translation=(x, 0.475, 0), scale=(0.075, 0.075, 0.075), extras={"role": "suspensionHook"})
         b.add_anchor(f"CableAnchor_{side}", (x, 0.51, 0), extras={"role": "dynamicCableAnchor"})
 
     # Purple culture capsule hanging underneath the scientific modules.
-    b.add_instance("SampleCapsule_Connector", "UnitCylinder", grey, translation=(0, -0.17, 0.01), scale=(0.035, 0.22, 0.035))
+    b.add_instance("SampleCapsule_Connector", "UnitCylinder", bronze_mid, translation=(0, -0.17, 0.01), scale=(0.035, 0.22, 0.035))
     b.add_instance("SampleCapsule_Glass", "UnitCylinder", glass, translation=(0, -0.315, 0.01), scale=(0.17, 0.25, 0.17), extras={"role": "spaceSample"})
-    b.add_instance("SampleCapsule_RingTop", "UnitTorus", violet, translation=(0, -0.19, 0.01), scale=(0.22, 0.22, 0.22))
-    b.add_instance("SampleCapsule_RingBottom", "UnitTorus", violet, translation=(0, -0.44, 0.01), scale=(0.22, 0.22, 0.22))
-    b.add_instance("SampleCapsule_Culture", "UnitSphere", violet, translation=(0, -0.315, 0.01), scale=(0.13, 0.20, 0.13))
+    b.add_instance("SampleCapsule_RingTop", "UnitTorus", bronze_light, translation=(0, -0.19, 0.01), scale=(0.22, 0.22, 0.22))
+    b.add_instance("SampleCapsule_RingBottom", "UnitTorus", bronze_dark, translation=(0, -0.44, 0.01), scale=(0.22, 0.22, 0.22))
+    b.add_instance("SampleCapsule_Culture", "UnitSphere", green_soft, translation=(0, -0.315, 0.01), scale=(0.13, 0.20, 0.13))
 
     bacteria_specs = [
         (-0.025, -0.275, 0.035, 0.3, -0.5, 0.2),
@@ -390,7 +400,7 @@ def build_model() -> GLBBuilder:
             scale=(0.020, 0.064, 0.020),
             extras={"organism": "Rhodospirillum rubrum"},
         )
-    b.add_instance("SampleCapsule_Status", "UnitSphere", turquoise, translation=(0, -0.455, 0.01), scale=(0.025, 0.025, 0.025))
+    b.add_instance("SampleCapsule_Status", "UnitSphere", green, translation=(0, -0.455, 0.01), scale=(0.025, 0.025, 0.025))
 
     b.add_anchor("InteractionAnchor_SPACE_MISSION", (0, -0.02, 0.36), extras={"role": "interactionAnchor"})
     b.add_anchor("PlacardAnchor_SPACE_MISSION", (0, -0.49, 0.02), extras={"role": "placardAnchor"})
