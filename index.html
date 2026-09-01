@@ -52,6 +52,7 @@
       <a-asset-item id="bacteria_small_05" src="./modulos/bacteria_small_05.glb?v=8c8c5d9"></a-asset-item>
       <a-asset-item id="bacteria_small_06" src="./modulos/bacteria_small_06.glb?v=8c8c5d9"></a-asset-item>
       <a-asset-item id="bioreactor" src="./modulos/bioreactor.glb?v=8c8c5d9"></a-asset-item>
+      <a-asset-item id="iss_space_mission" src="./modulos/iss_space_mission.glb?v=bronze01"></a-asset-item>
       <video id="ppb-video-02" src="./assets/videos/scientific-animation.mp4" autoplay loop muted playsinline crossorigin="anonymous"></video>
       <video id="ppb-video-03" src="./assets/videos/cereibacter-sphaeroides-animation.mp4" autoplay loop muted playsinline crossorigin="anonymous"></video>
       <video id="ppb-video-04" src="./assets/videos/rhodobacter-capsulatus-animation.mp4" autoplay loop muted playsinline crossorigin="anonymous"></video>
@@ -97,6 +98,20 @@
       <a-entity gltf-model="#bacteria_small_06" gltf-animations></a-entity>
       <a-entity gltf-model="#bioreactor" gltf-animations></a-entity>
     </a-entity>
+
+    <!-- Pieza espacial de R. rubrum. Vive fuera de #modelo porque el museo
+         usa una escala XZ/Y no uniforme: asi la estacion conserva sus
+         proporciones y el componente puede hacerla bajar en metros reales.
+         Se posiciona automaticamente sobre la segunda bacteria grande al
+         recibir museo-modules-loaded; no hay coordenadas fragiles escritas
+         a mano. -->
+    <a-entity
+      id="space-mission"
+      gltf-model="#iss_space_mission"
+      space-mission-descent="anchor: Exhibit_Mesh0_Capsule; trigger: 2.35; release: 3.20; duration: 1.65"
+      shadow="cast: true; receive: true"
+      visible="false"
+    ></a-entity>
 
     <!-- Pantallas circulares (sala violeta): 6 circulos independientes. Sus
          valores de posicion/normal/radio (en placeholder abajo) son crudos,
@@ -191,6 +206,6 @@
   </aside>
 
 
-  <script src="./script.js?v=8c8c5d9"></script>
+  <script src="./script.js?v=space02"></script>
 </body>
 </html>

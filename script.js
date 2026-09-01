@@ -1007,6 +1007,17 @@ const museumContent = {
     images: ['./assets/images/ppb-microscopy-overview.jpg'],
     body: 'Purple phototrophic bacteria (PPB) are a diverse group of microorganisms capable of using light as a source of energy. What makes them particularly interesting, however, is not only their photosynthetic ability, but also the extraordinary variety of metabolic strategies they can develop.\n\nDepending on the species and environmental conditions, these bacteria can modify their metabolism, fix nitrogen, transform organic compounds, use certain gases, exchange electrons with minerals or electrodes, and store carbon in the form of PHA (biopolymers with potential applications in the production of bio-based plastics). Some strains are also particularly efficient at producing hydrogen, while the biomass obtained from their cultivation is being investigated for food and feed applications.\n\nThis diversity makes purple phototrophic bacteria important both for understanding fundamental biological processes (such as the conversion of light into energy and cellular adaptation to environmental conditions) and for investigating more sustainable biotechnological processes. Their cultivation opens possibilities related to hydrogen production, bioplastics, biomass and bioelectrochemical systems.\n\nBut they do not all behave in the same way.\n\nFrom this point onwards, the exhibition focuses on eight specific strains, revealing the characteristics and capabilities that distinguish each one.\n\n01. RHODOSPIRILLUM RUBRUM\nA key bacterium for understanding photosynthesis\n\nRhodospirillum rubrum has played an important role in the history of bacterial photosynthesis research. Its relatively simple photosynthetic apparatus made it one of the first model organisms used to investigate how energy from light is transformed, through electron transfer, into energy that the cell can use.\n\nIts study has also helped researchers understand the relationship between energy production, nitrogen fixation and carbon metabolism, showing how a bacterium can coordinate different processes depending on its needs and environmental conditions.\n\nIts relevance is not limited to fundamental research. R. rubrum can accumulate PHA in the form of intracellular granules. These compounds act as carbon reserves for the bacterium and can be used in the production of bio-based and biodegradable materials. The species is also currently being investigated as a potential nutritious ingredient for food and feed applications.'
   },
+  /* Pieza suspendida independiente. El componente space-mission-descent la
+     registra cuando su GLB ya esta cargado y situado; por eso no busca un
+     ancla dentro de los doce modulos como las bacterias convencionales. */
+  spaceMission: {
+    dynamic: true, tier: 'primary',
+    section: 'ISS', title: 'RHODOSPIRILLUM RUBRUM IN SPACE',
+    lead: 'Seven days aboard the International Space Station',
+    tags: ['SPACEFLIGHT', 'MICROGRAVITY', 'CLOSED-LOOP LIFE SUPPORT'],
+    images: ['./assets/images/rhodospirillum-space-mission.jpg'],
+    body: 'Future space missions will need ways to produce food, recycle waste and regenerate air and water without depending on constant supplies from Earth. One possible solution is to use beneficial microorganisms inside engineered closed-loop ecosystems.\n\nIn 2015, scientists sent Rhodospirillum rubrum and several other useful bacterial species to the International Space Station for seven days. The original culture was divided into two groups: one remained on Earth while the other travelled into low Earth orbit, where it experienced microgravity and increased radiation.\n\nAfter the flight, the researchers reactivated both cultures and compared them. R. rubrum survived the journey, grew normally and continued to perform its expected biological functions. The spaceflight appeared to have little effect on its overall performance.\n\nThese results support the possibility of using this edible purple bacterium in experimental life-support systems. In the future, microorganisms such as R. rubrum could help recycle resources, reduce dependence on terrestrial resupply and perhaps contribute to feeding astronauts during long-duration missions.'
+  },
   bacteriaSmall01: {
     lead: 'The machinery that converts light into energy', tags: ['REACTION CENTER', 'NOBEL PRIZE'], icon: 'form',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_base',
@@ -1146,6 +1157,8 @@ const museumContent = {
   "hydrogen" suelto y "production" sin marcar.
 */
 const PANEL_KEYWORDS = [
+  'International Space Station', 'closed-loop ecosystems', 'life-support systems',
+  'microgravity', 'spaceflight', 'radiation',
   'photosynthetic reaction center', 'reaction center',
   'carbon monoxide (CO)', 'carbon monoxide',
   'anaerobic conditions', 'anaerobic degradation', 'anaerobic',
@@ -1417,6 +1430,7 @@ AFRAME.registerComponent('exhibit-info', {
     this.items = [];
     Object.keys(museumContent).forEach((id) => {
       const data = museumContent[id];
+      if (data.dynamic) return;
       let pos = null;
       let topY = null;
       let bottomY = null;
@@ -2156,7 +2170,7 @@ AFRAME.registerComponent('exhibit-info', {
     // Sala 2 (reactor/ventanas) usa el acento verde/turquesa del propio
     // sistema de color de esa sala, no el morado de la Sala 1 -- misma
     // ficha compartida, solo cambia --mus-morado (ver style.css).
-    this.panel.classList.toggle('room2', id.startsWith('reactor') || id.startsWith('window'));
+    this.panel.classList.toggle('room2', id.startsWith('reactor') || id.startsWith('window') || id === 'spaceMission');
     this.panel.classList.add('visible');
     const scroll = this.panel.querySelector('.panel-scroll');
     if (scroll) scroll.scrollTop = 0;   // cada ficha nueva empieza arriba, no donde quedo la anterior
@@ -2183,6 +2197,248 @@ AFRAME.registerComponent('exhibit-info', {
   remove() {
     window.removeEventListener('keydown', this.onKey);
     window.removeEventListener('mousemove', this.onMouseMove);
+  }
+});
+
+/*
+  Estacion espacial suspendida de R. rubrum.
+
+  La pieza se coloca a partir de la geometria real de la segunda bacteria
+  grande, no mediante coordenadas fijas. Al entrar en su radio de proximidad
+  baja desde el techo; al salir vuelve a subir. Dos lineas de bronce unen los
+  anclajes incluidos en el GLB con el techo y crecen durante el descenso.
+  La propia estacion se registra tambien en exhibit-info, asi que funciona
+  con el mismo click/tap, hover y panel accesible del resto del museo.
+*/
+AFRAME.registerComponent('space-mission-descent', {
+  schema: {
+    anchor: { type: 'string', default: 'Exhibit_Mesh0_Capsule' },
+    trigger: { type: 'number', default: 2.35 },
+    release: { type: 'number', default: 3.20 },
+    duration: { type: 'number', default: 1.65 },
+    modelScale: { type: 'number', default: 1.15 }
+  },
+
+  init() {
+    this.modelReady = false;
+    this.museumReady = false;
+    this.ready = false;
+    this.registered = false;
+    this.active = false;
+    this.progress = 0;
+    this.hoverT = 0;
+    this.nextDistanceCheck = 0;
+    this.rigPosition = new THREE.Vector3();
+    this.basePosition = new THREE.Vector3();
+    this.leftPosition = new THREE.Vector3();
+    this.rightPosition = new THREE.Vector3();
+
+    this.onModelLoaded = () => {
+      this.modelReady = true;
+      this.trySetup();
+    };
+    this.onMuseumLoaded = () => {
+      this.museumReady = true;
+      // exhibit-info escucha el mismo evento. Un turno de event-loop asegura
+      // que termine su registro convencional antes de añadir la pieza dinamica.
+      setTimeout(() => this.trySetup(), 0);
+    };
+
+    this.el.addEventListener('model-loaded', this.onModelLoaded);
+    const museum = document.getElementById('modelo');
+    if (museum) museum.addEventListener('museo-modules-loaded', this.onMuseumLoaded);
+
+    if (this.el.getObject3D('mesh')) this.modelReady = true;
+    if (window.MUSEO_SPAWN) this.museumReady = true;
+    this.trySetup();
+  },
+
+  trySetup() {
+    if (this.ready || !this.modelReady || !this.museumReady) return;
+    const museum = document.getElementById('modelo');
+    const spawn = window.MUSEO_SPAWN;
+    if (!museum || !spawn) return;
+
+    museum.object3D.updateMatrixWorld(true);
+    const anchor = museum.object3D.getObjectByName(this.data.anchor);
+    if (!anchor) {
+      console.warn('[space-mission-descent] no se encontro el ancla', this.data.anchor);
+      return;
+    }
+
+    const anchorPosition = new THREE.Box3().setFromObject(anchor).getCenter(new THREE.Vector3());
+    const towardVisitor = new THREE.Vector3(spawn.x - anchorPosition.x, 0, spawn.z - anchorPosition.z);
+    if (towardVisitor.lengthSq() < 0.0001) towardVisitor.set(0, 0, 1);
+    towardVisitor.normalize();
+
+    // Un poco hacia el pasillo para que la estacion no atraviese la vitrina
+    // de la bacteria. La altura visible queda por encima de la cabeza.
+    this.basePosition.set(
+      anchorPosition.x + towardVisitor.x * 0.82,
+      spawn.y + 2.72,
+      anchorPosition.z + towardVisitor.z * 0.82
+    );
+    this.visibleY = this.basePosition.y;
+    this.hiddenY = spawn.y + 5.45;
+    this.ceilingY = this.hiddenY + this.data.modelScale * 0.52;
+    this.baseYaw = Math.atan2(spawn.x - this.basePosition.x, spawn.z - this.basePosition.z);
+
+    this.el.object3D.position.set(this.basePosition.x, this.hiddenY, this.basePosition.z);
+    this.el.object3D.rotation.set(0, this.baseYaw, 0);
+    this.el.object3D.scale.setScalar(this.data.modelScale * 0.88);
+    this.el.object3D.visible = false;
+
+    this.leftAnchor = this.el.object3D.getObjectByName('CableAnchor_Left');
+    this.rightAnchor = this.el.object3D.getObjectByName('CableAnchor_Right');
+    this.createCables();
+    this.createGlow();
+    this.registerWithExhibitInfo();
+    this.ready = true;
+    console.log('[space-mission-descent] estacion preparada sobre', this.data.anchor, this.basePosition);
+  },
+
+  createCables() {
+    if (!this.leftAnchor || !this.rightAnchor) return;
+    this.cablePositions = new Float32Array(12);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(this.cablePositions, 3));
+    this.cableMaterial = new THREE.LineBasicMaterial({
+      color: 0xc1873b,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      toneMapped: true
+    });
+    this.cables = new THREE.LineSegments(geometry, this.cableMaterial);
+    this.cables.name = 'ISS_Suspension_Cables';
+    this.cables.visible = false;
+    this.el.sceneEl.object3D.add(this.cables);
+  },
+
+  createGlow() {
+    this.greenGlow = new THREE.PointLight(0x36df84, 0, 3.0, 2);
+    this.greenGlow.position.set(0, -0.18, 0.30);
+    this.greenGlow.castShadow = false;
+    this.el.object3D.add(this.greenGlow);
+  },
+
+  registerWithExhibitInfo() {
+    if (this.registered) return true;
+    const museum = document.getElementById('modelo');
+    const info = museum && museum.components && museum.components['exhibit-info'];
+    const data = museumContent.spaceMission;
+    if (!info || !data || !info.items || !info.selectableMeshes) {
+      setTimeout(() => this.registerWithExhibitInfo(), 60);
+      return false;
+    }
+
+    const item = {
+      id: 'spaceMission',
+      data,
+      pos: new THREE.Vector3(this.basePosition.x, this.visibleY, this.basePosition.z),
+      topY: this.visibleY + 0.7,
+      bottomY: this.visibleY - 0.7,
+      anchorObj: this.el.object3D
+    };
+    info.items.push(item);
+    this.infoItem = item;
+    this.info = info;
+
+    this.stationMeshes = [];
+    this.el.object3D.traverse((node) => {
+      if (!node.isMesh) return;
+      node.userData.museoExhibitId = 'spaceMission';
+      this.stationMeshes.push(node);
+      info.selectableMeshes.push(node);
+    });
+    this.registered = true;
+    return true;
+  },
+
+  updateCables() {
+    if (!this.cables || !this.leftAnchor || !this.rightAnchor) return;
+    this.el.object3D.updateMatrixWorld(true);
+    this.leftAnchor.getWorldPosition(this.leftPosition);
+    this.rightAnchor.getWorldPosition(this.rightPosition);
+    const p = this.cablePositions;
+    p.set([
+      this.leftPosition.x, this.ceilingY, this.leftPosition.z,
+      this.leftPosition.x, this.leftPosition.y, this.leftPosition.z,
+      this.rightPosition.x, this.ceilingY, this.rightPosition.z,
+      this.rightPosition.x, this.rightPosition.y, this.rightPosition.z
+    ]);
+    this.cables.geometry.attributes.position.needsUpdate = true;
+    this.cables.geometry.computeBoundingSphere();
+  },
+
+  tick(time, delta) {
+    if (!this.ready) return;
+    const rig = document.getElementById('rig');
+    if (!rig) return;
+
+    if (time >= this.nextDistanceCheck) {
+      this.nextDistanceCheck = time + 100;
+      rig.object3D.getWorldPosition(this.rigPosition);
+      const distance = Math.hypot(
+        this.rigPosition.x - this.basePosition.x,
+        this.rigPosition.z - this.basePosition.z
+      );
+      if (!this.active && distance <= this.data.trigger) {
+        this.active = true;
+        this.el.object3D.visible = true;
+        if (this.cables) this.cables.visible = true;
+      } else if (this.active && distance >= this.data.release) {
+        this.active = false;
+      }
+    }
+
+    const seconds = Math.min(0.05, (delta || 0) / 1000);
+    const direction = this.active ? 1 : -1;
+    this.progress = THREE.MathUtils.clamp(
+      this.progress + direction * seconds / Math.max(0.25, this.data.duration),
+      0,
+      1
+    );
+    const eased = this.progress * this.progress * (3 - 2 * this.progress);
+    const hovered = this.info && this.info.hoverId === 'spaceMission';
+    this.hoverT += ((hovered ? 1 : 0) - this.hoverT) * 0.10;
+    const settled = eased > 0.92 ? (eased - 0.92) / 0.08 : 0;
+    const bob = settled * Math.sin(time * 0.00135) * 0.035;
+    const yawDrift = settled * Math.sin(time * 0.00048) * 0.045;
+
+    this.el.object3D.position.set(
+      this.basePosition.x,
+      THREE.MathUtils.lerp(this.hiddenY, this.visibleY, eased) + bob,
+      this.basePosition.z
+    );
+    this.el.object3D.rotation.y = this.baseYaw + yawDrift;
+    const scale = this.data.modelScale * (0.88 + 0.12 * eased) * (1 + this.hoverT * 0.025);
+    this.el.object3D.scale.setScalar(scale);
+
+    if (this.greenGlow) this.greenGlow.intensity = eased * (0.62 + this.hoverT * 0.45);
+    if (this.cables) {
+      this.cables.visible = this.progress > 0.005;
+      this.cableMaterial.opacity = eased * 0.82;
+      this.updateCables();
+    }
+
+    if (!this.active && this.progress <= 0.001) {
+      this.el.object3D.visible = false;
+      if (this.cables) this.cables.visible = false;
+    }
+  },
+
+  remove() {
+    this.el.removeEventListener('model-loaded', this.onModelLoaded);
+    const museum = document.getElementById('modelo');
+    if (museum) museum.removeEventListener('museo-modules-loaded', this.onMuseumLoaded);
+    if (this.cables && this.cables.parent) this.cables.parent.remove(this.cables);
+    if (this.cables) this.cables.geometry.dispose();
+    if (this.cableMaterial) this.cableMaterial.dispose();
+    if (this.info && this.stationMeshes) {
+      this.info.selectableMeshes = this.info.selectableMeshes.filter((mesh) => !this.stationMeshes.includes(mesh));
+      this.info.items = this.info.items.filter((item) => item.id !== 'spaceMission');
+    }
   }
 });
 
