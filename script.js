@@ -1341,6 +1341,27 @@ AFRAME.registerComponent('exhibit-info', {
   },
 
   /*
+    Normal real de la pared mas cercana a "pos", apuntando hacia DENTRO de
+    la sala (perpendicular a esa pared, no hacia un punto de mira que
+    cambia con la posicion de cada pieza -- ver nota en setupWindowTag).
+    Usa el rectangulo real de la sala (MUSEO_BOUNDS): la pared mas cercana
+    es la que tiene menor distancia a cualquiera de sus 4 lados.
+  */
+  wallFacingDir(pos) {
+    const bounds = window.MUSEO_BOUNDS;
+    if (!bounds) return { x: 0, z: -1 };
+    const dLeft = pos.x - bounds.minX;
+    const dRight = bounds.maxX - pos.x;
+    const dNear = pos.z - bounds.minZ;
+    const dFar = bounds.maxZ - pos.z;
+    const min = Math.min(dLeft, dRight, dNear, dFar);
+    if (min === dRight) return { x: -1, z: 0 };
+    if (min === dLeft) return { x: 1, z: 0 };
+    if (min === dFar) return { x: 0, z: -1 };
+    return { x: 0, z: 1 };
+  },
+
+  /*
     Placa fisica de pared para las ventanas de la Sala 2 (openable:true):
     misma familia visual que las placas de peana (papel, sin cristal, sin
     resplandor permanente), pero plana -- aqui no hay ninguna peana
@@ -1355,17 +1376,17 @@ AFRAME.registerComponent('exhibit-info', {
     pasar el cursor, sin codigo nuevo en tick().
   */
   setupWindowTag(it) {
-    let dirX = 0, dirZ = -1;
-    const spawn = window.MUSEO_SPAWN;
-    const bounds = window.MUSEO_BOUNDS;
-    let tx = null, tz = null;
-    if (spawn && typeof spawn.x === 'number') { tx = spawn.x; tz = spawn.z; }
-    else if (bounds) { tx = (bounds.minX + bounds.maxX) / 2; tz = (bounds.minZ + bounds.maxZ) / 2; }
-    if (tx !== null) {
-      const dx = tx - it.pos.x, dz = tz - it.pos.z;
-      const len = Math.hypot(dx, dz);
-      if (len > 0.001) { dirX = dx / len; dirZ = dz / len; }
-    }
+    // Antes: direccion "hacia el punto de partida del visitante". Esa
+    // formula da un angulo DISTINTO por cada ventana (varia con su z),
+    // asi que ninguna quedaba realmente paralela al muro -- de ahi el
+    // aspecto "de lado" reportado. Las 6 ventanas estan en el MISMO muro
+    // real (confirmado por geometria: todas caen del lado x>=1.2 del
+    // recinto), asi que lo correcto es la normal real de ESE muro
+    // (perpendicular, hacia dentro de la sala), no un punto de mira que
+    // cambia con la posicion de cada pieza. wallFacingDir() calcula esa
+    // normal real a partir del rectangulo de la sala (MUSEO_BOUNDS).
+    const dir = this.wallFacingDir(it.pos);
+    const dirX = dir.x, dirZ = dir.z;
     const yaw = Math.atan2(dirX, dirZ);
 
     const OFFSET = 0.05;                                   // separada del marco, no pegada
@@ -1998,16 +2019,19 @@ AFRAME.registerComponent('reactor-control', {
     // comparte entre sus mallas), asi que basta con encontrar cada uno una
     // vez y guardar su intensidad/opacidad de fabrica como "base": los
     // botones solo escalan esa base, nunca la sustituyen.
-    let bubbleMat = null, liquidMat = null;
+    let bubbleMat = null, liquidMat = null, liquidMesh = null;
     mesh.traverse((o) => {
       if (!o.isMesh || !o.material) return;
       if (o.material.name === 'Bioreactor_Bubble' && !bubbleMat) bubbleMat = o.material;
-      if (o.material.name === 'Bioreactor_Liquid' && !liquidMat) liquidMat = o.material;
+      if (o.material.name === 'Bioreactor_Liquid' && !liquidMat) { liquidMat = o.material; liquidMesh = o; }
     });
     this.bubbleMat = bubbleMat;
     this.liquidMat = liquidMat;
     this.bubbleBase = bubbleMat ? { i: bubbleMat.emissiveIntensity, o: bubbleMat.opacity } : null;
     this.liquidBase = liquidMat ? { i: liquidMat.emissiveIntensity, o: liquidMat.opacity } : null;
+    // altura real de la superficie del cultivo (malla Bioreactor_Liquid_Obj),
+    // punto de llegada de las gotas de NUTRIENTS -- ver buildNutrientParticles.
+    this.liquidTopY = liquidMesh ? new THREE.Box3().setFromObject(liquidMesh).max.y : null;
 
     // Foco de exposicion que exhibit-lighting ya crea sobre PEANA_Bioreactor.
     const lightingComp = this.el.components['exhibit-lighting'];
@@ -2027,30 +2051,40 @@ AFRAME.registerComponent('reactor-control', {
     this.curLiquidI = this.targetLiquidI;
     this.applyReactorState();
 
+    this.buildNutrientParticles(mesh);
     this.buildControlStand();
     console.log('[reactor-control] listo -- estado 0 (reactor inactivo)');
   },
 
   /*
     Estado 0..1 de cada variable, a partir de que botones estan activados.
-    Cada boton SUMA a la mezcla en vez de fijar un valor unico: asi
-    LIGHT+NUTRIENTS (que comparten el brillo del liquido) se notan los dos,
-    y el boton final (ACTIVATE) da un ultimo empujon modesto de conjunto en
-    vez de un efecto nuevo y desconectado del resto.
+    Cada boton tiene ahora su PROPIO canal visual, sin compartir variable
+    con ningun otro (antes NUTRIENTS subia el mismo brillo del liquido que
+    LIGHT, y no se notaba como un efecto distinto):
+      01 LIGHT      -> foco de exposicion + brillo emisivo del liquido
+                       (iluminacion, tanto de la sala como del cultivo)
+      02 FLOW       -> intensidad/opacidad de las burbujas (la animacion de
+                       circulacion ya esta horneada y corre siempre; FLOW la
+                       hace notoria en vez de crearla)
+      03 NUTRIENTS  -> canal totalmente aparte, sin material: ver
+                       buildNutrientParticles/updateNutrientParticles
+                       (gotas visibles bajando por el tubo real del reactor)
+      04 ACTIVATE   -> un unico refuerzo modesto (activeBoost) aplicado
+                       sobre los tres canales anteriores, nunca un efecto
+                       nuevo y desconectado del resto.
   */
   recomputeTargets() {
     const s = this.stage;
     const activeBoost = s.active ? 1.12 : 1;
 
-    this.targetSpot = this.spotBase * (0.42 + (s.light ? 0.58 : 0)) * (s.active ? activeBoost : 1);
+    this.targetSpot = this.spotBase * (0.42 + (s.light ? 0.58 : 0)) * activeBoost;
+    const liquidIFrac = 0.30 + (s.light ? 0.55 : 0);
+    this.targetLiquidI = this.liquidBase ? this.liquidBase.i * liquidIFrac * activeBoost : 0;
 
-    const bubbleIFrac = 0.28 + (s.flow ? 0.72 : 0);
-    const bubbleOFrac = 0.55 + (s.flow ? 0.45 : 0);
+    const bubbleIFrac = 0.22 + (s.flow ? 0.78 : 0);
+    const bubbleOFrac = 0.45 + (s.flow ? 0.55 : 0);
     this.targetBubbleI = this.bubbleBase ? this.bubbleBase.i * bubbleIFrac * activeBoost : 0;
     this.targetBubbleO = this.bubbleBase ? Math.min(1, this.bubbleBase.o * bubbleOFrac) : 0;
-
-    const liquidIFrac = 0.30 + (s.light ? 0.35 : 0) + (s.nutrients ? 0.35 : 0);
-    this.targetLiquidI = this.liquidBase ? this.liquidBase.i * liquidIFrac * activeBoost : 0;
   },
 
   applyReactorState() {
@@ -2060,25 +2094,180 @@ AFRAME.registerComponent('reactor-control', {
   },
 
   /*
+    03 NUTRIENTS necesita un efecto propio, visualmente distinto de LIGHT y
+    FLOW -- el brief pide "pequeñas particulas o puntos entrando en el
+    cultivo". En vez de inventar un elemento nuevo, se reutiliza una pieza
+    real que ya trae el reactor: Bioreactor_CenterTube, el tubo que baja
+    desde la tapa hasta el liquido (confirmado por inspeccion del glTF).
+    Unas gotas pequeñas, del mismo color que las burbujas reales
+    (Bioreactor_Bubble), descienden por ese tubo hasta la superficie real
+    del cultivo (this.liquidTopY) y se funden en el. Nada de particulas
+    genericas flotando en el aire: el recorrido es la pieza fisica real.
+  */
+  buildNutrientParticles(mesh) {
+    this.nutrientDots = [];
+    const anchor = mesh.getObjectByName('Bioreactor_CenterTube') || mesh.getObjectByName('Bioreactor_InletValve');
+    if (!anchor) return;
+    const box = new THREE.Box3().setFromObject(anchor);
+    const cx = (box.min.x + box.max.x) / 2;
+    const cz = (box.min.z + box.max.z) / 2;
+    const topY = box.max.y;
+    const bottomY = (this.liquidTopY !== null && this.liquidTopY < topY) ? this.liquidTopY : box.min.y;
+
+    const dotColor = (this.bubbleMat && this.bubbleMat.color) ? this.bubbleMat.color.clone() : new THREE.Color(0xffffff);
+    const dotEmissive = (this.bubbleMat && this.bubbleMat.emissive) ? this.bubbleMat.emissive.clone() : dotColor.clone();
+
+    const group = new THREE.Group();
+    group.name = 'reactor-nutrient-dots';
+    const N = 6;
+    for (let i = 0; i < N; i++) {
+      const mat = new THREE.MeshStandardMaterial({
+        color: dotColor, emissive: dotEmissive, emissiveIntensity: 1.1,
+        roughness: 0.3, metalness: 0, transparent: true, opacity: 0, depthWrite: false
+      });
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.009, 6, 6), mat);
+      dot.position.set(cx, topY, cz);
+      group.add(dot);
+      this.nutrientDots.push({ mat, mesh: dot, phase: i / N });
+    }
+    this.nutrientTravel = { topY, bottomY, cx, cz };
+    // al espacio de mundo directamente (igual que las cartelas): ya viene
+    // medido en coordenadas reales, no debe heredar la escala de #modelo.
+    this.el.sceneEl.object3D.add(group);
+    this.nutrientGroup = group;
+  },
+
+  /*
+    Bucle de caida de las gotas de nutrientes: solo se mueven/se ven cuando
+    NUTRIENTS esta activo (si no, se desvanecen a opacidad 0 y quedan
+    quietas). Cada gota cae en bucle desde el tubo hasta la superficie real
+    del liquido, con una fase distinta para que no caigan todas a la vez.
+    ACTIVATE les da el mismo empujon sutil que al resto (mas visibles), sin
+    crear una cuarta variable independiente.
+  */
+  updateNutrientParticles(time) {
+    if (!this.nutrientDots || !this.nutrientDots.length) return;
+    const active = this.stage.nutrients;
+    const boost = this.stage.active ? 1.25 : 1;
+    const travel = this.nutrientTravel;
+    const period = 2.0;
+    const t = (time || 0) / 1000;
+    this.nutrientDots.forEach((d) => {
+      if (!active) {
+        d.mat.opacity += (0 - d.mat.opacity) * 0.08;
+        return;
+      }
+      const cycle = ((t / period) + d.phase) % 1;
+      d.mesh.position.set(travel.cx, THREE.MathUtils.lerp(travel.topY, travel.bottomY, cycle), travel.cz);
+      const fadeIn = Math.min(1, cycle / 0.18);
+      const fadeOut = Math.min(1, (1 - cycle) / 0.30);
+      const target = Math.min(fadeIn, fadeOut) * 0.85 * boost;
+      d.mat.opacity += (target - d.mat.opacity) * 0.25;
+    });
+  },
+
+  /*
+    Ajuste de un plano (y = a*x + b*z + c) por minimos cuadrados a la nube
+    de puntos del remate superior de una malla REAL, en espacio de mundo
+    (matrixWorld, que ya lleva aplicada la escala no uniforme del museo).
+    Un Box3 es siempre recto -- no puede revelar que un remate esta
+    inclinado. Muestreando la geometria real se obtiene la normal real de
+    esa superficie, se este inclinada o no. Se usa para apoyar el panel de
+    control EN el remate real de PEANA_Alta_B (que resulto tener ~15° de
+    inclinacion), en vez de adivinar que es plano y horizontal.
+  */
+  computeTopSurface(obj) {
+    let target = obj;
+    if (!target.isMesh) {
+      target = null;
+      obj.traverse((o) => { if (!target && o.isMesh) target = o; });
+    }
+    if (!target || !target.geometry || !target.geometry.attributes.position) return null;
+    target.updateWorldMatrix(true, false);
+    const posAttr = target.geometry.attributes.position;
+    const world = target.matrixWorld;
+    const pts = [];
+    const v = new THREE.Vector3();
+    let minY = Infinity, maxY = -Infinity;
+    for (let i = 0; i < posAttr.count; i++) {
+      v.fromBufferAttribute(posAttr, i).applyMatrix4(world);
+      pts.push(v.clone());
+      if (v.y < minY) minY = v.y;
+      if (v.y > maxY) maxY = v.y;
+    }
+    // solo la "tapa" superior (80% mas alto), para no mezclar los lados
+    // verticales de la peana con su remate real.
+    const thresh = minY + (maxY - minY) * 0.80;
+    const top = pts.filter((p) => p.y > thresh);
+    if (top.length < 8) return null;
+
+    let Sxx = 0, Sxz = 0, Szz = 0, Sxy = 0, Szy = 0, Sx = 0, Sz = 0, Sy = 0;
+    const n = top.length;
+    top.forEach((p) => {
+      Sxx += p.x * p.x; Sxz += p.x * p.z; Szz += p.z * p.z;
+      Sxy += p.x * p.y; Szy += p.z * p.y;
+      Sx += p.x; Sz += p.z; Sy += p.y;
+    });
+    // [Sxx Sxz Sx; Sxz Szz Sz; Sx Sz n] * [a;b;c] = [Sxy;Szy;Sy]
+    const M = [[Sxx, Sxz, Sx], [Sxz, Szz, Sz], [Sx, Sz, n]];
+    const R = [Sxy, Szy, Sy];
+    for (let i = 0; i < 3; i++) {
+      let piv = i;
+      for (let k = i + 1; k < 3; k++) if (Math.abs(M[k][i]) > Math.abs(M[piv][i])) piv = k;
+      if (piv !== i) { [M[i], M[piv]] = [M[piv], M[i]]; [R[i], R[piv]] = [R[piv], R[i]]; }
+      if (Math.abs(M[i][i]) < 1e-9) return null;
+      for (let k = i + 1; k < 3; k++) {
+        const f = M[k][i] / M[i][i];
+        for (let j = i; j < 3; j++) M[k][j] -= f * M[i][j];
+        R[k] -= f * R[i];
+      }
+    }
+    const abc = [0, 0, 0];
+    for (let i = 2; i >= 0; i--) {
+      let s = R[i];
+      for (let j = i + 1; j < 3; j++) s -= M[i][j] * abc[j];
+      abc[i] = s / M[i][i];
+    }
+    const normal = new THREE.Vector3(-abc[0], 1, -abc[1]).normalize();
+    if (normal.y < 0) normal.negate();
+    const centroid = new THREE.Vector3(Sx / n, Sy / n, Sz / n);
+    return { normal, centroid, topY: maxY };
+  },
+
+  /*
     Estacion de control: una unica placa (misma familia visual que las
     cartelas del resto del museo -- papel, sin cristal, sin resplandor
-    permanente) pegada al frente de PEANA_Alta_B, con el titulo pequeño, la
-    instruccion y los 4 botones en fila. Nada de esto es un panel flotante
-    de HTML: es señaletica fisica, como el resto de la Sala 1.
+    permanente), apoyada PLANA sobre el remate real de PEANA_Alta_B (no de
+    pie a su lado como antes). computeTopSurface() mide la inclinacion real
+    de ese remate y el panel se orienta exactamente con ella: su eje Z local
+    (la cara con texto/botones) queda alineado con la normal real medida,
+    su centro coincide con el centro real de esa superficie, y su eje
+    "arriba" es la proyeccion sobre ese mismo plano de la direccion generica
+    hacia el punto de partida del visitante (para que el texto quede leible
+    de frente, en el angulo real de la piedra, no vertical).
   */
   buildControlStand() {
     const mesh = this.el.object3D;
     const standObj = mesh.getObjectByName('PEANA_Alta_B');
     if (!standObj) { console.warn('[reactor-control] no se encontro PEANA_Alta_B'); return; }
 
-    const box = new THREE.Box3().setFromObject(standObj);
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    const topY = box.max.y;
-    const approxRadius = Math.max(size.x, size.z) / 2;
+    const top = this.computeTopSurface(standObj);
+    let origin, zAxis;
+    if (top) {
+      origin = top.centroid;
+      zAxis = top.normal;
+    } else {
+      // red de seguridad si la malla no trae geometria legible: se apoya
+      // sobre el techo recto del Box3, normal vertical.
+      const box = new THREE.Box3().setFromObject(standObj);
+      origin = box.getCenter(new THREE.Vector3());
+      origin.y = box.max.y;
+      zAxis = new THREE.Vector3(0, 1, 0);
+    }
 
-    // misma formula ya usada en todo el museo: direccion generica hacia el
-    // punto de partida del visitante, tangente/frontal a la pieza.
+    // misma formula generica de siempre ("hacia el punto de partida del
+    // visitante"), pero proyectada sobre el plano real -- da el eje
+    // "arriba" del panel, no su normal.
     let dirX = 0, dirZ = 1;
     const spawn = window.MUSEO_SPAWN;
     const bounds = window.MUSEO_BOUNDS;
@@ -2086,22 +2275,31 @@ AFRAME.registerComponent('reactor-control', {
     if (spawn && typeof spawn.x === 'number') { tx = spawn.x; tz = spawn.z; }
     else if (bounds) { tx = (bounds.minX + bounds.maxX) / 2; tz = (bounds.minZ + bounds.maxZ) / 2; }
     if (tx !== null) {
-      const dx = tx - center.x, dz = tz - center.z;
+      const dx = tx - origin.x, dz = tz - origin.z;
       const len = Math.hypot(dx, dz);
       if (len > 0.001) { dirX = dx / len; dirZ = dz / len; }
     }
-    const yaw = Math.atan2(dirX, dirZ);
+    let yAxis = new THREE.Vector3(dirX, 0, dirZ);
+    yAxis.addScaledVector(zAxis, -yAxis.dot(zAxis));
+    if (yAxis.lengthSq() < 1e-6) yAxis.set(0, 1, 0).addScaledVector(zAxis, -zAxis.y);
+    yAxis.normalize();
+    const xAxis = new THREE.Vector3().crossVectors(yAxis, zAxis).normalize();
+    yAxis.crossVectors(zAxis, xAxis).normalize();
 
-    const OFFSET = approxRadius + 0.01;
-    const px = center.x + dirX * OFFSET;
-    const pz = center.z + dirZ * OFFSET;
-    const py = topY - 0.24;   // tercio superior del frente de la peana
+    const basis = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
+    const quat = new THREE.Quaternion().setFromRotationMatrix(basis);
+
+    const STANDOFF = 0.006;   // apenas separado de la piedra, sin flotar
+    const pos = origin.clone().addScaledVector(zAxis, STANDOFF);
 
     const wrapper = document.createElement('a-entity');
-    wrapper.object3D.position.set(px, py, pz);
-    wrapper.object3D.rotation.set(0, yaw, 0);
+    wrapper.object3D.position.copy(pos);
+    wrapper.object3D.quaternion.copy(quat);
 
-    const WIDTH = 0.60, HEIGHT = 0.40;
+    // panel mas compacto que el cartel vertical anterior: apoyado plano
+    // sobre el remate real, su "alto" ahora corre a lo largo de la
+    // pendiente medida (mas corta que la altura libre que tenia de pie).
+    const WIDTH = 0.50, HEIGHT = 0.30;
     const exhibitInfo = this.el.components['exhibit-info'];
     const paperTex = exhibitInfo && exhibitInfo.getPlacardPaperTexture
       ? exhibitInfo.getPlacardPaperTexture() : null;
@@ -2122,21 +2320,21 @@ AFRAME.registerComponent('reactor-control', {
     heading.setAttribute('value', 'BUILD A BIOPROCESS');
     heading.setAttribute('align', 'center');
     heading.setAttribute('baseline', 'center');
-    heading.setAttribute('width', 0.52);
-    heading.setAttribute('wrap-count', 24);
+    heading.setAttribute('width', 0.44);
+    heading.setAttribute('wrap-count', 20);
     heading.setAttribute('letter-spacing', 1);
     heading.setAttribute('color', '#74349A');
-    heading.object3D.position.set(0, HEIGHT / 2 - 0.045, TEXT_Z);
+    heading.object3D.position.set(0, HEIGHT / 2 - 0.034, TEXT_Z);
     wrapper.appendChild(heading);
 
     const instruction = document.createElement('a-text');
     instruction.setAttribute('value', 'Activate the reactor step by step.');
     instruction.setAttribute('align', 'center');
     instruction.setAttribute('baseline', 'center');
-    instruction.setAttribute('width', 0.46);
-    instruction.setAttribute('wrap-count', 34);
+    instruction.setAttribute('width', 0.38);
+    instruction.setAttribute('wrap-count', 28);
     instruction.setAttribute('color', '#201A1E');
-    instruction.object3D.position.set(0, HEIGHT / 2 - 0.09, TEXT_Z);
+    instruction.object3D.position.set(0, HEIGHT / 2 - 0.068, TEXT_Z);
     wrapper.appendChild(instruction);
 
     // fila de 4 botones, centrada, con espacio uniforme
@@ -2146,10 +2344,10 @@ AFRAME.registerComponent('reactor-control', {
       { id: 'nutrients', num: '03', label: 'NUTRIENTS' },
       { id: 'active', num: '04', label: 'ACTIVATE' }
     ];
-    const spacing = 0.15;
+    const spacing = 0.11;
     const startX = -spacing * (defs.length - 1) / 2;
-    const BTN_Y = -0.03;
-    const BTN_R = 0.042;
+    const BTN_Y = -0.02;
+    const BTN_R = 0.035;
 
     defs.forEach((d, i) => {
       const bx = startX + i * spacing;
@@ -2170,21 +2368,21 @@ AFRAME.registerComponent('reactor-control', {
       num.setAttribute('value', d.num);
       num.setAttribute('align', 'center');
       num.setAttribute('baseline', 'center');
-      num.setAttribute('width', 0.09);
+      num.setAttribute('width', 0.075);
       num.setAttribute('wrap-count', 2);
       num.setAttribute('color', '#74349A');
-      num.object3D.position.set(bx, BTN_Y + 0.075, TEXT_Z);
+      num.object3D.position.set(bx, BTN_Y + 0.056, TEXT_Z);
       wrapper.appendChild(num);
 
       const label = document.createElement('a-text');
       label.setAttribute('value', d.label);
       label.setAttribute('align', 'center');
       label.setAttribute('baseline', 'center');
-      label.setAttribute('width', 0.14);
-      label.setAttribute('wrap-count', 10);
+      label.setAttribute('width', 0.115);
+      label.setAttribute('wrap-count', 8);
       label.setAttribute('letter-spacing', 0.5);
       label.setAttribute('color', '#201A1E');
-      label.object3D.position.set(bx, BTN_Y - 0.075, TEXT_Z);
+      label.object3D.position.set(bx, BTN_Y - 0.056, TEXT_Z);
       wrapper.appendChild(label);
 
       this.buttons.push({ id: d.id, mesh: btn, material, baseEmissive: material.emissiveIntensity });
@@ -2192,9 +2390,9 @@ AFRAME.registerComponent('reactor-control', {
     });
 
     // igual que las cartelas de peana/ventana: se cuelga directamente del
-    // escenario (sin escala), asi que px/py/pz -- ya en espacio de mundo,
-    // medidos con Box3 sobre la peana ya reescalada -- no se vuelven a
-    // reescalar por error al colgarlo bajo #modelo (que si tiene escala).
+    // escenario (sin escala), asi que pos/quat -- ya en espacio de mundo,
+    // medidos sobre la peana ya reescalada -- no se vuelven a reescalar por
+    // error al colgarlo bajo #modelo (que si tiene escala).
     this.el.sceneEl.appendChild(wrapper);
     this.wrapper = wrapper;
   },
@@ -2236,6 +2434,7 @@ AFRAME.registerComponent('reactor-control', {
     this.curBubbleO += (this.targetBubbleO - this.curBubbleO) * speed;
     this.curLiquidI += (this.targetLiquidI - this.curLiquidI) * speed;
     this.applyReactorState();
+    this.updateNutrientParticles(time);
 
     // hover de los 4 botones: mismo lenguaje que el resto del museo (escala
     // + brillo muy sutiles), leyendo el hoverId que ya calcula exhibit-info.
