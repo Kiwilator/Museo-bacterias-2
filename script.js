@@ -1362,7 +1362,7 @@ AFRAME.registerComponent('exhibit-info', {
       new THREE.PlaneGeometry(0.34, 0.20),
       new THREE.MeshBasicMaterial({
         map: this.getPopupGlowTexture(), transparent: true, opacity: 0,
-        depthWrite: false, toneMapped: false, side: THREE.DoubleSide
+        color: 0xe6d8c2, depthWrite: false, toneMapped: false, side: THREE.DoubleSide
       })
     );
     wrapper.object3D.add(bg);
@@ -1488,13 +1488,24 @@ AFRAME.registerComponent('exhibit-info', {
       }
 
       if (it.label) {
-        const bgOpacity = it.labelOpacity * (isPopup ? 0.60 : 0.82);
+        // En el popup pequeño, el hover ademas crece un poco y se aclara
+        // hacia blanco -- señal clara de "esto es seleccionable" sin tocar
+        // el tamaño de letra ni añadir movimiento brusco.
+        const bgOpacity = isPopup
+          ? it.labelOpacity * (0.55 + it.hoverT * 0.35)
+          : it.labelOpacity * 0.82;
         const textOpacity = it.labelOpacity * (isPopup ? 0.95 : 0.9);
         const cueOpacity = isPopup
           ? it.labelOpacity * 0.75
           : it.labelOpacity * (0.82 + it.hoverT * 0.18);  // "VIEW +" algo mas brillante en hover
         if (isPopup) {
           it.label.bg.material.opacity = bgOpacity;
+          if (!this._popupBaseColor) {
+            this._popupBaseColor = new THREE.Color(0xe6d8c2);
+            this._popupHoverColor = new THREE.Color(0xffffff);
+          }
+          it.label.bg.material.color.copy(this._popupBaseColor).lerp(this._popupHoverColor, it.hoverT);
+          it.label.wrapper.object3D.scale.setScalar(1 + it.hoverT * 0.12);
         } else {
           it.label.bg.setAttribute('material', 'opacity', bgOpacity);
         }
@@ -1722,6 +1733,60 @@ AFRAME.registerComponent('image-windows', {
       puestas++;
     });
     console.log(`[image-windows] ${puestas} vitrinas de imagen`);
+  }
+});
+
+/*
+  Tres acentos puntuales, sin sombra, tomados de la version antigua del
+  proyecto -- son luces reales (THREE.PointLight), no un cambio de
+  material, asi que no tocan el color/emisivo de ningun objeto. Dan
+  movimiento muy sutil (pulso lento) a la sala sin coste de un mapa de
+  sombras adicional: la directional sigue siendo la unica fuente de sombra
+  real.
+*/
+AFRAME.registerComponent('mood-lighting', {
+  init() {
+    this.accentLights = [];
+    this.nextPulse = 0;
+    this.el.addEventListener('museo-modules-loaded', () => this.onLoaded());
+  },
+  onLoaded() {
+    const root = this.el.object3D;
+    const bounds = window.MUSEO_BOUNDS;
+    const spawn = window.MUSEO_SPAWN;
+    if (!bounds || !spawn) return;
+    const cx = (bounds.minX + bounds.maxX) * 0.5;
+    const cz = (bounds.minZ + bounds.maxZ) * 0.5;
+    const sideOffset = (bounds.maxX - bounds.minX) * 0.26;
+    const accents = [
+      { x: cx - sideOffset, y: spawn.y + 2.65, z: cz, color: 0xa74cff, intensity: 1.00, distance: 4.8, phase: 0 },
+      { x: cx + sideOffset, y: spawn.y + 2.65, z: cz, color: 0x943cff, intensity: 0.96, distance: 4.8, phase: Math.PI },
+      { x: cx, y: spawn.y + 3.15, z: bounds.minZ + 0.8, color: 0xd7a4ff, intensity: 0.22, distance: 5.2, phase: Math.PI / 2 }
+    ];
+    accents.forEach((accent) => {
+      const local = new THREE.Vector3(accent.x, accent.y, accent.z);
+      root.worldToLocal(local);
+      const light = new THREE.PointLight(accent.color, accent.intensity, accent.distance, 2);
+      light.position.copy(local);
+      light.castShadow = false;
+      light.userData.baseIntensity = accent.intensity;
+      light.userData.phase = accent.phase;
+      root.add(light);
+      this.accentLights.push(light);
+    });
+    console.log(`[mood-lighting] ${this.accentLights.length} acentos violeta de bajo coste`);
+  },
+  tick(time) {
+    if (document.hidden || time < this.nextPulse) return;
+    this.nextPulse = time + 50;
+    const phase = time * 0.00042;
+    this.accentLights.forEach((light) => {
+      light.intensity = light.userData.baseIntensity * (0.93 + 0.07 * Math.sin(phase + light.userData.phase));
+    });
+  },
+  remove() {
+    this.accentLights.forEach((light) => { if (light.parent) light.parent.remove(light); });
+    this.accentLights.length = 0;
   }
 });
 
