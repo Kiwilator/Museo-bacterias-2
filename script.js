@@ -2810,7 +2810,7 @@ AFRAME.registerComponent('reactor-control', {
 
   drawControlPanelTexture() {
     if (!this.controlPanelCanvas) return;
-    const { c, ctx, tex, w: WPX, h: HPX, defs } = this.controlPanelCanvas;
+    const { ctx, tex, w: WPX, h: HPX, defs } = this.controlPanelCanvas;
 
     ctx.fillStyle = '#F7F4EE';
     ctx.fillRect(0, 0, WPX, HPX);
@@ -2827,7 +2827,7 @@ AFRAME.registerComponent('reactor-control', {
     const line = '#D8C7BE';
     const padX = WPX * 0.055;
     const topY = HPX * 0.18;
-    const activeMessage = this.controlMessage || 'Tap any control to change the bioreactor state.';
+    const activeMessage = this.controlMessage || 'Tap a control to learn how each process keeps the culture alive.';
 
     ctx.fillStyle = accent;
     ctx.fillRect(padX, HPX * 0.105, WPX - padX * 2, 8);
@@ -2852,9 +2852,9 @@ AFRAME.registerComponent('reactor-control', {
     const cols = defs.length;
     const usableW = WPX - padX * 2;
     const colW = usableW / cols;
-    const statusY = HPX * 0.39;
-    const buttonY = HPX * 0.51;
-    const labelY = HPX * 0.66;
+    const statusY = HPX * 0.365;
+    const buttonY = HPX * 0.49;
+    const labelY = HPX * 0.705;
     ctx.textAlign = 'center';
     defs.forEach((d, i) => {
       const x = padX + colW * (i + 0.5);
@@ -2865,7 +2865,7 @@ AFRAME.registerComponent('reactor-control', {
       if (i > 0) {
         ctx.beginPath();
         ctx.moveTo(x - colW * 0.5, HPX * 0.315);
-        ctx.lineTo(x - colW * 0.5, HPX * 0.72);
+        ctx.lineTo(x - colW * 0.5, HPX * 0.735);
         ctx.stroke();
       }
 
@@ -2896,16 +2896,34 @@ AFRAME.registerComponent('reactor-control', {
     });
 
     ctx.fillStyle = '#EFE7DF';
-    ctx.fillRect(padX, HPX * 0.79, WPX - padX * 2, HPX * 0.115);
+    ctx.fillRect(padX, HPX * 0.795, WPX - padX * 2, HPX * 0.145);
     ctx.fillStyle = accent;
-    ctx.fillRect(padX, HPX * 0.79, 10, HPX * 0.115);
+    ctx.fillRect(padX, HPX * 0.795, 12, HPX * 0.145);
     ctx.textAlign = 'left';
     ctx.fillStyle = ink;
-    ctx.font = '800 34px Arial, Helvetica, sans-serif';
-    ctx.fillText(activeMessage, padX + 34, HPX * 0.85);
+    ctx.font = '900 34px Arial, Helvetica, sans-serif';
+    this.wrapCanvasText(ctx, activeMessage, padX + 40, HPX * 0.835, WPX - padX * 2 - 80, 42, 2);
 
     // fuerza la subida del canvas redibujado a la textura de Three.js.
     tex.needsUpdate = true;
+  },
+
+  wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+    const words = String(text || '').split(/\s+/).filter(Boolean);
+    let line = '';
+    let lines = 0;
+    words.forEach((word) => {
+      if (lines >= maxLines) return;
+      const test = line ? `${line} ${word}` : word;
+      if (ctx.measureText(test).width > maxWidth && line) {
+        ctx.fillText(line, x, y + lines * lineHeight);
+        lines += 1;
+        line = word;
+      } else {
+        line = test;
+      }
+    });
+    if (line && lines < maxLines) ctx.fillText(line, x, y + lines * lineHeight);
   },
 
   /*
@@ -2996,40 +3014,40 @@ AFRAME.registerComponent('reactor-control', {
       return Math.min(Math.max(preferred, Math.min(minimum, max)), max);
     };
     const WIDTH = (top && top.extentLong)
-      ? fitWithin(0.74, 0.62, top.extentLong * 0.94)
-      : 0.74;
+      ? fitWithin(0.80, 0.66, top.extentLong * 0.96)
+      : 0.80;
     const HEIGHT = (top && top.extentShort)
-      ? fitWithin(0.24, 0.18, top.extentShort * 0.82)
-      : 0.24;
+      ? fitWithin(0.31, 0.24, top.extentShort * 0.86)
+      : 0.31;
     const exhibitInfo = this.el.components['exhibit-info'];
     const defs = [
       {
         id: 'light', num: '01', label: 'LIGHT', symbol: 'LUX',
         off: 0xe8f7f5, on: 0x59e7e0,
-        onText: 'Light on: the culture receives photosynthetic energy.',
-        offText: 'Light off: the illumination fades back down.'
+        onText: 'LIGHT: photons feed photosynthesis, so bacteria can turn light into chemical energy.',
+        offText: 'LIGHT OFF: without photons, photosynthetic energy capture slows down.'
       },
       {
         id: 'flow', num: '02', label: 'FLOW', symbol: 'FLOW',
         off: 0xe5f3ef, on: 0x35d5d3,
-        onText: 'Flow on: circulation moves through the reactor.',
-        offText: 'Flow off: the liquid returns to a calm state.'
+        onText: 'FLOW: circulation mixes cells, gases and dissolved compounds so the culture stays even.',
+        offText: 'FLOW OFF: mixing stops, so gradients can form inside the reactor.'
       },
       {
-        id: 'nutrients', num: '03', label: 'NUTRIENTS', symbol: 'FEED',
+        id: 'nutrients', num: '03', label: 'FEED', symbol: 'FEED',
         off: 0xeaf4de, on: 0xa9dc69,
-        onText: 'Nutrients on: feeding raises the culture level.',
-        offText: 'Nutrients off: feeding particles disappear.'
+        onText: 'FEED: nutrients add carbon, nitrogen and minerals that cells use to build biomass.',
+        offText: 'FEED OFF: the culture keeps running, but no fresh nutrients enter.'
       },
       {
         id: 'active', num: '04', label: 'ACTIVATE', symbol: 'BIO',
         off: 0xeee4f4, on: 0xb06ce8,
-        onText: 'Activate on: bubbles reveal metabolic activity.',
-        offText: 'Activate off: the activity signal settles.'
+        onText: 'ACTIVATE: bubbles make metabolism visible as the living culture produces and exchanges gases.',
+        offText: 'ACTIVATE OFF: the metabolic signal quiets and the reactor returns to observation mode.'
       }
     ];
     this.controlDefs = defs;
-    this.controlMessage = 'Tap a control: the bioreactor reacts in real time.';
+    this.controlMessage = 'Tap a control to learn what that process does inside a photobioreactor.';
     const controlTex = this.buildControlPanelTexture(WIDTH, HEIGHT, defs);
     const panel = new THREE.Mesh(
       new THREE.PlaneGeometry(WIDTH, HEIGHT),
@@ -3042,13 +3060,14 @@ AFRAME.registerComponent('reactor-control', {
     // el panel de fondo no es "una pieza": no abre nada ni se registra en
     // selectableMeshes, solo los 4 botones son interactivos.
 
-    const BUTTON_Z = 0.008;
+    const BUTTON_Z = 0.014;
 
     const spacing = Math.min(WIDTH * 0.23, (WIDTH * 0.84) / (defs.length - 1));
     const startX = -spacing * (defs.length - 1) / 2;
-    const BTN_R = Math.min(HEIGHT * 0.115, WIDTH * 0.045);
-    const BTN_Y = -HEIGHT * 0.03;
-    const STATUS_Y = BTN_Y + BTN_R + HEIGHT * 0.12;
+    const BTN_R = Math.min(HEIGHT * 0.105, WIDTH * 0.043);
+    const BTN_DEPTH = HEIGHT * 0.055;
+    const BTN_Y = HEIGHT * 0.01;
+    const STATUS_Y = BTN_Y + BTN_R + HEIGHT * 0.15;
 
     defs.forEach((d, i) => {
       const bx = startX + i * spacing;
@@ -3068,12 +3087,15 @@ AFRAME.registerComponent('reactor-control', {
         emissiveIntensity: 0.04, roughness: 0.62, metalness: 0,
         transparent: true, opacity: 0.34, side: THREE.DoubleSide
       });
-      const ring = new THREE.Mesh(new THREE.RingGeometry(BTN_R * 1.10, BTN_R * 1.30, 36), ringMaterial);
-      ring.position.set(bx, BTN_Y, BUTTON_Z);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(BTN_R * 1.12, BTN_R * 1.34, 36), ringMaterial);
+      ring.position.set(bx, BTN_Y, BUTTON_Z - 0.004);
       wrapper.object3D.add(ring);
 
-      const btn = new THREE.Mesh(new THREE.CircleGeometry(BTN_R, 28), material);
-      btn.position.set(bx, BTN_Y, BUTTON_Z + 0.001);
+      const btn = new THREE.Mesh(new THREE.CylinderGeometry(BTN_R, BTN_R * 0.94, BTN_DEPTH, 36), material);
+      btn.rotation.x = Math.PI / 2;
+      const upZ = BUTTON_Z + BTN_DEPTH * 0.55;
+      const downZ = BUTTON_Z + BTN_DEPTH * 0.18;
+      btn.position.set(bx, BTN_Y, upZ);
       btn.userData.museoExhibitId = `reactorBtn_${d.id}`;   // para el hover (setHover)
       btn.userData.museoAction = () => this.onButtonClick(d.id);
       wrapper.object3D.add(btn);
@@ -3090,7 +3112,7 @@ AFRAME.registerComponent('reactor-control', {
 
       this.buttons.push({
         id: d.id, mesh: btn, material, ring, ringMaterial, status, statusMaterial,
-        offColor: d.off, onColor: d.on,
+        offColor: d.off, onColor: d.on, upZ, downZ, pressT: 0,
         baseEmissive: material.emissiveIntensity
       });
       this._hoverT[d.id] = 0;
@@ -3117,6 +3139,8 @@ AFRAME.registerComponent('reactor-control', {
     this.stage[id] = !this.stage[id];
     const def = this.controlDefs && this.controlDefs.find((d) => d.id === id);
     if (def) this.controlMessage = this.stage[id] ? def.onText : def.offText;
+    const button = this.buttons.find((b) => b.id === id);
+    if (button) button.pressT = 1;
     this.recomputeTargets();
     this.updateButtonLooks();
     this.drawControlPanelTexture();
@@ -3184,6 +3208,9 @@ AFRAME.registerComponent('reactor-control', {
       const scale = 1 + t * 0.12;
       b.mesh.scale.setScalar(scale);
       if (b.ring) b.ring.scale.setScalar(1 + t * 0.08);
+      const targetZ = (this.stage[b.id] ? b.downZ : b.upZ) - (b.pressT || 0) * 0.004;
+      b.mesh.position.z += (targetZ - b.mesh.position.z) * 0.32;
+      b.pressT = Math.max(0, (b.pressT || 0) - dt * 5.5);
       b.material.emissiveIntensity = b.baseEmissive * (1 + t * 0.6);
     });
   }
