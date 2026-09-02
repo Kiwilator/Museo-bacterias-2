@@ -3129,11 +3129,23 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     ctx.fillStyle = '#4FE4DC';
     ctx.fillRect(0, 0, 7, c.height);
     ctx.textAlign = 'left';
+    // El titulo cambia de longitud con el idioma ("ELECTRON UPTAKE" /
+    // "CAPTACION DE ELECTRONES"): el cuerpo se reduce hasta que la linea cabe
+    // de verdad en la etiqueta, en vez de salirse por el borde.
+    const fit = (text, weight, maxPx, boxW) => {
+      let size = maxPx;
+      ctx.font = `${weight} ${size}px Arial, Helvetica, sans-serif`;
+      while (size > 22 && ctx.measureText(text).width > boxW) {
+        size -= 2;
+        ctx.font = `${weight} ${size}px Arial, Helvetica, sans-serif`;
+      }
+    };
+    const boxW = c.width - 34 - 26;
     ctx.fillStyle = '#4FE4DC';
-    ctx.font = '900 52px Arial, Helvetica, sans-serif';
+    fit(this.getText('title'), 900, 52, boxW);
     ctx.fillText(this.getText('title'), 34, 84);
     ctx.fillStyle = 'rgba(247, 252, 250, 0.88)';
-    ctx.font = '700 44px Arial, Helvetica, sans-serif';
+    fit(this.getText('flow'), 700, 44, boxW);
     ctx.fillText(this.getText('flow'), 34, 150);
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
