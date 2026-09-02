@@ -11,6 +11,17 @@
 // Ver trySelect() mas abajo: es lo unico que distingue seleccionar una pieza
 // de simplemente mirar alrededor.
 const CLICK_MAX_MOVE_PX = 6;
+/*
+  El dedo nunca se queda tan quieto como el raton: un tap normal en pantalla
+  tactil se desplaza facilmente 10-15 px entre touchstart y touchend, asi que
+  con el umbral del raton (6 px) casi todos los toques se interpretaban como
+  arrastre de camara y la seleccion no llegaba a dispararse.
+*/
+const TAP_MAX_MOVE_PX = 16;
+// radio de tolerancia del dedo al apuntar: los controles del reactor son
+// piezas de ~3 cm y en un movil caen en muy pocos pixeles, demasiado poco
+// para un dedo. Ver trySelect().
+const TAP_TOLERANCE_PX = 18;
 const MUSEUM_LANGUAGE = window.MUSEUM_LANGUAGE || 'en';
 const museumText = (key) => window.getMuseumUiText ? window.getMuseumUiText(key) : key;
 
@@ -155,19 +166,32 @@ AFRAME.registerComponent('drag-look-controls', {
       this.pitch = THREE.MathUtils.clamp(this.pitch, -maxPitch, maxPitch);
       this.el.object3D.rotation.set(this.pitch, this.yaw, 0);
     };
-    const end = () => {
+    const end = (isTouch) => {
       this.dragging = false;
       canvas.style.cursor = 'grab';
       // Mismo gesto (mousedown/touchstart -> mouseup/touchend) que el drag-look,
       // pero si el puntero apenas se movio se interpreta como click/tap sobre
       // una pieza en vez de arrastre de camara -- ver CLICK_MAX_MOVE_PX arriba.
       const moved = Math.hypot(this.lastX - this.downX, this.lastY - this.downY);
-      if (moved < CLICK_MAX_MOVE_PX) this.trySelect(this.lastX, this.lastY);
+      const slop = isTouch ? TAP_MAX_MOVE_PX : CLICK_MAX_MOVE_PX;
+      if (moved < slop) this.trySelect(this.lastX, this.lastY, !!isTouch);
     };
 
-    this.onMouseDown = (e) => { if (e.button === 0) start(e.clientX, e.clientY); };
-    this.onMouseMove = (e) => move(e.clientX, e.clientY);
-    this.onMouseUp = () => end();
+    /*
+      MOVIL -- causa real de que los controles del reactor "no funcionaran":
+      despues de cada touchend el navegador emite ademas mousedown/mouseup de
+      compatibilidad sobre el mismo punto. El gesto llegaba entonces por las
+      DOS vias y trySelect() se ejecutaba dos veces por cada toque: el boton
+      se encendia y se apagaba dentro del mismo tap, asi que en pantalla no
+      cambiaba nada. Aqui se marca el instante del ultimo toque y se ignora
+      cualquier evento de raton que llegue justo detras.
+    */
+    this._lastTouchAt = 0;
+    const echoOfTouch = () => (Date.now() - this._lastTouchAt) < 900;
+
+    this.onMouseDown = (e) => { if (e.button === 0 && !echoOfTouch()) start(e.clientX, e.clientY); };
+    this.onMouseMove = (e) => { if (!echoOfTouch()) move(e.clientX, e.clientY); };
+    this.onMouseUp = () => { if (!echoOfTouch()) end(false); };
 
     /*
       Toque en movil: se identifica el "dedo de mirar" por su touch.identifier
@@ -188,7 +212,20 @@ AFRAME.registerComponent('drag-look-controls', {
     */
     this._touchId = null;
     this.onTouchStart = (e) => {
-      if (this._touchId !== null) return;   // ya hay un toque de "mirar" en curso
+      this._lastTouchAt = Date.now();
+      // Red de seguridad: si un gesto anterior se quedo "colgado" (por ejemplo
+      // un touchcancel del sistema que no llego a cerrarse) y ya no queda
+      // ningun dedo del gesto anterior en pantalla, se descarta ese id en vez
+      // de bloquear para siempre tanto el mirar como el tap.
+      if (this._touchId !== null) {
+        let alive = false;
+        for (let i = 0; i < e.touches.length; i++) {
+          if (e.touches[i].identifier === this._touchId) { alive = true; break; }
+        }
+        if (alive) return;                  // ya hay un toque de "mirar" en curso
+        this._touchId = null;
+        this.dragging = false;
+      }
       const t = e.changedTouches[0];
       this._touchId = t.identifier;
       start(t.clientX, t.clientY);
@@ -201,9 +238,28 @@ AFRAME.registerComponent('drag-look-controls', {
       }
     };
     this.onTouchEnd = (e) => {
+      this._lastTouchAt = Date.now();
       if (this._touchId === null) return;
       for (let i = 0; i < e.changedTouches.length; i++) {
-        if (e.changedTouches[i].identifier === this._touchId) { this._touchId = null; end(); break; }
+        if (e.changedTouches[i].identifier === this._touchId) { this._touchId = null; end(true); break; }
+      }
+    };
+    /*
+      touchcancel lo dispara el propio sistema (gesto del navegador, llamada
+      entrante, cambio de app...). Sin escucharlo, this._touchId se quedaba
+      apuntando a un dedo que ya no existe y a partir de ahi ni el tap ni el
+      giro de camara volvian a responder en toda la sesion.
+    */
+    this.onTouchCancel = (e) => {
+      this._lastTouchAt = Date.now();
+      if (this._touchId === null) return;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === this._touchId) {
+          this._touchId = null;
+          this.dragging = false;
+          canvas.style.cursor = 'grab';
+          break;
+        }
       }
     };
 
@@ -217,6 +273,7 @@ AFRAME.registerComponent('drag-look-controls', {
       c.addEventListener('touchstart', this.onTouchStart, { passive: true });
       window.addEventListener('touchmove', this.onTouchMove, { passive: false });
       window.addEventListener('touchend', this.onTouchEnd);
+      window.addEventListener('touchcancel', this.onTouchCancel);
     };
     if (canvas) attach();
     else this.el.sceneEl.addEventListener('render-target-loaded', attach, { once: true });
@@ -229,31 +286,55 @@ AFRAME.registerComponent('drag-look-controls', {
     esa lista corta de mallas (bacterias, reactor...), nunca contra paredes,
     suelo o neones, y solo se llama cuando el gesto no fue un arrastre.
   */
-  trySelect(x, y) {
+  trySelect(x, y, isTouch) {
     const sceneEl = this.el.sceneEl;
     const canvas = sceneEl && sceneEl.canvas;
     const modelo = document.querySelector('#modelo');
     const info = modelo && modelo.components && modelo.components['exhibit-info'];
     if (!canvas || !info || !info.selectableMeshes || !info.selectableMeshes.length) return;
+    const camera = sceneEl.camera;
+    if (!camera) return;
 
     const rect = canvas.getBoundingClientRect();
     if (!this._ndc) this._ndc = new THREE.Vector2();
-    this._ndc.set(
-      ((x - rect.left) / rect.width) * 2 - 1,
-      -((y - rect.top) / rect.height) * 2 + 1
-    );
-    const camera = sceneEl.camera;
-    if (!camera) return;
     if (!this._raycaster) this._raycaster = new THREE.Raycaster();
-    this._raycaster.setFromCamera(this._ndc, camera);
-    const hits = this._raycaster.intersectObjects(info.selectableMeshes, false);
-    if (!hits.length) return;
-    // Los controles del reactor (Sala 2) no abren ficha: llevan su propia
-    // accion (museoAction) en vez de museoExhibitId, y se comprueban primero.
-    const action = hits[0].object.userData.museoAction;
-    if (action) { action(); return; }
-    const id = hits[0].object.userData.museoExhibitId;
-    if (id) info.open(id);
+
+    /*
+      Con raton basta un rayo por el punto exacto. Con el dedo no: los cuatro
+      controles del reactor son cilindros de unos 3 cm y en un movil ocupan muy
+      pocos pixeles, mucho menos que la huella real de un dedo. Se prueba
+      primero el punto exacto -- asi un toque preciso se comporta igual que
+      siempre -- y solo si falla se prueban dos coronas de puntos alrededor,
+      dentro del radio de tolerancia. Nunca amplia lo que es seleccionable,
+      solo la punteria necesaria para acertarle.
+    */
+    const probes = [[0, 0]];
+    if (isTouch) {
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        probes.push([Math.cos(a) * TAP_TOLERANCE_PX * 0.55, Math.sin(a) * TAP_TOLERANCE_PX * 0.55]);
+      }
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+        probes.push([Math.cos(a) * TAP_TOLERANCE_PX, Math.sin(a) * TAP_TOLERANCE_PX]);
+      }
+    }
+
+    for (let p = 0; p < probes.length; p++) {
+      this._ndc.set(
+        ((x + probes[p][0] - rect.left) / rect.width) * 2 - 1,
+        -((y + probes[p][1] - rect.top) / rect.height) * 2 + 1
+      );
+      this._raycaster.setFromCamera(this._ndc, camera);
+      const hits = this._raycaster.intersectObjects(info.selectableMeshes, false);
+      if (!hits.length) continue;
+      // Los controles del reactor (Sala 2) no abren ficha: llevan su propia
+      // accion (museoAction) en vez de museoExhibitId, y se comprueban primero.
+      const action = hits[0].object.userData.museoAction;
+      if (action) { action(); return; }
+      const id = hits[0].object.userData.museoExhibitId;
+      if (id) { info.open(id); return; }
+    }
   },
   remove() {
     const c = this.el.sceneEl.canvas;
@@ -265,6 +346,7 @@ AFRAME.registerComponent('drag-look-controls', {
     window.removeEventListener('mouseup', this.onMouseUp);
     window.removeEventListener('touchmove', this.onTouchMove);
     window.removeEventListener('touchend', this.onTouchEnd);
+    window.removeEventListener('touchcancel', this.onTouchCancel);
   }
 });
 
