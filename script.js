@@ -990,6 +990,98 @@ AFRAME.registerComponent('web-fixes', {
 */
 const ROOM2_ACCENT = '#2C8C82';         // equivalente a #74349A en Sala 2
 const ROOM2_ACCENT_LIGHT = '#5A9994';   // equivalente a #805096 en Sala 2
+const REACTOR_CONTROL_I18N = {
+  en: {
+    title: 'PHOTOBIOREACTOR',
+    statusTitle: 'CONTROL STATUS',
+    idle: 'Tap a control to learn what that process does inside a photobioreactor.',
+    systemActive: 'SYSTEM ACTIVE',
+    systemActiveText: 'Light, circulation, nutrients and metabolic activity are balanced.',
+    labels: {
+      light: 'LIGHT',
+      flow: 'FLOW',
+      nutrients: 'NUTRIENTS',
+      active: 'ACTIVITY'
+    },
+    buttons: {
+      light: 'LIGHT',
+      flow: 'FLOW',
+      nutrients: 'FEED',
+      active: 'ACTIVATE'
+    },
+    messages: {
+      light: {
+        onTitle: 'LIGHT',
+        on: 'Light provides the energy used by purple phototrophic bacteria.',
+        offTitle: 'LIGHT OFF',
+        off: 'Photosynthetic activity decreases.'
+      },
+      flow: {
+        onTitle: 'FLOW',
+        on: 'Circulation keeps cells and nutrients distributed throughout the culture.',
+        offTitle: 'FLOW OFF',
+        off: 'Circulation slows and the culture becomes less mixed.'
+      },
+      nutrients: {
+        onTitle: 'NUTRIENTS',
+        on: 'Carbon, nitrogen and minerals enter the culture.',
+        offTitle: 'NUTRIENTS OFF',
+        off: 'The feed stream pauses.'
+      },
+      active: {
+        onTitle: 'ACTIVE CULTURE',
+        on: 'Metabolic activity becomes visible through gas production and exchange.',
+        offTitle: 'ACTIVITY OFF',
+        off: 'Gas production and exchange become less visible.'
+      }
+    }
+  },
+  es: {
+    title: 'FOTOBIORREACTOR',
+    statusTitle: 'ESTADO DE CONTROL',
+    idle: 'Pulsa un control para aprender qué proceso activa dentro del fotobiorreactor.',
+    systemActive: 'SISTEMA ACTIVO',
+    systemActiveText: 'Luz, circulación, nutrientes y actividad metabólica están equilibrados.',
+    labels: {
+      light: 'LUZ',
+      flow: 'FLUJO',
+      nutrients: 'NUTRIENTES',
+      active: 'ACTIVIDAD'
+    },
+    buttons: {
+      light: 'LUZ',
+      flow: 'FLUJO',
+      nutrients: 'NUTRIENTES',
+      active: 'ACTIVAR'
+    },
+    messages: {
+      light: {
+        onTitle: 'LUZ',
+        on: 'La luz aporta la energía utilizada por las bacterias fototróficas púrpuras.',
+        offTitle: 'LUZ APAGADA',
+        off: 'La actividad fotosintética disminuye.'
+      },
+      flow: {
+        onTitle: 'FLUJO',
+        on: 'La circulación mantiene las células y los nutrientes distribuidos por el cultivo.',
+        offTitle: 'FLUJO APAGADO',
+        off: 'La mezcla se ralentiza y el cultivo queda menos distribuido.'
+      },
+      nutrients: {
+        onTitle: 'NUTRIENTES',
+        on: 'El cultivo recibe carbono, nitrógeno y minerales.',
+        offTitle: 'NUTRIENTES APAGADOS',
+        off: 'La entrada de nutrientes queda en pausa.'
+      },
+      active: {
+        onTitle: 'CULTIVO ACTIVO',
+        on: 'La actividad metabólica se hace visible mediante la producción y el intercambio de gases.',
+        offTitle: 'ACTIVIDAD APAGADA',
+        off: 'La producción y el intercambio de gases se ven menos.'
+      }
+    }
+  }
+};
 
 const museumContent = {
   /* Sala 1 (Purple Phototrophic Bacteria). Introduccion general + las 8 cepas
@@ -2635,7 +2727,47 @@ AFRAME.registerComponent('reactor-control', {
     this.stage = { light: false, flow: false, nutrients: false, active: false };
     this.buttons = [];        // {id, mesh, material, locked, baseEmissive}
     this._hoverT = {};        // id -> 0..1, suavizado de hover por boton
+    this.reactorLang = this.getReactorLang();
+    this.reactorLast = { id: null, on: false };
+    this.nextLangCheck = 0;
     this.el.addEventListener('museo-modules-loaded', () => this.onLoaded());
+  },
+
+  getReactorLang() {
+    const readStore = (key) => {
+      try { return localStorage.getItem(key); }
+      catch (e) { return null; }
+    };
+    const candidates = [
+      window.MUSEUM_LANGUAGE,
+      window.MUSEO_LANGUAGE,
+      window.MUSEO_LANG,
+      readStore('museum-language'),
+      readStore('MUSEUM_LANGUAGE'),
+      readStore('museumLanguage'),
+      readStore('museoLanguage'),
+      document.documentElement.getAttribute('lang')
+    ].filter(Boolean);
+    const value = String(candidates[0] || 'en').toLowerCase();
+    return value.startsWith('es') ? 'es' : 'en';
+  },
+
+  getReactorCopy() {
+    const lang = this.getReactorLang();
+    this.reactorLang = lang;
+    return REACTOR_CONTROL_I18N[lang] || REACTOR_CONTROL_I18N.en;
+  },
+
+  getReactorMessage(copy) {
+    const allOn = this.stage.light && this.stage.flow && this.stage.nutrients && this.stage.active;
+    if (allOn) return { title: copy.systemActive, body: copy.systemActiveText };
+    if (this.reactorLast && this.reactorLast.id) {
+      const m = copy.messages[this.reactorLast.id];
+      if (m) return this.reactorLast.on
+        ? { title: m.onTitle, body: m.on }
+        : { title: m.offTitle, body: m.off };
+    }
+    return { title: copy.title, body: copy.idle };
   },
 
   onLoaded() {
@@ -2708,6 +2840,7 @@ AFRAME.registerComponent('reactor-control', {
     this.curFlowSpeed = this.targetFlowSpeed;
     this.applyReactorState();
 
+    this.buildFlowParticles(mesh);
     this.buildNutrientParticles(mesh);
     this.buildActivityBubbles(mesh);
     this.buildControlStand();
@@ -2741,16 +2874,17 @@ AFRAME.registerComponent('reactor-control', {
   */
   recomputeTargets() {
     const s = this.stage;
-    const activeMult = s.active ? 1.15 : 1;
+    const allOn = s.light && s.flow && s.nutrients && s.active;
+    const activeMult = s.active ? 1.06 : 1;
 
-    const spotFrac = 0.34 + (s.light ? 0.54 : 0);
+    const spotFrac = 0.34 + (s.light ? 0.50 : 0) + (allOn ? 0.06 : 0);
     this.targetSpot = this.spotBase * spotFrac;
 
-    const liquidIFrac = 0.22 + (s.light ? 0.56 : 0) + (s.active ? 0.24 : 0);
+    const liquidIFrac = 0.20 + (s.light ? 0.58 : 0) + (s.active ? 0.10 : 0) + (allOn ? 0.08 : 0);
     this.targetLiquidI = this.liquidBase ? this.liquidBase.i * liquidIFrac * activeMult : 0;
 
-    const bubbleIFrac = 0.16 + (s.flow ? 0.68 : 0) + (s.active ? 0.34 : 0);
-    const bubbleOFrac = 0.36 + (s.flow ? 0.48 : 0) + (s.active ? 0.30 : 0);
+    const bubbleIFrac = 0.12 + (s.flow ? 0.30 : 0) + (s.active ? 0.42 : 0) + (allOn ? 0.08 : 0);
+    const bubbleOFrac = 0.20 + (s.flow ? 0.22 : 0) + (s.active ? 0.38 : 0) + (allOn ? 0.08 : 0);
     this.targetBubbleI = this.bubbleBase ? this.bubbleBase.i * bubbleIFrac * activeMult : 0;
     this.targetBubbleO = this.bubbleBase ? Math.min(1, this.bubbleBase.o * bubbleOFrac) : 0;
 
@@ -2758,7 +2892,7 @@ AFRAME.registerComponent('reactor-control', {
     // sigue dependiendo solo de FLOW -- si ACTIVATE por si solo tambien
     // pusiera en marcha la animacion, dejaria de poder distinguirse de
     // FLOW. ACTIVATE unicamente la refuerza un poco cuando FLOW ya esta on.
-    this.targetFlowSpeed = s.flow ? (1 * (s.active ? 1.3 : 1)) : 0;
+    this.targetFlowSpeed = s.flow ? (0.72 * (allOn ? 1.12 : 1)) : 0;
     this.targetNutrientLevel = s.nutrients ? 1 : 0;
   },
 
@@ -2774,7 +2908,7 @@ AFRAME.registerComponent('reactor-control', {
     // suave sobre foco/liquido/burbujas, solo presente cuando ACTIVATE esta
     // encendido -- es la señal que hace que el reactor "se sienta vivo" y
     // operativo, distinta de cualquier cambio estatico de brillo.
-    const activePulseBoost = 1 + (this.activePulse || 0) * 0.22;
+    const activePulseBoost = 1 + (this.activePulse || 0) * 0.05;
     if (this.reactorSpot) this.reactorSpot.intensity = this.curSpot * activePulseBoost;
     if (this.bubbleMat) {
       this.bubbleMat.emissiveIntensity = this.curBubbleI * hoverBoost * activePulseBoost;
@@ -2790,10 +2924,68 @@ AFRAME.registerComponent('reactor-control', {
     // El pulso de ACTIVATE tambien se nota aqui (un halo que respira), para
     // que el estado "operativo" se lea incluso mirando solo el cristal.
     if (this.glassMat) {
-      const glowMix = Math.min(1, this.hoverGlow * 0.42 + (this.activePulse || 0) * 0.30);
+      const glowMix = Math.min(1, this.hoverGlow * 0.42 + (this.activePulseAmt || 0) * 0.18);
       this.glassMat.emissive.copy(this.glassBaseEmissive).lerp(this._room2AccentColor || (this._room2AccentColor = new THREE.Color(ROOM2_ACCENT)), glowMix);
-      this.glassMat.emissiveIntensity = this.glassBaseEmissiveIntensity + this.hoverGlow * 0.55 + (this.activePulse || 0) * 0.35;
+      this.glassMat.emissiveIntensity = this.glassBaseEmissiveIntensity + this.hoverGlow * 0.55 + (this.activePulseAmt || 0) * 0.16;
     }
+  },
+
+  buildFlowParticles(mesh) {
+    this.flowDots = [];
+    if (!this.liquidMesh) return;
+    const liquidBox = new THREE.Box3().setFromObject(this.liquidMesh);
+    const sx = Math.max(0.02, liquidBox.max.x - liquidBox.min.x);
+    const sy = Math.max(0.02, liquidBox.max.y - liquidBox.min.y);
+    const sz = Math.max(0.02, liquidBox.max.z - liquidBox.min.z);
+    const cx = (liquidBox.min.x + liquidBox.max.x) * 0.5;
+    const cy = (liquidBox.min.y + liquidBox.max.y) * 0.5;
+    const cz = (liquidBox.min.z + liquidBox.max.z) * 0.5;
+    const group = new THREE.Group();
+    group.name = 'reactor-flow-circulation-dots';
+    const color = new THREE.Color(0x63d8d2);
+    const N = 22;
+    for (let i = 0; i < N; i++) {
+      const mat = new THREE.MeshStandardMaterial({
+        color, emissive: color, emissiveIntensity: 0.85,
+        roughness: 0.25, metalness: 0, transparent: true, opacity: 0, depthWrite: false
+      });
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.006 + (i % 2) * 0.002, 8, 8), mat);
+      group.add(dot);
+      this.flowDots.push({
+        mesh: dot, mat,
+        phase: i / N,
+        offset: ((i * 41) % 100) / 100,
+        radiusX: sx * (0.16 + ((i * 13) % 8) / 100),
+        radiusZ: sz * (0.16 + ((i * 17) % 8) / 100)
+      });
+    }
+    this.flowTravel = {
+      cx, cy, cz,
+      minY: liquidBox.min.y + sy * 0.18,
+      maxY: liquidBox.max.y - sy * 0.14
+    };
+    this.el.sceneEl.object3D.add(group);
+    this.flowGroup = group;
+  },
+
+  updateFlowParticles(time) {
+    if (!this.flowDots || !this.flowDots.length || !this.flowTravel) return;
+    const t = (time || 0) / 1000;
+    const amount = THREE.MathUtils.clamp((this.curFlowSpeed || 0) / 0.72, 0, 1);
+    const travel = this.flowTravel;
+    this.flowDots.forEach((d) => {
+      const cycle = (t * 0.10 + d.phase) % 1;
+      const angle = cycle * Math.PI * 2;
+      const vertical = (Math.sin(angle + d.offset * Math.PI * 2) * 0.5 + 0.5);
+      d.mesh.position.set(
+        travel.cx + Math.cos(angle) * d.radiusX,
+        THREE.MathUtils.lerp(travel.minY, travel.maxY, vertical),
+        travel.cz + Math.sin(angle) * d.radiusZ
+      );
+      const target = amount * 0.42;
+      d.mat.opacity += (target - d.mat.opacity) * (this.stage.flow ? 0.08 : 0.045);
+      d.mat.emissiveIntensity = 0.65 + amount * 0.55;
+    });
   },
 
   /*
@@ -2959,13 +3151,21 @@ AFRAME.registerComponent('reactor-control', {
       }
       const bottomY = this.currentLiquidTopY || travel.bottomY;
       const cycle = ((t / period) + d.phase) % 1;
-      d.mesh.position.set(travel.cx, THREE.MathUtils.lerp(travel.topY, bottomY, cycle), travel.cz);
+      const tubePhase = Math.min(cycle / 0.76, 1);
+      const spread = THREE.MathUtils.clamp((cycle - 0.76) / 0.24, 0, 1);
+      const angle = d.phase * Math.PI * 2 + t * 0.55;
+      const radius = 0.018 * spread;
+      d.mesh.position.set(
+        travel.cx + Math.cos(angle) * radius,
+        THREE.MathUtils.lerp(travel.topY, bottomY, tubePhase) - spread * 0.018,
+        travel.cz + Math.sin(angle) * radius
+      );
       const fadeIn = Math.min(1, cycle / 0.18);
       const fadeOut = Math.min(1, (1 - cycle) / 0.30);
       // ligero "salpicon" al llegar al liquido: la gota crece un poco justo
       // antes de fundirse, para que el punto de entrada al cultivo tambien
       // se note, no solo la caida.
-      const splash = 1 + Math.max(0, (cycle - 0.82) / 0.18) * 0.6;
+      const splash = 1 + spread * 0.45;
       d.mesh.scale.setScalar(splash);
       const target = Math.min(fadeIn, fadeOut) * 1.0 * boost;
       d.mat.opacity += (target - d.mat.opacity) * 0.25;
@@ -3110,43 +3310,50 @@ AFRAME.registerComponent('reactor-control', {
   drawControlPanelTexture() {
     if (!this.controlPanelCanvas) return;
     const { ctx, tex, w: WPX, h: HPX, defs } = this.controlPanelCanvas;
+    const copy = this.getReactorCopy();
+    const message = this.getReactorMessage(copy);
+    const allOn = this.stage.light && this.stage.flow && this.stage.nutrients && this.stage.active;
 
-    ctx.fillStyle = '#F7F4EE';
+    ctx.clearRect(0, 0, WPX, HPX);
+    ctx.fillStyle = 'rgba(3, 10, 13, 0.90)';
     ctx.fillRect(0, 0, WPX, HPX);
-    const grain = Math.round((WPX * HPX) / 900);
+    const grain = Math.round((WPX * HPX) / 1200);
     for (let i = 0; i < grain; i++) {
-      const v = 205 + Math.floor(Math.random() * 42);
-      ctx.fillStyle = `rgba(${v},${v},${v},0.045)`;
+      const v = 70 + Math.floor(Math.random() * 60);
+      ctx.fillStyle = `rgba(${v},${v + 20},${v + 20},0.035)`;
       ctx.fillRect(Math.random() * WPX, Math.random() * HPX, 1, 1);
     }
 
     const accent = ROOM2_ACCENT;
-    const ink = '#201A1E';
-    const muted = '#756E69';
-    const line = '#D8C7BE';
+    const accentLight = ROOM2_ACCENT_LIGHT;
+    const ink = '#F7FCFA';
+    const muted = '#AAB9B7';
+    const line = 'rgba(90, 153, 148, 0.35)';
     const padX = WPX * 0.055;
-    const topY = HPX * 0.18;
-    const activeMessage = this.controlMessage || museumText('reactorFallback');
+    const topY = HPX * 0.15;
 
-    ctx.fillStyle = accent;
-    ctx.fillRect(padX, HPX * 0.105, WPX - padX * 2, 8);
+    ctx.strokeStyle = 'rgba(90, 153, 148, 0.60)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(padX * 0.52, HPX * 0.075, WPX - padX * 1.04, HPX * 0.85);
+    ctx.fillStyle = accentLight;
+    ctx.fillRect(padX, HPX * 0.105, WPX - padX * 2, 6);
     ctx.fillStyle = line;
-    ctx.fillRect(padX, HPX * 0.28, WPX - padX * 2, 3);
-    ctx.fillRect(padX, HPX * 0.74, WPX - padX * 2, 3);
+    ctx.fillRect(padX, HPX * 0.275, WPX - padX * 2, 2);
+    ctx.fillRect(padX, HPX * 0.735, WPX - padX * 2, 2);
 
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = accent;
-    ctx.font = '800 58px Arial, Helvetica, sans-serif';
+    ctx.fillStyle = accentLight;
+    ctx.font = '800 48px Arial, Helvetica, sans-serif';
     ctx.fillText('02', padX, topY);
 
     ctx.fillStyle = ink;
-    ctx.font = '900 86px Arial, Helvetica, sans-serif';
-    ctx.fillText(museumText('reactorTitle'), padX + 116, topY);
+    ctx.font = '900 68px Arial, Helvetica, sans-serif';
+    ctx.fillText(copy.title, padX + 104, topY);
 
-    ctx.fillStyle = muted;
-    ctx.font = '700 34px Arial, Helvetica, sans-serif';
-    ctx.fillText(museumText('reactorPanel'), padX + 120, topY + 70);
+    ctx.fillStyle = allOn ? accentLight : muted;
+    ctx.font = '800 34px Arial, Helvetica, sans-serif';
+    ctx.fillText(allOn ? copy.systemActive : copy.statusTitle, padX + 108, topY + 68);
 
     const cols = defs.length;
     const usableW = WPX - padX * 2;
@@ -3159,7 +3366,9 @@ AFRAME.registerComponent('reactor-control', {
       const x = padX + colW * (i + 0.5);
       const color = `#${new THREE.Color(d.on).getHexString()}`;
       const isOn = !!(this.stage && this.stage[d.id]);
-      ctx.strokeStyle = 'rgba(132, 111, 103, 0.26)';
+      const label = copy.buttons[d.id] || d.label;
+      const statusLabel = copy.labels[d.id] || label;
+      ctx.strokeStyle = line;
       ctx.lineWidth = 2;
       if (i > 0) {
         ctx.beginPath();
@@ -3168,40 +3377,43 @@ AFRAME.registerComponent('reactor-control', {
         ctx.stroke();
       }
 
-      ctx.fillStyle = isOn ? color : '#B9B0A8';
+      ctx.fillStyle = isOn ? color : 'rgba(247, 252, 250, 0.34)';
       ctx.beginPath();
       ctx.arc(x, statusY, 14, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = isOn ? color : '#D6CDC5';
+      ctx.fillStyle = isOn ? color : 'rgba(247, 252, 250, 0.18)';
       ctx.fillRect(x - colW * 0.27, statusY + 38, colW * 0.54, 6);
-      ctx.strokeStyle = `rgba(${isOn ? '32,26,30' : '120,110,104'},0.18)`;
+      ctx.strokeStyle = isOn ? 'rgba(90, 153, 148, 0.55)' : 'rgba(247, 252, 250, 0.18)';
       ctx.lineWidth = 8;
       ctx.beginPath();
       ctx.arc(x, buttonY, 56, 0, Math.PI * 2);
       ctx.stroke();
 
-      ctx.fillStyle = accent;
-      ctx.font = '800 38px Arial, Helvetica, sans-serif';
+      ctx.fillStyle = accentLight;
+      ctx.font = '800 34px Arial, Helvetica, sans-serif';
       ctx.fillText(d.num, x, labelY - 44);
 
       ctx.fillStyle = ink;
-      const labelFont = d.label.length > 8 ? 46 : 54;
+      const labelFont = label.length > 8 ? 38 : 48;
       ctx.font = `900 ${labelFont}px Arial, Helvetica, sans-serif`;
-      ctx.fillText(d.label, x, labelY + 6);
+      ctx.fillText(label, x, labelY + 6);
 
       ctx.fillStyle = muted;
-      ctx.font = '800 24px Arial, Helvetica, sans-serif';
-      ctx.fillText(isOn ? museumText('on') : museumText('off'), x, labelY + 58);
+      ctx.font = '800 25px Arial, Helvetica, sans-serif';
+      ctx.fillText(`${statusLabel}  ${isOn ? 'ON' : 'OFF'}`, x, labelY + 58);
     });
 
-    ctx.fillStyle = '#EFE7DF';
+    ctx.fillStyle = 'rgba(247, 252, 250, 0.07)';
     ctx.fillRect(padX, HPX * 0.795, WPX - padX * 2, HPX * 0.145);
-    ctx.fillStyle = accent;
+    ctx.fillStyle = accentLight;
     ctx.fillRect(padX, HPX * 0.795, 12, HPX * 0.145);
     ctx.textAlign = 'left';
+    ctx.fillStyle = accentLight;
+    ctx.font = '900 31px Arial, Helvetica, sans-serif';
+    ctx.fillText(message.title, padX + 38, HPX * 0.825);
     ctx.fillStyle = ink;
-    ctx.font = '900 34px Arial, Helvetica, sans-serif';
-    this.wrapCanvasText(ctx, activeMessage, padX + 40, HPX * 0.835, WPX - padX * 2 - 80, 42, 2);
+    ctx.font = '800 32px Arial, Helvetica, sans-serif';
+    this.wrapCanvasText(ctx, message.body, padX + 38, HPX * 0.873, WPX - padX * 2 - 76, 39, 2);
 
     // fuerza la subida del canvas redibujado a la textura de Three.js.
     tex.needsUpdate = true;
@@ -3353,13 +3565,13 @@ AFRAME.registerComponent('reactor-control', {
       }
     ];
     this.controlDefs = defs;
-    this.controlMessage = museumText('reactorPrompt');
     const controlTex = this.buildControlPanelTexture(WIDTH, HEIGHT, defs);
     const panel = new THREE.Mesh(
       new THREE.PlaneGeometry(WIDTH, HEIGHT),
       new THREE.MeshStandardMaterial({
         color: 0xffffff, map: controlTex,
-        roughness: 0.9, metalness: 0, side: THREE.DoubleSide
+        roughness: 0.88, metalness: 0, side: THREE.DoubleSide,
+        transparent: true, opacity: 0.92
       })
     );
     wrapper.object3D.add(panel);
@@ -3443,8 +3655,7 @@ AFRAME.registerComponent('reactor-control', {
   onButtonClick(id) {
     if (!(id in this.stage)) return;
     this.stage[id] = !this.stage[id];
-    const def = this.controlDefs && this.controlDefs.find((d) => d.id === id);
-    if (def) this.controlMessage = this.stage[id] ? def.onText : def.offText;
+    this.reactorLast = { id, on: this.stage[id] };
     const button = this.buttons.find((b) => b.id === id);
     if (button) button.pressT = 1;
     this.recomputeTargets();
@@ -3502,8 +3713,17 @@ AFRAME.registerComponent('reactor-control', {
     this.curFlowSpeed += (this.targetFlowSpeed - this.curFlowSpeed) * speed;
     this.curNutrientLevel += ((this.targetNutrientLevel || 0) - this.curNutrientLevel) * speed;
     this.applyReactorState();
+    this.updateFlowParticles(time);
     this.updateNutrientParticles(time);
     this.updateActivityBubbles(time);
+    if ((time || 0) > this.nextLangCheck) {
+      this.nextLangCheck = (time || 0) + 400;
+      const lang = this.getReactorLang();
+      if (lang !== this.reactorLang) {
+        this.reactorLang = lang;
+        this.drawControlPanelTexture();
+      }
+    }
 
     // hover de los 4 botones: mismo lenguaje que el resto del museo (escala
     // + brillo muy sutiles), leyendo el hoverId que ya calcula exhibit-info.
