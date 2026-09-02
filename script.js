@@ -11,6 +11,8 @@
 // Ver trySelect() mas abajo: es lo unico que distingue seleccionar una pieza
 // de simplemente mirar alrededor.
 const CLICK_MAX_MOVE_PX = 6;
+const MUSEUM_LANGUAGE = window.MUSEUM_LANGUAGE || 'en';
+const museumText = (key) => window.getMuseumUiText ? window.getMuseumUiText(key) : key;
 
 /* ==========================================================================
    Soporte movil: en un telefono/tablet no hay teclado, asi que WASD (unica
@@ -1141,6 +1143,18 @@ const museumContent = {
     body: 'Purple phototrophic bacteria do not lead to a single product or application.\n\nDepending on the strain, cultivation conditions and process, their metabolism can be connected to different outcomes.\n\nHYDROGEN\nPHA\nBIOMASS\nELECTRON EXCHANGE\n\nThe value of these microorganisms lies precisely in this diversity.\n\nDifferent bacteria, different processes and different possibilities.\n\nBACTERIA → PROCESS → RESULT\n\nUnderstanding the microorganism is the first step. Controlling the process is what allows its capabilities to be explored at a larger scale.' }
 };
 
+// English is the canonical/default content. The Spanish file only contains
+// translated text fields, so anchors, images, icons and interaction metadata
+// always stay identical in both languages.
+const translatedContent = window.MUSEUM_I18N
+  && window.MUSEUM_I18N.content
+  && window.MUSEUM_I18N.content[MUSEUM_LANGUAGE];
+if (translatedContent) {
+  Object.keys(translatedContent).forEach((id) => {
+    if (museumContent[id]) museumContent[id] = { ...museumContent[id], ...translatedContent[id] };
+  });
+}
+
 /*
   Texto del cuerpo de la ficha: de textContent plano a HTML controlado, para
   poder (a) resaltar en negrita solo los conceptos cientificos importantes
@@ -1170,7 +1184,20 @@ const PANEL_KEYWORDS = [
   'chromatophores',
   'redox balance',
   'bioelectrochemical', 'bioelectrochemistry',
-  'PHA'
+  'PHA',
+  'Estación Espacial Internacional', 'ecosistemas cerrados', 'sistemas de soporte vital',
+  'microgravedad', 'vuelo espacial', 'radiación',
+  'centro de reacción fotosintético', 'centro de reacción',
+  'monóxido de carbono (CO)', 'monóxido de carbono',
+  'condiciones anaerobias', 'degradación anaerobia', 'anaerobia',
+  'producción de hidrógeno', 'productividad de hidrógeno', 'biohidrógeno', 'hidrógeno',
+  'electroactividad', 'electroactivas',
+  'fotofermentación',
+  'fijación de nitrógeno',
+  'intercambio de electrones', 'transferencia de electrones', 'electrones',
+  'cromatóforos',
+  'equilibrio redox',
+  'bioelectroquímicos', 'bioelectroquímica'
 ].sort((a, b) => b.length - a.length);
 
 const PANEL_KEYWORDS_RE = new RegExp(
@@ -1697,7 +1724,7 @@ AFRAME.registerComponent('exhibit-info', {
     // vez del morado por defecto -- misma jerarquia, misma tipografia,
     // mismo "lenguaje museo", solo cambia el acento de color.
     const texture = this.buildPlacardTextTexture(
-      it.data.section || '', (it.data.title || '').toUpperCase(), 'CLICK TO EXPLORE',
+      it.data.section || '', (it.data.title || '').toUpperCase(), museumText('clickToExplore'),
       HEIGHT, WIDTH, ROOM2_ACCENT, ROOM2_ACCENT_LIGHT
     );
     const plane = new THREE.Mesh(
@@ -2002,7 +2029,7 @@ AFRAME.registerComponent('exhibit-info', {
     }
 
     const texture = this.buildPlacardTextTexture(
-      it.data.section || '', (it.data.title || '').toUpperCase(), 'CLICK TO EXPLORE',
+      it.data.section || '', (it.data.title || '').toUpperCase(), museumText('clickToExplore'),
       PLACARD_HEIGHT, arcLengthM
     );
     const curve = new THREE.Mesh(
@@ -3099,7 +3126,7 @@ AFRAME.registerComponent('reactor-control', {
     const line = '#D8C7BE';
     const padX = WPX * 0.055;
     const topY = HPX * 0.18;
-    const activeMessage = this.controlMessage || 'Tap a control to learn how each process keeps the culture alive.';
+    const activeMessage = this.controlMessage || museumText('reactorFallback');
 
     ctx.fillStyle = accent;
     ctx.fillRect(padX, HPX * 0.105, WPX - padX * 2, 8);
@@ -3115,11 +3142,11 @@ AFRAME.registerComponent('reactor-control', {
 
     ctx.fillStyle = ink;
     ctx.font = '900 86px Arial, Helvetica, sans-serif';
-    ctx.fillText('BIOREACTOR', padX + 116, topY);
+    ctx.fillText(museumText('reactorTitle'), padX + 116, topY);
 
     ctx.fillStyle = muted;
     ctx.font = '700 34px Arial, Helvetica, sans-serif';
-    ctx.fillText('CONTROL PANEL', padX + 120, topY + 70);
+    ctx.fillText(museumText('reactorPanel'), padX + 120, topY + 70);
 
     const cols = defs.length;
     const usableW = WPX - padX * 2;
@@ -3164,7 +3191,7 @@ AFRAME.registerComponent('reactor-control', {
 
       ctx.fillStyle = muted;
       ctx.font = '800 24px Arial, Helvetica, sans-serif';
-      ctx.fillText(isOn ? 'ON' : 'OFF', x, labelY + 58);
+      ctx.fillText(isOn ? museumText('on') : museumText('off'), x, labelY + 58);
     });
 
     ctx.fillStyle = '#EFE7DF';
@@ -3292,34 +3319,41 @@ AFRAME.registerComponent('reactor-control', {
       ? fitWithin(0.31, 0.24, top.extentShort * 0.86)
       : 0.31;
     const exhibitInfo = this.el.components['exhibit-info'];
+    const reactorText = (id) => window.getMuseumReactorText
+      ? window.getMuseumReactorText(id)
+      : { label: id.toUpperCase(), symbol: id.toUpperCase(), onText: '', offText: '' };
+    const lightText = reactorText('light');
+    const flowText = reactorText('flow');
+    const nutrientsText = reactorText('nutrients');
+    const activeText = reactorText('active');
     const defs = [
       {
-        id: 'light', num: '01', label: 'LIGHT', symbol: 'LUX',
+        id: 'light', num: '01', label: lightText.label, symbol: lightText.symbol,
         off: 0xe8f7f5, on: 0x59e7e0,
-        onText: 'LIGHT: photons feed photosynthesis, so bacteria can turn light into chemical energy.',
-        offText: 'LIGHT OFF: without photons, photosynthetic energy capture slows down.'
+        onText: lightText.onText,
+        offText: lightText.offText
       },
       {
-        id: 'flow', num: '02', label: 'FLOW', symbol: 'FLOW',
+        id: 'flow', num: '02', label: flowText.label, symbol: flowText.symbol,
         off: 0xe5f3ef, on: 0x35d5d3,
-        onText: 'FLOW: circulation mixes cells, gases and dissolved compounds so the culture stays even.',
-        offText: 'FLOW OFF: mixing stops, so gradients can form inside the reactor.'
+        onText: flowText.onText,
+        offText: flowText.offText
       },
       {
-        id: 'nutrients', num: '03', label: 'FEED', symbol: 'FEED',
+        id: 'nutrients', num: '03', label: nutrientsText.label, symbol: nutrientsText.symbol,
         off: 0xeaf4de, on: 0xa9dc69,
-        onText: 'FEED: nutrients add carbon, nitrogen and minerals that cells use to build biomass.',
-        offText: 'FEED OFF: the culture keeps running, but no fresh nutrients enter.'
+        onText: nutrientsText.onText,
+        offText: nutrientsText.offText
       },
       {
-        id: 'active', num: '04', label: 'ACTIVATE', symbol: 'BIO',
+        id: 'active', num: '04', label: activeText.label, symbol: activeText.symbol,
         off: 0xeee4f4, on: 0xb06ce8,
-        onText: 'ACTIVATE: bubbles make metabolism visible as the living culture produces and exchanges gases.',
-        offText: 'ACTIVATE OFF: the metabolic signal quiets and the reactor returns to observation mode.'
+        onText: activeText.onText,
+        offText: activeText.offText
       }
     ];
     this.controlDefs = defs;
-    this.controlMessage = 'Tap a control to learn what that process does inside a photobioreactor.';
+    this.controlMessage = museumText('reactorPrompt');
     const controlTex = this.buildControlPanelTexture(WIDTH, HEIGHT, defs);
     const panel = new THREE.Mesh(
       new THREE.PlaneGeometry(WIDTH, HEIGHT),

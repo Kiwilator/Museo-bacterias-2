@@ -1,13 +1,19 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>PURPLE BACTERIA</title>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <link rel="stylesheet" href="./style.css?v=ff9b03e">
+  <link rel="stylesheet" href="./style.css?v=lang01">
 </head>
 <body>
+
+  <div id="language-switcher" role="group" aria-label="Language selection">
+    <button type="button" data-language="en" aria-pressed="true">EN</button>
+    <span aria-hidden="true">/</span>
+    <button type="button" data-language="es" aria-pressed="false">ES</button>
+  </div>
 
   <div id="loading-screen">
     <div id="loading-title">PURPLE BACTERIA</div>
@@ -19,10 +25,10 @@
        <span> se muestra -- nunca los dos a la vez, para no mostrar
        instrucciones de teclado a quien no tiene teclado. -->
   <div id="controls-help">
-    <span class="hint-desktop"><b>WASD</b> Moverse</span>
-    <span class="hint-desktop"><b>Arrastrar</b> Mirar</span>
-    <span class="hint-mobile"><b>Joystick</b> Moverse</span>
-    <span class="hint-mobile"><b>Deslizar</b> Mirar</span>
+    <span class="hint-desktop"><b>WASD</b> <span class="control-action">Move</span></span>
+    <span class="hint-desktop"><b>Drag</b> <span class="control-action">Look</span></span>
+    <span class="hint-mobile"><b>Joystick</b> <span class="control-action">Move</span></span>
+    <span class="hint-mobile"><b>Swipe</b> <span class="control-action">Look</span></span>
   </div>
 
   <!-- Joystick tactil de movimiento: solo visible en moviles (is-mobile).
@@ -177,8 +183,8 @@
        ventana, reutilizados por todas las piezas desde museumContent -->
   <div id="intro-msg">
     <p>MOVE THROUGH THE SPACE AND APPROACH THE EXHIBITS TO DISCOVER MORE</p>
-    <span class="hint-desktop"><b>WASD</b> — MOVE &nbsp;&nbsp; <b>DRAG</b> — LOOK</span>
-    <span class="hint-mobile"><b>JOYSTICK</b> — MOVE &nbsp;&nbsp; <b>SWIPE</b> — LOOK</span>
+    <span class="hint-desktop"><b>WASD</b> — <span class="intro-move">MOVE</span> &nbsp;&nbsp; <b class="intro-drag">DRAG</b> — <span class="intro-look">LOOK</span></span>
+    <span class="hint-mobile"><b>JOYSTICK</b> — <span class="intro-move">MOVE</span> &nbsp;&nbsp; <b class="intro-swipe">SWIPE</b> — <span class="intro-look">LOOK</span></span>
   </div>
 
   <!-- Grafismo de sala: una sola pieza, muy tenue, como señaletica de museo -->
@@ -207,6 +213,7 @@
   </aside>
 
 
-  <script src="./script.js?v=ff9b03e"></script>
+  <script src="./museum-i18n.js?v=lang01"></script>
+  <script src="./script.js?v=lang01"></script>
 </body>
 </html>
