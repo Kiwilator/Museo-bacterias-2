@@ -10,6 +10,7 @@ h = re.sub(r'(museo_bacterias\.glb)(\?v=[^"]*)?', r'\1?v=%s' % v, h)
 h = re.sub(r'(modulos/[a-z0-9_]+\.glb)(\?v=[^"]*)?', r'\1?v=%s' % v, h)
 h = re.sub(r'(href="\./style\.css)(\?v=[^"]*)?"', r'\1?v=%s"' % v, h)
 h = re.sub(r'(src="\./script\.js)(\?v=[^"]*)?"', r'\1?v=%s"' % v, h)
+h = re.sub(r'(src="\./museum-i18n\.js)(\?v=[^"]*)?"', r'\1?v=%s"' % v, h)
 with open('index.html','w') as f: f.write(h)
 print('assets versionados ->', v)
 PY

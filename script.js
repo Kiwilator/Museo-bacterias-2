@@ -2710,6 +2710,558 @@ AFRAME.registerComponent('image-windows', {
   }
 });
 
+/*
+  Microinstalacion de electroactividad de RHODOVULUM.
+
+  Es una capa museografica: no toca el GLB, ni posiciones, ni materiales
+  base. Todo se deriva por MEDICION en tiempo de ejecucion de piezas reales
+  del modelo -- la bacteria (anclaje curatorial bacteriaSmall04), su campana
+  de cristal (VITRINA_Campana_*), la base de esa campana (VITRINA_Base_*) y
+  la peana que las sostiene -- de modo que no hay ni una sola coordenada
+  escrita a mano.
+
+  Lectura buscada, desde la posicion normal del visitante:
+
+      [ELECTRODO]  ---> e-  e-  e-  --->  [BACTERIA]
+
+  El electrodo es una placa fina, discreta, a la DERECHA del visitante y
+  ligeramente retrasada, apoyada en la tapa de la peana (fuera de la campana,
+  porque la bacteria ocupa practicamente todo el diametro interior: medido,
+  quedan 1.7 cm libres a cada lado, imposible meter nada sin que la propia
+  bacteria lo tape). Los electrones nacen en la superficie de la placa y
+  mueren dentro de la bacteria siguiendo una curva muy suave, con una guia
+  casi transparente y una punta de flecha minuscula junto a la bacteria para
+  que la direccion se entienda incluso en una captura fija.
+
+  No hay ningun cartel grande: solo una microetiqueta de dos lineas que
+  aparece al acercarse, siempre por debajo de la imagen circular superior.
+*/
+AFRAME.registerComponent('electroactivity-exhibit', {
+  schema: {
+    target: { type: 'string', default: 'bacteriaSmall04' },
+    trigger: { type: 'number', default: 2.2 },
+    release: { type: 'number', default: 2.8 },
+    maxElectrons: { type: 'number', default: 7 }
+  },
+
+  init() {
+    this.ready = false;
+    this.active = false;
+    this.displayT = 0;
+    this.nextSpawn = 0;
+    this.boostUntil = 0;
+    this.pulseT = 0;
+    this.retryCount = 0;
+    this.tmp = new THREE.Vector3();
+    this.tmp2 = new THREE.Vector3();
+    this.electrons = [];
+    this.curves = [];
+    this.bacteriaMats = [];
+    this.el.addEventListener('museo-modules-loaded', () => {
+      window.setTimeout(() => this.setup(), 0);
+    });
+  },
+
+  getText(key) {
+    return window.getMuseumElectroactivityText ? window.getMuseumElectroactivityText(key) : key;
+  },
+
+  /* --------------------------------------------------------------------
+     MEDICION. Todo lo que sigue sale del modelo, nunca de constantes.
+     -------------------------------------------------------------------- */
+
+  // Campana de cristal que cubre a esta bacteria. Se localiza por contencion
+  // real (la caja del cristal envuelve el centro de la bacteria), no por
+  // indice ni por nombre exacto, para que siga funcionando si cambia la
+  // numeracion de las vitrinas en Blender.
+  findVitrine(center) {
+    let bell = null, base = null;
+    this.el.object3D.traverse((o) => {
+      if (!o.isMesh || !o.name) return;
+      const isBell = o.name.indexOf('VITRINA_Campana') === 0;
+      const isBase = o.name.indexOf('VITRINA_Base') === 0;
+      if (!isBell && !isBase) return;
+      const b = new THREE.Box3().setFromObject(o);
+      const inXZ = center.x >= b.min.x - 0.02 && center.x <= b.max.x + 0.02 &&
+                   center.z >= b.min.z - 0.02 && center.z <= b.max.z + 0.02;
+      if (!inXZ) return;
+      if (isBell && (!bell || b.max.y > bell.box.max.y)) bell = { obj: o, box: b };
+      if (isBase && (!base || b.max.y > base.box.max.y)) base = { obj: o, box: b };
+    });
+    return { bell, base };
+  },
+
+  findNearestPeana(info, center) {
+    let nearest = null, nearestD = Infinity;
+    (info.peanaBoxes || []).forEach((pb) => {
+      const d = Math.hypot(pb.center.x - center.x, pb.center.z - center.z);
+      if (d < nearestD) { nearestD = d; nearest = pb; }
+    });
+    return nearest;
+  },
+
+  // Direccion "hacia el visitante": la misma fila de cartelas que ya usa
+  // exhibit-info para orientar todas las fichas de la sala.
+  getFrontDirection(info, center) {
+    if (info && info._placardRowDir) {
+      return new THREE.Vector3(info._placardRowDir.x, 0, info._placardRowDir.z).normalize();
+    }
+    const spawn = window.MUSEO_SPAWN;
+    if (spawn && typeof spawn.x === 'number') {
+      const dx = spawn.x - center.x, dz = spawn.z - center.z;
+      const len = Math.hypot(dx, dz);
+      if (len > 0.001) return new THREE.Vector3(dx / len, 0, dz / len);
+    }
+    return new THREE.Vector3(0, 0, 1);
+  },
+
+  setup() {
+    const info = this.el.components['exhibit-info'];
+    const item = info && info.items && info.items.find((it) => it.id === this.data.target);
+    const anchor = item && item.anchorObj;
+    if (!info || !item || !anchor) {
+      this.retryCount += 1;
+      if (this.retryCount < 30) window.setTimeout(() => this.setup(), 120);
+      else console.warn('[electroactivity] no se pudo localizar Rhodovulum');
+      return;
+    }
+
+    const box = new THREE.Box3().setFromObject(anchor);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const bacHeight = Math.max(0.05, size.y);
+
+    const vitrine = this.findVitrine(center);
+    const bellBox = vitrine.bell ? vitrine.bell.box : null;
+    const bellCenter = bellBox ? bellBox.getCenter(new THREE.Vector3()) : center.clone();
+    const bellRadius = bellBox
+      ? Math.max(bellBox.max.x - bellBox.min.x, bellBox.max.z - bellBox.min.z) * 0.5
+      : Math.max(size.x, size.z) * 0.5 + 0.05;
+
+    const peana = this.findNearestPeana(info, center);
+    const standTopY = peana && typeof peana.maxY === 'number'
+      ? peana.maxY
+      : (vitrine.base ? vitrine.base.box.min.y : box.min.y - 0.12);
+    const standCenter = peana ? peana.center : bellCenter;
+    const standRadius = peana ? peana.radius : bellRadius + 0.18;
+
+    const front = this.getFrontDirection(info, center);
+    // Derecha del VISITANTE (mira hacia -front): right = (-front) x up.
+    const right = new THREE.Vector3(front.z, 0, -front.x).normalize();
+
+    // Se prueba primero la derecha; si ahi el electrodo no cabria dentro de
+    // la tapa de la peana, se usa la izquierda. Nunca se fuerza una posicion
+    // que se salga de la piedra.
+    const margin = 0.055;
+    const wanted = bellRadius + 0.072;
+    const place = (dir, lateral) => bellCenter.clone()
+      .addScaledVector(dir, lateral)
+      .addScaledVector(front, -0.022);
+    const fits = (p) => Math.hypot(p.x - standCenter.x, p.z - standCenter.z) <= standRadius - margin;
+
+    let sideDir = right.clone();
+    let lateral = wanted;
+    let pos = place(sideDir, lateral);
+    if (!fits(pos)) {
+      const alt = place(right.clone().negate(), wanted);
+      if (fits(alt)) { sideDir = right.clone().negate(); pos = alt; }
+      else {
+        // se acerca el electrodo hasta que quepa, sin bajar de la campana
+        while (lateral > bellRadius + 0.030 && !fits(pos)) {
+          lateral -= 0.008;
+          pos = place(sideDir, lateral);
+        }
+      }
+    }
+    pos.y = standTopY + 0.002;
+
+    // Proporciones DERIVADAS de la bacteria: la placa mide poco mas de la
+    // mitad de su altura visual, tal y como pide el guion museografico.
+    const plateH = THREE.MathUtils.clamp(bacHeight * 0.58, 0.046, 0.095);
+    const plateW = plateH * 0.64;
+    const plateT = 0.0038;
+    const plateCY = center.y - bacHeight * 0.12;   // ligeramente por debajo del centro
+
+    this.info = info;
+    this.anchorObj = anchor;
+    this.targetCenter = center;
+    this.bacHeight = bacHeight;
+    this.front = front;
+    this.side = sideDir;
+    this.electrodeBase = pos;
+    this.plateGeom = { w: plateW, h: plateH, t: plateT, cy: plateCY };
+    this.bellBox = bellBox;
+
+    this.collectBacteriaMaterials(anchor);
+    this.createElectrode();
+    this.createPath();
+    this.createGuide();
+    this.createElectronPool();
+    this.createLabel();
+
+    this.ready = true;
+    console.log('[electroactivity] Rhodovulum listo', {
+      bacteria: center.toArray().map((v) => +v.toFixed(3)),
+      alturaBacteria: +bacHeight.toFixed(3),
+      electrodo: pos.toArray().map((v) => +v.toFixed(3)),
+      placa: [+plateW.toFixed(3), +plateH.toFixed(3)],
+      campana: bellBox ? bellBox.max.toArray().map((v) => +v.toFixed(3)) : null
+    });
+  },
+
+  collectBacteriaMaterials(anchor) {
+    const mats = new Set();
+    anchor.traverse((node) => {
+      if (!node.isMesh || !node.material) return;
+      const list = Array.isArray(node.material) ? node.material : [node.material];
+      list.forEach((mat) => { if (mat && mat.emissive) mats.add(mat); });
+    });
+    this.bacteriaMats = Array.from(mats).map((mat) => ({
+      mat, base: mat.emissiveIntensity || 0
+    }));
+  },
+
+  /* --------------------------------------------------------------------
+     ELECTRODO. Placa fina de grafito con un filo turquesa, sobre un pie
+     minimo. Nada de torre, nada de pantalla.
+     -------------------------------------------------------------------- */
+  createElectrode() {
+    const sceneObj = this.el.sceneEl.object3D;
+    const { w, h, t, cy } = this.plateGeom;
+    const base = this.electrodeBase;
+
+    const group = new THREE.Group();
+    group.name = 'rhodovulum-electrodo';
+    group.position.copy(base);
+    // la cara util mira a la bacteria
+    const toBac = this.targetCenter.clone().sub(base); toBac.y = 0;
+    if (toBac.lengthSq() < 1e-6) toBac.copy(this.front);
+    toBac.normalize();
+    group.rotation.y = Math.atan2(toBac.x, toBac.z);
+    sceneObj.add(group);
+    this.faceDir = toBac;
+
+    const graphite = new THREE.MeshStandardMaterial({
+      color: 0x1b1e20, roughness: 0.46, metalness: 0.62,
+      emissive: 0x0d2b2b, emissiveIntensity: 0,
+      transparent: true, opacity: 0
+    });
+    const turquoise = new THREE.MeshBasicMaterial({
+      color: 0x3fd9d2, transparent: true, opacity: 0, depthWrite: false
+    });
+    const stemMat = new THREE.MeshStandardMaterial({
+      color: 0x24282a, roughness: 0.5, metalness: 0.6,
+      transparent: true, opacity: 0
+    });
+
+    const plateY = cy - base.y;                 // altura local del centro de placa
+    const plateBottom = plateY - h / 2;
+
+    // filo turquesa: un plano un pelin mayor detras de la placa, de modo que
+    // solo asome como una linea de menos de 1 mm en todo el contorno.
+    const rim = new THREE.Mesh(new THREE.PlaneGeometry(w + 0.0016, h + 0.0016), turquoise);
+    rim.position.set(0, plateY, t / 2 - 0.0004);
+    group.add(rim);
+
+    const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, t), graphite);
+    body.position.set(0, plateY, 0);
+    group.add(body);
+
+    const faceMat = new THREE.MeshBasicMaterial({
+      map: this.buildElectrodeFaceTexture(), transparent: true, opacity: 0,
+      depthWrite: false
+    });
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.94, h * 0.94), faceMat);
+    face.position.set(0, plateY, t / 2 + 0.0006);
+    group.add(face);
+
+    const stem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.0026, 0.0032, Math.max(0.004, plateBottom), 10), stemMat);
+    stem.position.set(0, plateBottom / 2, 0);
+    group.add(stem);
+
+    const foot = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.40, w * 0.46, 0.005, 20), stemMat);
+    foot.position.set(0, 0.0025, 0);
+    group.add(foot);
+
+    // zona de click comoda, invisible
+    const hit = new THREE.Mesh(
+      new THREE.PlaneGeometry(w * 2.6, h * 1.9),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false, side: THREE.DoubleSide })
+    );
+    hit.position.set(0, plateY, t / 2 + 0.004);
+    group.add(hit);
+    hit.userData.museoExhibitId = 'electroactivityElectrode';
+    hit.userData.museoAction = () => this.boostElectrons();
+    if (this.info && this.info.selectableMeshes) this.info.selectableMeshes.push(hit);
+
+    this.electrode = { group, graphite, turquoise, stemMat, faceMat, plateY, hit };
+  },
+
+  buildElectrodeFaceTexture() {
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 400;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#5FEDE4';
+    ctx.textAlign = 'center';
+    ctx.font = '900 132px Arial, Helvetica, sans-serif';
+    ctx.fillText(this.getText('electron'), c.width / 2, 215);
+    ctx.fillStyle = 'rgba(233, 250, 248, 0.80)';
+    ctx.font = '800 40px Arial, Helvetica, sans-serif';
+    ctx.fillText(this.getText('electrode'), c.width / 2, 300);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  },
+
+  /* --------------------------------------------------------------------
+     TRAYECTORIA. Nace en la superficie de la placa, muere en la bacteria.
+     -------------------------------------------------------------------- */
+  createPath() {
+    const base = this.electrodeBase;
+    const { cy, t } = this.plateGeom;
+    const start = new THREE.Vector3(base.x, cy, base.z).addScaledVector(this.faceDir, t / 2 + 0.003);
+    const end = this.targetCenter.clone();
+    this.pathStart = start;
+    this.pathEnd = end;
+
+    const lift = Math.max(0.016, start.distanceTo(end) * 0.16);
+    const perp = new THREE.Vector3(this.faceDir.z, 0, -this.faceDir.x);
+    this.curves = [-1, 0, 1].map((v) => {
+      const mid = start.clone().lerp(end, 0.5)
+        .addScaledVector(perp, v * 0.010)
+        .add(new THREE.Vector3(0, lift * (1 + v * 0.14), 0));
+      return new THREE.QuadraticBezierCurve3(start.clone(), mid, end.clone());
+    });
+  },
+
+  // Guia direccional: linea finisima semitransparente + punta de flecha
+  // minuscula junto a la bacteria (opcion A del guion).
+  createGuide() {
+    const sceneObj = this.el.sceneEl.object3D;
+    const group = new THREE.Group();
+    group.name = 'rhodovulum-guia-electrones';
+    sceneObj.add(group);
+
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x3fd9d2, transparent: true, opacity: 0,
+      depthWrite: false, side: THREE.DoubleSide
+    });
+    const tube = new THREE.Mesh(new THREE.TubeGeometry(this.curves[1], 44, 0.0014, 6, false), mat);
+    group.add(tube);
+
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.0068, 0.017, 12), mat);
+    // la punta se coloca en el hueco visible entre placa y bacteria (medido:
+    // la trayectoria entra en los pili hacia t=0.37), no dentro del cuerpo.
+    const tAt = 0.50;
+    const p = this.curves[1].getPointAt(tAt);
+    const tan = this.curves[1].getTangentAt(tAt).normalize();
+    head.position.copy(p);
+    head.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tan);
+    group.add(head);
+
+    this.guide = { group, mat };
+  },
+
+  createElectronPool() {
+    const sceneObj = this.el.sceneEl.object3D;
+    // MUCHO mas pequenos que antes (0.013 -> 0.0038): puntos de energia, no bolas.
+    const geo = new THREE.SphereGeometry(0.0045, 10, 8);
+    const trailGeo = new THREE.SphereGeometry(0.0026, 8, 6);
+    this.electronGeo = geo;
+    this.trailGeo = trailGeo;
+    for (let i = 0; i < this.data.maxElectrons; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0x6ffcf2, transparent: true, opacity: 0,
+        depthWrite: false, blending: THREE.AdditiveBlending
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.visible = false;
+      sceneObj.add(mesh);
+      const trails = [0.045, 0.09].map(() => {
+        const tm = new THREE.MeshBasicMaterial({
+          color: 0x4fe4dc, transparent: true, opacity: 0,
+          depthWrite: false, blending: THREE.AdditiveBlending
+        });
+        const t = new THREE.Mesh(trailGeo, tm);
+        t.visible = false;
+        sceneObj.add(t);
+        return { mesh: t, mat: tm };
+      });
+      this.electrons.push({ mesh, mat, trails, active: false, t: 0, speed: 0.55, curve: i % 3 });
+    }
+  },
+
+  /* --------------------------------------------------------------------
+     MICROETIQUETA. Dos lineas, pequena, siempre por debajo de la imagen
+     circular (se calcula con el tope real de la campana, no a ojo).
+     -------------------------------------------------------------------- */
+  createLabel() {
+    const sceneObj = this.el.sceneEl.object3D;
+    const group = new THREE.Group();
+    group.name = 'rhodovulum-microetiqueta';
+    const base = this.electrodeBase;
+    const topPlate = this.plateGeom.cy + this.plateGeom.h / 2;
+    const bellTop = this.bellBox ? this.bellBox.max.y : topPlate + 0.2;
+    // se queda entre el borde superior de la placa y el tope de la campana:
+    // por encima del electrodo, muy por debajo del circulo de imagen.
+    const y = Math.min(topPlate + 0.048, bellTop - 0.030);
+    group.position.set(base.x + this.side.x * 0.022, y, base.z + this.side.z * 0.022);
+    sceneObj.add(group);
+
+    const tex = this.buildLabelTexture();
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide
+    });
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.160, 0.043), mat);
+    group.add(plane);
+    this.label = { group, mat, plane };
+  },
+
+  buildLabelTexture() {
+    const c = document.createElement('canvas');
+    c.width = 740; c.height = 200;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.fillStyle = 'rgba(6, 14, 17, 0.62)';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#4FE4DC';
+    ctx.fillRect(0, 0, 7, c.height);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#4FE4DC';
+    ctx.font = '900 52px Arial, Helvetica, sans-serif';
+    ctx.fillText(this.getText('title'), 34, 84);
+    ctx.fillStyle = 'rgba(247, 252, 250, 0.88)';
+    ctx.font = '700 44px Arial, Helvetica, sans-serif';
+    ctx.fillText(this.getText('flow'), 34, 150);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  },
+
+  /* -------------------------------------------------------------------- */
+
+  boostElectrons() {
+    this.boostUntil = performance.now() + 3000;
+    this.spawnElectron(true);
+  },
+
+  isBoosting() { return performance.now() < this.boostUntil; },
+
+  spawnElectron(force) {
+    if (!this.ready || (!this.active && !force)) return;
+    const e = this.electrons.find((p) => !p.active);
+    if (!e) return;
+    e.active = true;
+    e.t = 0;
+    e.curve = Math.floor(Math.random() * this.curves.length);
+    e.speed = 1 / THREE.MathUtils.randFloat(1.25, 1.85);
+    e.mesh.visible = true;
+    e.mat.opacity = 0;
+  },
+
+  setVisibleAmount(t) {
+    if (!this.electrode) return;
+    const eased = t * t * (3 - 2 * t);
+    const boost = this.isBoosting() ? 1 : 0;
+    const g = this.electrode;
+    g.group.visible = eased > 0.005;
+    // apagado: el electrodo sigue ahi pero casi no se ve (no desaparece de golpe)
+    const solid = 0.22 + 0.72 * eased;
+    g.graphite.opacity = solid;
+    g.stemMat.opacity = solid;
+    g.turquoise.opacity = (0.10 + 0.62 * eased) * (1 + boost * 0.25);
+    g.graphite.emissiveIntensity = (0.02 + 0.10 * eased) * (1 + boost * 0.6);
+    g.faceMat.opacity = 0.05 + 0.90 * eased;
+    if (this.guide) {
+      this.guide.group.visible = eased > 0.01;
+      this.guide.mat.opacity = (0.06 + 0.36 * eased) * (1 + boost * 0.45);
+    }
+    if (this.label) {
+      this.label.group.visible = eased > 0.03;
+      this.label.mat.opacity = 0.94 * Math.max(0, (eased - 0.03) / 0.97);
+    }
+  },
+
+  updateParticles(dt, time) {
+    if (!this.curves.length) return;
+    if (this.active) {
+      const interval = this.isBoosting()
+        ? THREE.MathUtils.randFloat(130, 190)
+        : THREE.MathUtils.randFloat(290, 400);
+      if (time >= this.nextSpawn) {
+        this.spawnElectron(false);
+        this.nextSpawn = time + interval;
+      }
+    }
+    this.electrons.forEach((e) => {
+      if (!e.active) return;
+      e.t += e.speed * dt;
+      const curve = this.curves[e.curve] || this.curves[0];
+      const tt = Math.min(e.t, 1);
+      e.mesh.position.copy(curve.getPointAt(tt));
+      const fadeIn = THREE.MathUtils.clamp(e.t / 0.10, 0, 1);
+      const fadeOut = THREE.MathUtils.clamp((1 - e.t) / 0.14, 0, 1);
+      const a = 0.95 * this.displayT * fadeIn * fadeOut;
+      e.mat.opacity = a;
+      e.trails.forEach((tr, i) => {
+        const bt = Math.max(0, tt - 0.05 * (i + 1));
+        tr.mesh.visible = true;
+        tr.mesh.position.copy(curve.getPointAt(bt));
+        tr.mat.opacity = a * (0.34 - i * 0.14);
+      });
+      if (e.t >= 1) {
+        e.active = false;
+        e.mesh.visible = false;
+        e.trails.forEach((tr) => { tr.mesh.visible = false; });
+        this.pulseT = 1;   // llegada -> destello minimo de la bacteria
+      }
+    });
+  },
+
+  // Llegada: subida muy pequena de emision, 0.3 s, y vuelta exacta al valor
+  // de fabrica. Nada de flashes ni de pulsos violeta.
+  updateBacteriaPulse(dt) {
+    if (this.pulseT > 0) this.pulseT = Math.max(0, this.pulseT - dt / 0.32);
+    const p = Math.sin(this.pulseT * Math.PI);
+    this.bacteriaMats.forEach(({ mat, base }) => {
+      mat.emissiveIntensity = base + (base > 0.01 ? base * 0.30 : 0.09) * p;
+    });
+  },
+
+  tick(time, delta) {
+    if (!this.ready) return;
+    const rig = document.getElementById('rig');
+    if (!rig) return;
+    const p = rig.object3D.getWorldPosition(this.tmp2);
+    const d = Math.hypot(p.x - this.targetCenter.x, p.z - this.targetCenter.z);
+    if (!this.active && d <= this.data.trigger) { this.active = true; this.nextSpawn = time + 140; }
+    else if (this.active && d >= this.data.release) this.active = false;
+
+    const dt = Math.min(0.05, Math.max(0.001, (delta || 16) / 1000));
+    this.displayT += ((this.active ? 1 : 0) - this.displayT) * 0.075;
+    this.setVisibleAmount(this.displayT);
+    this.updateParticles(dt, time);
+    this.updateBacteriaPulse(dt);
+    if (this.label && this.el.sceneEl.camera) {
+      this.label.group.lookAt(this.el.sceneEl.camera.getWorldPosition(this.tmp));
+    }
+  },
+
+  remove() {
+    this.bacteriaMats.forEach(({ mat, base }) => { mat.emissiveIntensity = base; });
+    [this.electrode && this.electrode.group, this.guide && this.guide.group, this.label && this.label.group]
+      .forEach((g) => { if (g && g.parent) g.parent.remove(g); });
+    this.electrons.forEach((e) => {
+      if (e.mesh && e.mesh.parent) e.mesh.parent.remove(e.mesh);
+      e.trails.forEach((tr) => { if (tr.mesh.parent) tr.mesh.parent.remove(tr.mesh); });
+    });
+    if (this.electronGeo) this.electronGeo.dispose();
+    if (this.trailGeo) this.trailGeo.dispose();
+  }
+});
+
 /* ==========================================================================
    SALA 2 -- estacion de control del reactor. Cuatro botones fisicos sobre
    la peana cuadrada ya existente (PEANA_Alta_B, sin usar hasta ahora),
@@ -2725,10 +3277,16 @@ AFRAME.registerComponent('image-windows', {
 AFRAME.registerComponent('reactor-control', {
   init() {
     this.stage = { light: false, flow: false, nutrients: false, active: false };
-    this.buttons = [];        // {id, mesh, material, locked, baseEmissive}
+    this.buttons = [];        // {id, mesh, material, ring, status, ...}
     this._hoverT = {};        // id -> 0..1, suavizado de hover por boton
     this.reactorLang = this.getReactorLang();
     this.reactorLast = { id: null, on: false };
+    this.msgUntil = 0;        // el mensaje de causa-efecto vive 3.8 s y se va
+    this.rewardUntil = 0;     // banner SISTEMA ACTIVO, ~2.6 s
+    this.wasComplete = false; // ver checkReward(): la recompensa solo salta en la transicion
+    this.rewardPulse = 0;
+    this.doses = [];          // dosis de nutrientes en curso (ver injectDose)
+    this.needsRedraw = false;
     this.nextLangCheck = 0;
     this.el.addEventListener('museo-modules-loaded', () => this.onLoaded());
   },
@@ -2752,41 +3310,53 @@ AFRAME.registerComponent('reactor-control', {
     return value.startsWith('es') ? 'es' : 'en';
   },
 
+  /*
+    La copia del display vive en museum-i18n.js (window.MUSEUM_I18N.reactorPanel),
+    el MISMO sistema ES/EN del resto del museo. REACTOR_CONTROL_I18N queda
+    unicamente como red de seguridad por si ese fichero no hubiera cargado:
+    no es un segundo sistema de idiomas.
+  */
   getReactorCopy() {
     const lang = this.getReactorLang();
     this.reactorLang = lang;
-    return REACTOR_CONTROL_I18N[lang] || REACTOR_CONTROL_I18N.en;
+    const shared = window.MUSEUM_I18N && window.MUSEUM_I18N.reactorPanel;
+    const fromI18n = shared && (shared[lang] || shared.en);
+    return fromI18n || REACTOR_CONTROL_I18N[lang] || REACTOR_CONTROL_I18N.en;
   },
 
+  now() { return (window.performance && performance.now) ? performance.now() : Date.now(); },
+
+  activeCount() {
+    const s = this.stage;
+    return (s.light ? 1 : 0) + (s.flow ? 1 : 0) + (s.nutrients ? 1 : 0) + (s.active ? 1 : 0);
+  },
+
+  // Mensaje de causa-efecto del ultimo control pulsado. Caduca solo: pasados
+  // 3.8 s el display vuelve a mostrar unicamente los estados.
   getReactorMessage(copy) {
-    const allOn = this.stage.light && this.stage.flow && this.stage.nutrients && this.stage.active;
-    if (allOn) return { title: copy.systemActive, body: copy.systemActiveText };
-    if (this.reactorLast && this.reactorLast.id) {
+    if (this.reactorLast && this.reactorLast.id && this.now() < this.msgUntil) {
       const m = copy.messages[this.reactorLast.id];
-      if (m) return this.reactorLast.on
-        ? { title: m.onTitle, body: m.on }
-        : { title: m.offTitle, body: m.off };
+      if (m) {
+        return this.reactorLast.on
+          ? { title: m.onTitle, body: m.on }
+          : { title: m.offTitle, body: m.off };
+      }
     }
-    return { title: copy.title, body: copy.idle };
+    return { title: copy.statusTitle, body: copy.idle };
   },
 
   onLoaded() {
     const mesh = this.el.object3D;
 
-    // Materiales reales del reactor. Un unico material por nombre (glTF los
-    // comparte entre sus mallas), asi que basta con encontrar cada uno una
-    // vez y guardar su intensidad/opacidad de fabrica como "base": los
-    // botones solo escalan esa base, nunca la sustituyen.
-    let bubbleMat = null, liquidMat = null, liquidMesh = null, glassMat = null;
+    // Materiales reales del reactor (un unico material por nombre: el glTF
+    // los comparte entre sus mallas). Se guarda su valor de fabrica como
+    // "base": los controles solo escalan esa base, nunca la sustituyen.
+    let bubbleMat = null, liquidMat = null, liquidMesh = null, glassMat = null, glassMesh = null;
     mesh.traverse((o) => {
       if (!o.isMesh || !o.material) return;
       if (o.material.name === 'Bioreactor_Bubble' && !bubbleMat) bubbleMat = o.material;
       if (o.material.name === 'Bioreactor_Liquid' && !liquidMat) { liquidMat = o.material; liquidMesh = o; }
-      // "Vidrio" es el material del cristal exterior del reactor (Bioreactor_
-      // Glass): sin emisivo propio en el glTF (solo transparencia), asi que
-      // sirve de superficie neutra sobre la que pintar el realce de hover
-      // (ver hoverGlow en tick) sin depender de que LIGHT/FLOW ya esten
-      // encendidos -- el reactor debe notarse seleccionable incluso apagado.
+      if (o.name === 'Bioreactor_Glass') { glassMesh = o; if (!glassMat) glassMat = o.material; }
       if (o.material.name === 'Vidrio' && !glassMat) glassMat = o.material;
     });
     this.bubbleMat = bubbleMat;
@@ -2796,245 +3366,265 @@ AFRAME.registerComponent('reactor-control', {
     this.liquidBase = liquidMat ? { i: liquidMat.emissiveIntensity, o: liquidMat.opacity } : null;
     this.liquidMesh = liquidMesh;
     this.captureLiquidLevel(liquidMesh);
-    // base real del cristal (casi siempre negro/sin emisivo de fabrica) --
-    // el realce de hover se mezcla hacia el acento de Sala 2 partiendo de
-    // este valor, nunca sustituyendolo.
+
     this.glassBaseEmissive = glassMat && glassMat.emissive ? glassMat.emissive.clone() : new THREE.Color(0, 0, 0);
     this.glassBaseEmissiveIntensity = (glassMat && typeof glassMat.emissiveIntensity === 'number') ? glassMat.emissiveIntensity : 1;
-    this.hoverGlow = 0;   // 0..1, suavizado -- ver tick()
-    this.activePulseAmt = 0;   // 0..1, entra/sale con ACTIVATE -- ver tick()
-    this.activePulse = 0;      // 0..1, activePulseAmt * oscilacion senoidal -- ver tick()
-    // altura real de la superficie del cultivo (malla Bioreactor_Liquid_Obj),
-    // punto de llegada de las gotas de NUTRIENTS -- ver buildNutrientParticles.
+    this.hoverGlow = 0;
+
+    // Cotas reales medidas del propio reactor: techo del cristal (donde
+    // empieza a verse la dosis de nutrientes) y superficie del cultivo.
+    this.glassBox = glassMesh ? new THREE.Box3().setFromObject(glassMesh) : null;
     this.liquidTopY = liquidMesh ? new THREE.Box3().setFromObject(liquidMesh).max.y : null;
 
-    // 02 FLOW necesita un efecto "legible a distancia normal", no solo un
-    // cambio de brillo/opacidad de las burbujas (que a distancia se nota
-    // poco). Las burbujas ya llevan una animacion horneada en el propio GLB
-    // (Bioreactor_Bubbles.000-030, reproducida en bucle por gltf-animations
-    // sobre el modulo del bioreactor) -- FLOW controla directamente la
-    // VELOCIDAD real de esa animacion (AnimationMixer.timeScale), asi que
-    // encender FLOW hace que la circulacion se vea moverse de verdad, y
-    // apagarlo la detiene, en vez de solo atenuar su brillo.
+    // Burbujas horneadas del GLB (Bioreactor_Bubbles.000-030, en bucle desde
+    // que carga el modulo). Su VELOCIDAD real la controla ahora ACTIVIDAD --
+    // no FLUJO: burbujas que suben son metabolismo, no circulacion, y asi
+    // los dos controles dejan de leerse igual.
     const bioreactorEl = this.el.querySelector('[gltf-model="#bioreactor"]');
     this.bioreactorAnim = bioreactorEl && bioreactorEl.components && bioreactorEl.components['gltf-animations'];
 
-    // Foco de exposicion que exhibit-lighting ya crea sobre PEANA_Bioreactor.
     const lightingComp = this.el.components['exhibit-lighting'];
     this.reactorSpot = lightingComp && lightingComp.spotsByAnchor && lightingComp.spotsByAnchor['PEANA_Bioreactor'];
     this.spotBase = (this.reactorSpot && this.reactorSpot.userData.baseIntensity) || 2.4;
 
-    // valores actuales (se interpolan en tick hacia this.target*)
     this.curSpot = this.spotBase;
     this.curBubbleI = this.bubbleBase ? this.bubbleBase.i : 0;
     this.curBubbleO = this.bubbleBase ? this.bubbleBase.o : 0;
     this.curLiquidI = this.liquidBase ? this.liquidBase.i : 0;
-    this.curFlowSpeed = 0;
+    this.curFlowAmount = 0;
+    this.curAnimSpeed = 0;
     this.curNutrientLevel = 0;
+    this.flowAngle = 0;
     this.recomputeTargets();
-    // arranca ya en el estado 0 (inactivo), sin animar desde el valor de fabrica
     this.curSpot = this.targetSpot;
     this.curBubbleI = this.targetBubbleI;
     this.curBubbleO = this.targetBubbleO;
     this.curLiquidI = this.targetLiquidI;
-    this.curFlowSpeed = this.targetFlowSpeed;
+    this.curFlowAmount = this.targetFlowAmount;
+    this.curAnimSpeed = this.targetAnimSpeed;
     this.applyReactorState();
 
     this.buildFlowParticles(mesh);
     this.buildNutrientParticles(mesh);
     this.buildActivityBubbles(mesh);
     this.buildControlStand();
-    console.log('[reactor-control] listo -- estado 0 (reactor inactivo)');
+    console.log('[reactor-control] listo -- 0/4, reactor en reposo');
   },
-
   /*
-    Estado 0..1 de cada variable, a partir de que botones estan activados.
-    Cada boton tiene ahora su PROPIO canal visual, sin compartir variable
-    con ningun otro (antes NUTRIENTS subia el mismo brillo del liquido que
-    LIGHT, y no se notaba como un efecto distinto):
-      01 LIGHT      -> foco de exposicion + brillo emisivo del liquido
-                       (iluminacion, tanto de la sala como del cultivo)
-      02 FLOW       -> intensidad/opacidad de las burbujas (la animacion de
-                       circulacion ya esta horneada y corre siempre; FLOW la
-                       hace notoria en vez de crearla)
-      03 NUTRIENTS  -> canal totalmente aparte, sin material: ver
-                       buildNutrientParticles/updateNutrientParticles
-                       (gotas visibles bajando por el tubo real del reactor)
-      04 ACTIVATE   -> ya no es un multiplicador (*1.12) sobre valores que,
-                       con LIGHT/FLOW apagados, ya eran muy bajos -- eso es lo
-                       que hacia que "no se notara nada" al pulsarlo solo.
-                       Ahora ACTIVATE aporta su PROPIO incremento aditivo en
-                       los tres canales (igual que LIGHT/FLOW aportan el
-                       suyo), asi que se nota encendido incluso el solo, y
-                       ademas anade un pulso ritmico propio (ver activePulse
-                       en tick/applyReactorState) que es la señal mas clara
-                       de "actividad biologica" y no se puede confundir con
-                       ningun otro boton (ni LIGHT, ni FLOW, ni NUTRIENTS son
-                       pulsantes).
+    Un canal visual por control, sin solaparse -- esa era la razon de que
+    "se pulsara y no se notara nada": tres de los cuatro botones movian el
+    mismo brillo.
+
+      01 LUZ        -> iluminacion: foco de exposicion + emision del cultivo.
+                       Apagado NO es negro, es una interior neutra, para que
+                       ON/OFF/ON se reconozcan los dos estados.
+      02 FLUJO      -> circulacion: puntos turquesa girando en horizontal
+                       dentro del volumen del liquido. Ni burbujas ni brillo.
+      03 NUTRIENTES -> dosis: cada pulsacion mete una tanda de gotas que
+                       entran por la tapa, caen al cultivo y se dispersan.
+                       Ademas el nivel del liquido sube mientras esta activo.
+      04 ACTIVIDAD  -> burbujas: unico canal que enciende las burbujas reales
+                       del GLB (opacidad + velocidad de su animacion) y las
+                       burbujas propias que nacen abajo y suben. No enciende
+                       ninguna luz.
   */
   recomputeTargets() {
     const s = this.stage;
-    const allOn = s.light && s.flow && s.nutrients && s.active;
-    const activeMult = s.active ? 1.06 : 1;
+    const all = this.activeCount() === 4;
 
-    const spotFrac = 0.34 + (s.light ? 0.50 : 0) + (allOn ? 0.06 : 0);
-    this.targetSpot = this.spotBase * spotFrac;
+    this.targetSpot = this.spotBase * (0.46 + (s.light ? 0.54 : 0) + (all ? 0.05 : 0));
+    this.targetLiquidI = this.liquidBase
+      ? this.liquidBase.i * (0.34 + (s.light ? 0.66 : 0) + (all ? 0.06 : 0))
+      : 0;
 
-    const liquidIFrac = 0.20 + (s.light ? 0.58 : 0) + (s.active ? 0.10 : 0) + (allOn ? 0.08 : 0);
-    this.targetLiquidI = this.liquidBase ? this.liquidBase.i * liquidIFrac * activeMult : 0;
-
-    const bubbleIFrac = 0.12 + (s.flow ? 0.30 : 0) + (s.active ? 0.42 : 0) + (allOn ? 0.08 : 0);
-    const bubbleOFrac = 0.20 + (s.flow ? 0.22 : 0) + (s.active ? 0.38 : 0) + (allOn ? 0.08 : 0);
-    this.targetBubbleI = this.bubbleBase ? this.bubbleBase.i * bubbleIFrac * activeMult : 0;
-    this.targetBubbleO = this.bubbleBase ? Math.min(1, this.bubbleBase.o * bubbleOFrac) : 0;
-
-    // Velocidad real de la circulacion (ver bioreactorAnim en onLoaded):
-    // sigue dependiendo solo de FLOW -- si ACTIVATE por si solo tambien
-    // pusiera en marcha la animacion, dejaria de poder distinguirse de
-    // FLOW. ACTIVATE unicamente la refuerza un poco cuando FLOW ya esta on.
-    this.targetFlowSpeed = s.flow ? (0.72 * (allOn ? 1.12 : 1)) : 0;
+    this.targetFlowAmount = s.flow ? 1 : 0;
     this.targetNutrientLevel = s.nutrients ? 1 : 0;
+
+    this.targetBubbleI = this.bubbleBase ? this.bubbleBase.i * (s.active ? 1.0 : 0.05) : 0;
+    this.targetBubbleO = this.bubbleBase ? (s.active ? Math.min(1, this.bubbleBase.o * 1.2) : 0) : 0;
+    this.targetAnimSpeed = s.active ? (all ? 1.12 : 1) : 0;
   },
 
   applyReactorState() {
-    // Realce sutil de hover (ver tick()): un empujon MUY modesto sobre las
-    // dos superficies que ya brillan (liquido/burbujas), independiente del
-    // estado de los botones -- se nota un pelin mas vivo el reactor cuando
-    // el visitante pasa el raton por encima, sin competir con el efecto de
-    // los botones ni resultar exagerado.
     const hoverBoost = 1 + this.hoverGlow * 0.18;
-    // Pulso de ACTIVATE (ver tick(): this.activePulse, 0..1, ya con su propio
-    // fundido de entrada/salida y oscilacion senoidal): un "latido" lento y
-    // suave sobre foco/liquido/burbujas, solo presente cuando ACTIVATE esta
-    // encendido -- es la señal que hace que el reactor "se sienta vivo" y
-    // operativo, distinta de cualquier cambio estatico de brillo.
-    const activePulseBoost = 1 + (this.activePulse || 0) * 0.05;
-    if (this.reactorSpot) this.reactorSpot.intensity = this.curSpot * activePulseBoost;
+    const reward = this.rewardPulse || 0;
+    if (this.reactorSpot) this.reactorSpot.intensity = this.curSpot * (1 + reward * 0.10);
     if (this.bubbleMat) {
-      this.bubbleMat.emissiveIntensity = this.curBubbleI * hoverBoost * activePulseBoost;
+      this.bubbleMat.emissiveIntensity = this.curBubbleI * hoverBoost;
       this.bubbleMat.opacity = this.curBubbleO;
+      this.bubbleMat.visible = this.curBubbleO > 0.01;
     }
-    if (this.liquidMat) this.liquidMat.emissiveIntensity = this.curLiquidI * hoverBoost * activePulseBoost;
-    if (this.bioreactorAnim && this.bioreactorAnim.mixer) this.bioreactorAnim.mixer.timeScale = this.curFlowSpeed;
+    if (this.liquidMat) this.liquidMat.emissiveIntensity = this.curLiquidI * hoverBoost * (1 + reward * 0.12);
+    if (this.bioreactorAnim && this.bioreactorAnim.mixer) this.bioreactorAnim.mixer.timeScale = this.curAnimSpeed;
     this.applyLiquidLevel(this.curNutrientLevel || 0);
-    // Cristal exterior: unico material del reactor que no depende de ningun
-    // boton, asi que es el que mejor comunica "esto se puede seleccionar"
-    // incluso con el reactor todavia apagado -- un tinte muy suave hacia el
-    // acento de Sala 2, nunca un contorno duro ni un brillo tipo sci-fi.
-    // El pulso de ACTIVATE tambien se nota aqui (un halo que respira), para
-    // que el estado "operativo" se lea incluso mirando solo el cristal.
+
+    // Cristal exterior: comunica que la pieza es seleccionable (hover) y
+    // acompana el pulso de la recompensa. Nunca un contorno duro.
     if (this.glassMat) {
-      const glowMix = Math.min(1, this.hoverGlow * 0.42 + (this.activePulseAmt || 0) * 0.18);
-      this.glassMat.emissive.copy(this.glassBaseEmissive).lerp(this._room2AccentColor || (this._room2AccentColor = new THREE.Color(ROOM2_ACCENT)), glowMix);
-      this.glassMat.emissiveIntensity = this.glassBaseEmissiveIntensity + this.hoverGlow * 0.55 + (this.activePulseAmt || 0) * 0.16;
+      const accent = this._room2AccentColor || (this._room2AccentColor = new THREE.Color(ROOM2_ACCENT));
+      const glowMix = Math.min(1, this.hoverGlow * 0.42 + reward * 0.30);
+      this.glassMat.emissive.copy(this.glassBaseEmissive).lerp(accent, glowMix);
+      this.glassMat.emissiveIntensity = this.glassBaseEmissiveIntensity + this.hoverGlow * 0.55 + reward * 0.35;
     }
   },
 
+  /*
+    02 FLUJO -- circulacion. Los puntos recorren orbitas HORIZONTALES a
+    cuatro alturas dentro del volumen real del cultivo y todas giran a la
+    vez: se lee como liquido que se mueve, nunca como burbujas subiendo.
+  */
   buildFlowParticles(mesh) {
     this.flowDots = [];
     if (!this.liquidMesh) return;
-    const liquidBox = new THREE.Box3().setFromObject(this.liquidMesh);
-    const sx = Math.max(0.02, liquidBox.max.x - liquidBox.min.x);
-    const sy = Math.max(0.02, liquidBox.max.y - liquidBox.min.y);
-    const sz = Math.max(0.02, liquidBox.max.z - liquidBox.min.z);
-    const cx = (liquidBox.min.x + liquidBox.max.x) * 0.5;
-    const cy = (liquidBox.min.y + liquidBox.max.y) * 0.5;
-    const cz = (liquidBox.min.z + liquidBox.max.z) * 0.5;
+    const b = new THREE.Box3().setFromObject(this.liquidMesh);
+    const sx = Math.max(0.02, b.max.x - b.min.x);
+    const sy = Math.max(0.02, b.max.y - b.min.y);
+    const sz = Math.max(0.02, b.max.z - b.min.z);
+    const cx = (b.min.x + b.max.x) * 0.5;
+    const cz = (b.min.z + b.max.z) * 0.5;
     const group = new THREE.Group();
-    group.name = 'reactor-flow-circulation-dots';
-    const color = new THREE.Color(0x63d8d2);
-    const N = 22;
-    for (let i = 0; i < N; i++) {
-      const mat = new THREE.MeshStandardMaterial({
-        color, emissive: color, emissiveIntensity: 0.85,
-        roughness: 0.25, metalness: 0, transparent: true, opacity: 0, depthWrite: false
-      });
-      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.006 + (i % 2) * 0.002, 8, 8), mat);
-      group.add(dot);
-      this.flowDots.push({
-        mesh: dot, mat,
-        phase: i / N,
-        offset: ((i * 41) % 100) / 100,
-        radiusX: sx * (0.16 + ((i * 13) % 8) / 100),
-        radiusZ: sz * (0.16 + ((i * 17) % 8) / 100)
-      });
+    group.name = 'reactor-flow-circulation';
+    // el turquesa puro se fundia con el propio liquido: se aclara para que
+    // los trazos se lean de verdad a distancia de visita.
+    const color = new THREE.Color(0x8df7ef);
+    const RINGS = 4, PER = 5;
+    for (let r = 0; r < RINGS; r++) {
+      for (let i = 0; i < PER; i++) {
+        const mat = new THREE.MeshBasicMaterial({
+          color, transparent: true, opacity: 0, depthWrite: false
+        });
+        const dot = new THREE.Mesh(new THREE.SphereGeometry(0.0125 - (r % 2) * 0.0025, 10, 8), mat);
+        group.add(dot);
+        this.flowDots.push({
+          mesh: dot, mat,
+          angle: (i / PER) * Math.PI * 2 + r * 0.5,
+          // radio y altura fijos por anillo: la lectura es "gira", no "flota"
+          radiusX: sx * (0.20 + r * 0.055),
+          radiusZ: sz * (0.20 + r * 0.055),
+          y: b.min.y + sy * (0.20 + r * 0.185),
+          dir: r % 2 === 0 ? 1 : -1
+        });
+      }
     }
-    this.flowTravel = {
-      cx, cy, cz,
-      minY: liquidBox.min.y + sy * 0.18,
-      maxY: liquidBox.max.y - sy * 0.14
-    };
+    this.flowCenter = { cx, cz };
     this.el.sceneEl.object3D.add(group);
     this.flowGroup = group;
   },
 
-  updateFlowParticles(time) {
-    if (!this.flowDots || !this.flowDots.length || !this.flowTravel) return;
-    const t = (time || 0) / 1000;
-    const amount = THREE.MathUtils.clamp((this.curFlowSpeed || 0) / 0.72, 0, 1);
-    const travel = this.flowTravel;
+  updateFlowParticles(dt) {
+    if (!this.flowDots || !this.flowDots.length) return;
+    const amount = THREE.MathUtils.clamp(this.curFlowAmount || 0, 0, 1);
+    this.flowAngle = (this.flowAngle + dt * 0.85 * Math.max(amount, 0.0001)) % (Math.PI * 2);
+    const c = this.flowCenter;
+    const axis = this._flowAxis || (this._flowAxis = new THREE.Vector3(1, 0, 0));
+    const tan = this._flowTan || (this._flowTan = new THREE.Vector3());
     this.flowDots.forEach((d) => {
-      const cycle = (t * 0.10 + d.phase) % 1;
-      const angle = cycle * Math.PI * 2;
-      const vertical = (Math.sin(angle + d.offset * Math.PI * 2) * 0.5 + 0.5);
-      d.mesh.position.set(
-        travel.cx + Math.cos(angle) * d.radiusX,
-        THREE.MathUtils.lerp(travel.minY, travel.maxY, vertical),
-        travel.cz + Math.sin(angle) * d.radiusZ
-      );
-      const target = amount * 0.42;
-      d.mat.opacity += (target - d.mat.opacity) * (this.stage.flow ? 0.08 : 0.045);
-      d.mat.emissiveIntensity = 0.65 + amount * 0.55;
+      const a = d.angle + this.flowAngle * d.dir;
+      d.mesh.position.set(c.cx + Math.cos(a) * d.radiusX, d.y, c.cz + Math.sin(a) * d.radiusZ);
+      // cada punto se estira en su direccion real de avance: en una captura
+      // fija ya se lee "esto circula", y nunca se confunde con una burbuja.
+      tan.set(-Math.sin(a) * d.dir, 0, Math.cos(a) * d.dir).normalize();
+      d.mesh.quaternion.setFromUnitVectors(axis, tan);
+      d.mesh.scale.set(3.0, 0.8, 0.8);
+      d.mat.opacity += (amount - d.mat.opacity) * 0.10;
+      d.mesh.visible = d.mat.opacity > 0.01;
     });
   },
 
   /*
-    03 NUTRIENTS necesita un efecto propio, visualmente distinto de LIGHT y
-    FLOW -- el brief pide "pequeñas particulas o puntos entrando en el
-    cultivo". En vez de inventar un elemento nuevo, se reutiliza una pieza
-    real que ya trae el reactor: Bioreactor_CenterTube, el tubo que baja
-    desde la tapa hasta el liquido (confirmado por inspeccion del glTF).
-    Unas gotas pequeñas, del mismo color que las burbujas reales
-    (Bioreactor_Bubble), descienden por ese tubo hasta la superficie real
-    del cultivo (this.liquidTopY) y se funden en el. Nada de particulas
-    genericas flotando en el aire: el recorrido es la pieza fisica real.
+    03 NUTRIENTES -- dosis. Las gotas NO nacen dentro del cultivo: aparecen
+    a la altura real del techo del cristal (medida sobre Bioreactor_Glass),
+    bajan por el eje del tubo central hasta la superficie real del liquido,
+    entran y se dispersan en abanico mientras se desvanecen. Cada pulsacion
+    del control lanza una tanda nueva, aunque el estado ON/OFF se conserve
+    para el display.
   */
   buildNutrientParticles(mesh) {
     this.nutrientDots = [];
-    const anchor = mesh.getObjectByName('Bioreactor_CenterTube') || mesh.getObjectByName('Bioreactor_InletValve');
-    if (!anchor) return;
-    const box = new THREE.Box3().setFromObject(anchor);
-    const cx = (box.min.x + box.max.x) / 2;
-    const cz = (box.min.z + box.max.z) / 2;
-    const topY = box.max.y;
-    const bottomY = (this.liquidTopY !== null && this.liquidTopY < topY) ? this.liquidTopY : box.min.y;
+    const tube = mesh.getObjectByName('Bioreactor_CenterTube');
+    const box = tube ? new THREE.Box3().setFromObject(tube) : null;
+    const cx = box ? (box.min.x + box.max.x) / 2 : 0;
+    const cz = box ? (box.min.z + box.max.z) / 2 : 0;
+    if (!box) return;
+    const glassTop = this.glassBox ? this.glassBox.max.y : box.max.y;
+    const liquidTop = (this.liquidTopY !== null && this.liquidTopY < glassTop) ? this.liquidTopY : box.min.y;
+    const liquidBottom = this.liquidMesh
+      ? new THREE.Box3().setFromObject(this.liquidMesh).min.y
+      : liquidTop - 0.3;
 
-    const dotColor = (this.bubbleMat && this.bubbleMat.color) ? this.bubbleMat.color.clone() : new THREE.Color(0xffffff);
-    const dotEmissive = (this.bubbleMat && this.bubbleMat.emissive) ? this.bubbleMat.emissive.clone() : dotColor.clone();
-
-    // El brief pide que el efecto "se lea a distancia normal de visitante" --
-    // las 6 gotas de 0.009 m originales resultaban demasiado pequeñas/tenues
-    // para notarse desde fuera de la sala. Mas gotas, mas grandes y mas
-    // brillantes (opacidad tope tambien mas alta, ver updateNutrientParticles)
-    // sin dejar de ser "pequeñas particulas" fieles al brief.
+    // crema calido: el blanco frio de las burbujas se perdia sobre el
+    // cultivo turquesa, y ademas asi NUTRIENTES no se confunde con ACTIVIDAD.
+    const color = new THREE.Color(0xf6e9d2);
     const group = new THREE.Group();
-    group.name = 'reactor-nutrient-dots';
-    const N = 10;
+    group.name = 'reactor-nutrient-dose';
+    const N = 20;
     for (let i = 0; i < N; i++) {
-      const mat = new THREE.MeshStandardMaterial({
-        color: dotColor, emissive: dotEmissive, emissiveIntensity: 1.8,
-        roughness: 0.3, metalness: 0, transparent: true, opacity: 0, depthWrite: false
+      const mat = new THREE.MeshBasicMaterial({
+        color, transparent: true, opacity: 0, depthWrite: false
       });
-      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.015, 8, 8), mat);
-      dot.position.set(cx, topY, cz);
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.014, 10, 8), mat);
+      dot.visible = false;
       group.add(dot);
-      this.nutrientDots.push({ mat, mesh: dot, phase: i / N });
+      this.nutrientDots.push({ mesh: dot, mat, active: false, t: 0, delay: 0, ax: 0, az: 0, drop: 0 });
     }
-    this.nutrientTravel = { topY, bottomY, cx, cz };
-    // al espacio de mundo directamente (igual que las cartelas): ya viene
-    // medido en coordenadas reales, no debe heredar la escala de #modelo.
+    // Radio de entrada: las gotas caen JUNTO al tubo central, nunca dentro.
+    // El tubo es metal opaco -- ese era exactamente el motivo de que la dosis
+    // no se viera: las particulas estaban escondidas en su interior.
+    const tubeR = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) * 0.5;
+    this.nutrientTravel = {
+      cx, cz,
+      entryR: tubeR + 0.024,
+      entryY: glassTop - 0.012,           // justo bajo la tapa, ya dentro del cristal
+      surfaceY: liquidTop,
+      depthY: liquidBottom + (liquidTop - liquidBottom) * 0.35
+    };
     this.el.sceneEl.object3D.add(group);
     this.nutrientGroup = group;
+  },
+
+  // Una dosis = 10 gotas escalonadas. Se lanza en cada clic del control 03.
+  injectDose() {
+    if (!this.nutrientDots || !this.nutrientDots.length) return;
+    const free = this.nutrientDots.filter((d) => !d.active);
+    const n = Math.min(10, free.length);
+    for (let i = 0; i < n; i++) {
+      const d = free[i];
+      const a = Math.random() * Math.PI * 2;
+      d.active = true;
+      d.t = 0;
+      d.delay = i * 0.13;
+      d.ax = Math.cos(a);
+      d.az = Math.sin(a);
+      d.drop = 0.9 + Math.random() * 0.35;
+      d.mesh.visible = true;
+      d.mat.opacity = 0;
+    }
+    this.nextTrickle = this.now() + 1600;
+  },
+
+  updateNutrientParticles(dt) {
+    if (!this.nutrientDots || !this.nutrientTravel) return;
+    // mientras NUTRIENTES esta encendido, un goteo lento mantiene viva la
+    // lectura sin necesidad de volver a pulsar
+    if (this.stage.nutrients && this.now() > (this.nextTrickle || 0)) this.injectDose();
+
+    const tr = this.nutrientTravel;
+    const fallH = tr.entryY - tr.surfaceY;
+    this.nutrientDots.forEach((d) => {
+      if (!d.active) { d.mat.opacity = 0; d.mesh.visible = false; return; }
+      if (d.delay > 0) { d.delay -= dt; d.mat.opacity = 0; return; }
+      d.t += dt * 0.42 * d.drop;
+      if (d.t >= 1) { d.active = false; d.mesh.visible = false; d.mat.opacity = 0; return; }
+      const fall = THREE.MathUtils.clamp(d.t / 0.34, 0, 1);      // caida por el tubo
+      const spread = THREE.MathUtils.clamp((d.t - 0.34) / 0.66, 0, 1);  // dispersion
+      const y = tr.entryY - fallH * fall - (tr.surfaceY - tr.depthY) * spread;
+      const rad = tr.entryR + 0.075 * spread;
+      d.mesh.position.set(tr.cx + d.ax * rad, y, tr.cz + d.az * rad);
+      d.mesh.scale.setScalar(1 + spread * 0.5);
+      const fadeIn = Math.min(1, d.t / 0.06);
+      const fadeOut = 1 - THREE.MathUtils.smoothstep(spread, 0.5, 1);
+      d.mat.opacity = fadeIn * fadeOut;
+    });
   },
 
   captureLiquidLevel(liquidMesh) {
@@ -3048,7 +3638,7 @@ AFRAME.registerComponent('reactor-control', {
       basePosY: liquidMesh.position.y,
       minY: box.min.y,
       maxY: box.max.y,
-      low: 0.92,
+      low: 0.90,
       high: 1.0
     };
   },
@@ -3066,112 +3656,71 @@ AFRAME.registerComponent('reactor-control', {
     this.currentLiquidTopY = top.y;
   },
 
+  /*
+    04 ACTIVIDAD -- burbujas propias, con tamanos distintos, que nacen abajo,
+    suben y desaparecen al llegar a la superficie. Al apagar el control cada
+    burbuja TERMINA su recorrido antes de irse (no se cortan de golpe).
+  */
   buildActivityBubbles(mesh) {
     this.activityBubbles = [];
     if (!this.liquidMesh) return;
-    const liquidBox = new THREE.Box3().setFromObject(this.liquidMesh);
-    const sx = Math.max(0.02, liquidBox.max.x - liquidBox.min.x);
-    const sy = Math.max(0.02, liquidBox.max.y - liquidBox.min.y);
-    const sz = Math.max(0.02, liquidBox.max.z - liquidBox.min.z);
-    const cx = (liquidBox.min.x + liquidBox.max.x) * 0.5;
-    const cz = (liquidBox.min.z + liquidBox.max.z) * 0.5;
+    const b = new THREE.Box3().setFromObject(this.liquidMesh);
+    const sx = Math.max(0.02, b.max.x - b.min.x);
+    const sy = Math.max(0.02, b.max.y - b.min.y);
+    const sz = Math.max(0.02, b.max.z - b.min.z);
+    const cx = (b.min.x + b.max.x) * 0.5;
+    const cz = (b.min.z + b.max.z) * 0.5;
     const group = new THREE.Group();
-    group.name = 'reactor-active-culture-bubbles';
-    const color = this.bubbleMat && this.bubbleMat.color ? this.bubbleMat.color.clone() : new THREE.Color(0x73e2dc);
-    const emissive = this.bubbleMat && this.bubbleMat.emissive ? this.bubbleMat.emissive.clone() : color.clone();
-    const N = 18;
+    group.name = 'reactor-activity-bubbles';
+    const color = this.bubbleMat && this.bubbleMat.color ? this.bubbleMat.color.clone() : new THREE.Color(0xd8fbf7);
+    const N = 20;
     for (let i = 0; i < N; i++) {
-      const mat = new THREE.MeshStandardMaterial({
-        color, emissive, emissiveIntensity: 1.2,
-        roughness: 0.2, metalness: 0, transparent: true, opacity: 0, depthWrite: false
-      });
-      const bubble = new THREE.Mesh(new THREE.SphereGeometry(0.012 + (i % 3) * 0.004, 10, 8), mat);
-      const px = cx + (((i * 37) % 100) / 100 - 0.5) * sx * 0.46;
-      const pz = cz + (((i * 61) % 100) / 100 - 0.5) * sz * 0.46;
-      bubble.position.set(px, liquidBox.min.y + sy * 0.12, pz);
-      group.add(bubble);
+      const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false });
+      const size = 0.008 + ((i * 37) % 5) * 0.0035;    // tamanos variados
+      const bub = new THREE.Mesh(new THREE.SphereGeometry(size, 10, 8), mat);
+      bub.visible = false;
+      group.add(bub);
       this.activityBubbles.push({
-        mesh: bubble, mat,
-        baseX: px, baseZ: pz,
-        phase: i / N,
-        radius: 0.006 + ((i * 17) % 5) * 0.001
+        mesh: bub, mat,
+        x: cx + (((i * 37) % 100) / 100 - 0.5) * sx * 0.52,
+        z: cz + (((i * 61) % 100) / 100 - 0.5) * sz * 0.52,
+        t: i / N,
+        speed: 0.16 + ((i * 13) % 7) * 0.022,
+        sway: 0.004 + ((i * 17) % 5) * 0.0016,
+        alive: false
       });
     }
-    this.activityTravel = { minY: liquidBox.min.y + sy * 0.10, maxY: liquidBox.max.y - sy * 0.08, height: sy };
+    this.activityTravel = { minY: b.min.y + sy * 0.06, maxY: b.max.y - sy * 0.05 };
     this.el.sceneEl.object3D.add(group);
     this.activityGroup = group;
   },
 
-  updateActivityBubbles(time) {
+  updateActivityBubbles(dt, time) {
     if (!this.activityBubbles || !this.activityBubbles.length) return;
-    const active = this.stage.active;
-    const t = (time || 0) / 1000;
-    const travel = this.activityTravel;
-    const amount = this.activePulseAmt || 0;
+    const on = this.stage.active;
+    const tr = this.activityTravel;
+    const secs = (time || 0) / 1000;
     this.activityBubbles.forEach((b) => {
-      if (!active && b.mat.opacity < 0.01) {
-        b.mat.opacity = 0;
-        return;
+      if (!b.alive) {
+        if (!on) { b.mat.opacity = 0; b.mesh.visible = false; return; }
+        b.alive = true; b.t = Math.random() * 0.3;
       }
-      const cycle = ((t * 0.33) + b.phase) % 1;
-      const wobble = Math.sin(t * 1.7 + b.phase * Math.PI * 2);
-      const rise = THREE.MathUtils.lerp(travel.minY, travel.maxY, cycle);
+      b.t += dt * b.speed;
+      if (b.t >= 1) {
+        b.t = 0;
+        if (!on) { b.alive = false; b.mesh.visible = false; b.mat.opacity = 0; return; }
+      }
+      b.mesh.visible = true;
       b.mesh.position.set(
-        b.baseX + Math.sin(t * 1.1 + b.phase * 9) * b.radius,
-        rise,
-        b.baseZ + wobble * b.radius
+        b.x + Math.sin(secs * 1.3 + b.t * 7) * b.sway,
+        THREE.MathUtils.lerp(tr.minY, tr.maxY, b.t),
+        b.z + Math.cos(secs * 1.1 + b.t * 6) * b.sway
       );
-      const fadeIn = Math.min(1, cycle / 0.18);
-      const fadeOut = Math.min(1, (1 - cycle) / 0.22);
-      const target = active ? Math.min(fadeIn, fadeOut) * 0.78 * Math.max(0.35, amount) : 0;
-      b.mat.opacity += (target - b.mat.opacity) * 0.16;
-      b.mat.emissiveIntensity = 1.1 + (this.activePulse || 0) * 0.8;
+      const fadeIn = Math.min(1, b.t / 0.10);
+      const fadeOut = Math.min(1, (1 - b.t) / 0.16);   // desaparece en la superficie
+      b.mat.opacity = Math.min(fadeIn, fadeOut) * 0.85;
     });
   },
-
-  /*
-    Bucle de caida de las gotas de nutrientes: solo se mueven/se ven cuando
-    NUTRIENTS esta activo (si no, se desvanecen a opacidad 0 y quedan
-    quietas). Cada gota cae en bucle desde el tubo hasta la superficie real
-    del liquido, con una fase distinta para que no caigan todas a la vez.
-    ACTIVATE les da el mismo empujon sutil que al resto (mas visibles), sin
-    crear una cuarta variable independiente.
-  */
-  updateNutrientParticles(time) {
-    if (!this.nutrientDots || !this.nutrientDots.length) return;
-    const active = this.stage.nutrients;
-    const boost = this.stage.active ? 1.25 : 1;
-    const travel = this.nutrientTravel;
-    const period = 1.7;
-    const t = (time || 0) / 1000;
-    this.nutrientDots.forEach((d) => {
-      if (!active) {
-        d.mat.opacity += (0 - d.mat.opacity) * 0.08;
-        return;
-      }
-      const bottomY = this.currentLiquidTopY || travel.bottomY;
-      const cycle = ((t / period) + d.phase) % 1;
-      const tubePhase = Math.min(cycle / 0.76, 1);
-      const spread = THREE.MathUtils.clamp((cycle - 0.76) / 0.24, 0, 1);
-      const angle = d.phase * Math.PI * 2 + t * 0.55;
-      const radius = 0.018 * spread;
-      d.mesh.position.set(
-        travel.cx + Math.cos(angle) * radius,
-        THREE.MathUtils.lerp(travel.topY, bottomY, tubePhase) - spread * 0.018,
-        travel.cz + Math.sin(angle) * radius
-      );
-      const fadeIn = Math.min(1, cycle / 0.18);
-      const fadeOut = Math.min(1, (1 - cycle) / 0.30);
-      // ligero "salpicon" al llegar al liquido: la gota crece un poco justo
-      // antes de fundirse, para que el punto de entrada al cultivo tambien
-      // se note, no solo la caida.
-      const splash = 1 + spread * 0.45;
-      d.mesh.scale.setScalar(splash);
-      const target = Math.min(fadeIn, fadeOut) * 1.0 * boost;
-      d.mat.opacity += (target - d.mat.opacity) * 0.25;
-    });
-  },
-
   /*
     Encuentra la cara superior REAL de PEANA_Alta_B agrupando triangulos
     coplanares con normal ascendente. Para una tapa inclinada no sirve
@@ -3312,113 +3861,150 @@ AFRAME.registerComponent('reactor-control', {
     const { ctx, tex, w: WPX, h: HPX, defs } = this.controlPanelCanvas;
     const copy = this.getReactorCopy();
     const message = this.getReactorMessage(copy);
-    const allOn = this.stage.light && this.stage.flow && this.stage.nutrients && this.stage.active;
+    const count = this.activeCount();
+    const complete = count === 4;
+    const rewarding = this.now() < this.rewardUntil;
 
     ctx.clearRect(0, 0, WPX, HPX);
-    ctx.fillStyle = 'rgba(3, 10, 13, 0.90)';
+    ctx.fillStyle = 'rgba(3, 10, 13, 0.92)';
     ctx.fillRect(0, 0, WPX, HPX);
-    const grain = Math.round((WPX * HPX) / 1200);
+    const grain = Math.round((WPX * HPX) / 1400);
     for (let i = 0; i < grain; i++) {
       const v = 70 + Math.floor(Math.random() * 60);
-      ctx.fillStyle = `rgba(${v},${v + 20},${v + 20},0.035)`;
+      ctx.fillStyle = `rgba(${v},${v + 20},${v + 20},0.03)`;
       ctx.fillRect(Math.random() * WPX, Math.random() * HPX, 1, 1);
     }
 
     const accent = ROOM2_ACCENT;
     const accentLight = ROOM2_ACCENT_LIGHT;
+    const onColor = '#4FE4DC';        // turquesa del museo para ON
+    const offColor = 'rgba(200, 212, 210, 0.30)';
     const ink = '#F7FCFA';
-    const muted = '#AAB9B7';
-    const line = 'rgba(90, 153, 148, 0.35)';
-    const padX = WPX * 0.055;
-    const topY = HPX * 0.15;
+    const muted = '#9FB2B0';
+    const line = 'rgba(90, 153, 148, 0.32)';
+    const padX = WPX * 0.048;
 
-    ctx.strokeStyle = 'rgba(90, 153, 148, 0.60)';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(padX * 0.52, HPX * 0.075, WPX - padX * 1.04, HPX * 0.85);
-    ctx.fillStyle = accentLight;
-    ctx.fillRect(padX, HPX * 0.105, WPX - padX * 2, 6);
-    ctx.fillStyle = line;
-    ctx.fillRect(padX, HPX * 0.275, WPX - padX * 2, 2);
-    ctx.fillRect(padX, HPX * 0.735, WPX - padX * 2, 2);
+    // marco; cuando se completa el sistema respira en turquesa
+    const pulse = rewarding ? (0.55 + 0.45 * Math.sin(this.now() / 150)) : 0;
+    ctx.strokeStyle = complete
+      ? `rgba(79, 228, 220, ${0.45 + pulse * 0.5})`
+      : 'rgba(90, 153, 148, 0.55)';
+    ctx.lineWidth = complete ? 6 : 3;
+    ctx.strokeRect(padX * 0.55, HPX * 0.055, WPX - padX * 1.10, HPX * 0.885);
 
+    // ------------------------------------------------ cabecera
+    const headY = HPX * 0.115;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = accentLight;
-    ctx.font = '800 48px Arial, Helvetica, sans-serif';
-    ctx.fillText('02', padX, topY);
-
+    ctx.font = '800 44px Arial, Helvetica, sans-serif';
+    ctx.fillText('02', padX, headY);
     ctx.fillStyle = ink;
-    ctx.font = '900 68px Arial, Helvetica, sans-serif';
-    ctx.fillText(copy.title, padX + 104, topY);
+    ctx.font = '900 62px Arial, Helvetica, sans-serif';
+    ctx.fillText(copy.title, padX + 96, headY);
 
-    ctx.fillStyle = allOn ? accentLight : muted;
-    ctx.font = '800 34px Arial, Helvetica, sans-serif';
-    ctx.fillText(allOn ? copy.systemActive : copy.statusTitle, padX + 108, topY + 68);
+    // contador n / 4 -- hace evidente que se esta construyendo un estado
+    ctx.textAlign = 'right';
+    ctx.fillStyle = muted;
+    ctx.font = '800 30px Arial, Helvetica, sans-serif';
+    ctx.fillText(copy.statusTitle, WPX - padX - 132, headY - 14);
+    ctx.fillStyle = complete ? onColor : ink;
+    ctx.font = '900 58px Arial, Helvetica, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${count} / 4`, WPX - padX, headY + 4);
 
+    ctx.fillStyle = complete ? 'rgba(79, 228, 220, 0.85)' : line;
+    ctx.fillRect(padX, HPX * 0.178, (WPX - padX * 2) * (count / 4), 5);
+    ctx.fillStyle = 'rgba(247, 252, 250, 0.10)';
+    ctx.fillRect(padX + (WPX - padX * 2) * (count / 4), HPX * 0.178, (WPX - padX * 2) * (1 - count / 4), 5);
+
+    // ------------------------------------------------ columnas de estado
     const cols = defs.length;
     const usableW = WPX - padX * 2;
     const colW = usableW / cols;
-    const statusY = HPX * 0.365;
-    const buttonY = HPX * 0.49;
-    const labelY = HPX * 0.705;
+    const chipY = HPX * 0.248;
+    const buttonY = HPX * 0.49;      // coincide con el boton fisico real
+    const labelY = HPX * 0.685;
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     defs.forEach((d, i) => {
       const x = padX + colW * (i + 0.5);
-      const color = `#${new THREE.Color(d.on).getHexString()}`;
       const isOn = !!(this.stage && this.stage[d.id]);
       const label = copy.buttons[d.id] || d.label;
-      const statusLabel = copy.labels[d.id] || label;
-      ctx.strokeStyle = line;
-      ctx.lineWidth = 2;
+
       if (i > 0) {
+        ctx.strokeStyle = line;
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(x - colW * 0.5, HPX * 0.315);
-        ctx.lineTo(x - colW * 0.5, HPX * 0.735);
+        ctx.moveTo(x - colW * 0.5, HPX * 0.215);
+        ctx.lineTo(x - colW * 0.5, HPX * 0.745);
         ctx.stroke();
       }
 
-      ctx.fillStyle = isOn ? color : 'rgba(247, 252, 250, 0.34)';
+      // chip ON/OFF: turquesa encendido, gris muy tenue apagado
+      const chipW = colW * 0.46, chipH = HPX * 0.072, rr = chipH / 2;
+      const cx0 = x - chipW / 2, cy0 = chipY - chipH / 2;
       ctx.beginPath();
-      ctx.arc(x, statusY, 14, 0, Math.PI * 2);
+      ctx.moveTo(cx0 + rr, cy0);
+      ctx.lineTo(cx0 + chipW - rr, cy0);
+      ctx.quadraticCurveTo(cx0 + chipW, cy0, cx0 + chipW, cy0 + rr);
+      ctx.lineTo(cx0 + chipW, cy0 + chipH - rr);
+      ctx.quadraticCurveTo(cx0 + chipW, cy0 + chipH, cx0 + chipW - rr, cy0 + chipH);
+      ctx.lineTo(cx0 + rr, cy0 + chipH);
+      ctx.quadraticCurveTo(cx0, cy0 + chipH, cx0, cy0 + chipH - rr);
+      ctx.lineTo(cx0, cy0 + rr);
+      ctx.quadraticCurveTo(cx0, cy0, cx0 + rr, cy0);
+      ctx.closePath();
+      ctx.fillStyle = isOn ? onColor : 'rgba(247, 252, 250, 0.07)';
       ctx.fill();
-      ctx.fillStyle = isOn ? color : 'rgba(247, 252, 250, 0.18)';
-      ctx.fillRect(x - colW * 0.27, statusY + 38, colW * 0.54, 6);
-      ctx.strokeStyle = isOn ? 'rgba(90, 153, 148, 0.55)' : 'rgba(247, 252, 250, 0.18)';
+      ctx.strokeStyle = isOn ? onColor : offColor;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = isOn ? '#04191B' : 'rgba(247, 252, 250, 0.45)';
+      ctx.font = '900 34px Arial, Helvetica, sans-serif';
+      ctx.fillText(isOn ? (copy.on || 'ON') : (copy.off || 'OFF'), x, chipY + 2);
+
+      // aro que rodea al boton fisico
+      ctx.strokeStyle = isOn ? 'rgba(79, 228, 220, 0.75)' : 'rgba(247, 252, 250, 0.16)';
       ctx.lineWidth = 8;
       ctx.beginPath();
       ctx.arc(x, buttonY, 56, 0, Math.PI * 2);
       ctx.stroke();
 
-      ctx.fillStyle = accentLight;
-      ctx.font = '800 34px Arial, Helvetica, sans-serif';
-      ctx.fillText(d.num, x, labelY - 44);
-
-      ctx.fillStyle = ink;
-      const labelFont = label.length > 8 ? 38 : 48;
+      ctx.fillStyle = isOn ? onColor : accentLight;
+      ctx.font = '800 30px Arial, Helvetica, sans-serif';
+      ctx.fillText(d.num, x, labelY - 42);
+      ctx.fillStyle = isOn ? ink : 'rgba(247, 252, 250, 0.72)';
+      const labelFont = label.length > 8 ? 38 : 46;
       ctx.font = `900 ${labelFont}px Arial, Helvetica, sans-serif`;
-      ctx.fillText(label, x, labelY + 6);
-
-      ctx.fillStyle = muted;
-      ctx.font = '800 25px Arial, Helvetica, sans-serif';
-      ctx.fillText(`${statusLabel}  ${isOn ? 'ON' : 'OFF'}`, x, labelY + 58);
+      ctx.fillText(label, x, labelY + 8);
     });
 
-    ctx.fillStyle = 'rgba(247, 252, 250, 0.07)';
-    ctx.fillRect(padX, HPX * 0.795, WPX - padX * 2, HPX * 0.145);
-    ctx.fillStyle = accentLight;
-    ctx.fillRect(padX, HPX * 0.795, 12, HPX * 0.145);
+    // ------------------------------------------------ franja inferior
+    const stripY = HPX * 0.775, stripH = HPX * 0.155;
+    ctx.fillStyle = rewarding ? 'rgba(79, 228, 220, 0.16)' : 'rgba(247, 252, 250, 0.06)';
+    ctx.fillRect(padX, stripY, WPX - padX * 2, stripH);
+    ctx.fillStyle = rewarding ? onColor : accentLight;
+    ctx.fillRect(padX, stripY, 10, stripH);
     ctx.textAlign = 'left';
-    ctx.fillStyle = accentLight;
-    ctx.font = '900 31px Arial, Helvetica, sans-serif';
-    ctx.fillText(message.title, padX + 38, HPX * 0.825);
-    ctx.fillStyle = ink;
-    ctx.font = '800 32px Arial, Helvetica, sans-serif';
-    this.wrapCanvasText(ctx, message.body, padX + 38, HPX * 0.873, WPX - padX * 2 - 76, 39, 2);
+    if (rewarding) {
+      ctx.fillStyle = onColor;
+      ctx.font = '900 44px Arial, Helvetica, sans-serif';
+      ctx.fillText(copy.systemActive, padX + 34, stripY + stripH * 0.34);
+      ctx.fillStyle = ink;
+      ctx.font = '800 34px Arial, Helvetica, sans-serif';
+      ctx.fillText(copy.systemActiveText, padX + 34, stripY + stripH * 0.74);
+    } else {
+      ctx.fillStyle = accentLight;
+      ctx.font = '900 30px Arial, Helvetica, sans-serif';
+      ctx.fillText(message.title, padX + 34, stripY + stripH * 0.30);
+      ctx.fillStyle = ink;
+      ctx.font = '800 31px Arial, Helvetica, sans-serif';
+      this.wrapCanvasText(ctx, message.body, padX + 34, stripY + stripH * 0.68, WPX - padX * 2 - 68, 36, 2);
+    }
 
-    // fuerza la subida del canvas redibujado a la textura de Three.js.
     tex.needsUpdate = true;
   },
-
   wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
     const words = String(text || '').split(/\s+/).filter(Boolean);
     let line = '';
@@ -3541,7 +4127,7 @@ AFRAME.registerComponent('reactor-control', {
     const defs = [
       {
         id: 'light', num: '01', label: lightText.label, symbol: lightText.symbol,
-        off: 0xe8f7f5, on: 0x59e7e0,
+        off: 0xeaf6f4, on: 0x6ff0e8,
         onText: lightText.onText,
         offText: lightText.offText
       },
@@ -3553,13 +4139,13 @@ AFRAME.registerComponent('reactor-control', {
       },
       {
         id: 'nutrients', num: '03', label: nutrientsText.label, symbol: nutrientsText.symbol,
-        off: 0xeaf4de, on: 0xa9dc69,
+        off: 0xe7f2f0, on: 0x4fe4dc,
         onText: nutrientsText.onText,
         offText: nutrientsText.offText
       },
       {
         id: 'active', num: '04', label: activeText.label, symbol: activeText.symbol,
-        off: 0xeee4f4, on: 0xb06ce8,
+        off: 0xe4f0ee, on: 0x2fc9c2,
         onText: activeText.onText,
         offText: activeText.offText
       }
@@ -3585,7 +4171,7 @@ AFRAME.registerComponent('reactor-control', {
     const BTN_R = Math.min(HEIGHT * 0.105, WIDTH * 0.043);
     const BTN_DEPTH = HEIGHT * 0.055;
     const BTN_Y = HEIGHT * 0.01;
-    const STATUS_Y = BTN_Y + BTN_R + HEIGHT * 0.15;
+    // (el indicador fisico sobre cada boton se retiro: ver mas abajo)
 
     defs.forEach((d, i) => {
       const bx = startX + i * spacing;
@@ -3619,17 +4205,12 @@ AFRAME.registerComponent('reactor-control', {
       wrapper.object3D.add(btn);
       if (exhibitInfo) exhibitInfo.selectableMeshes.push(btn);
 
-      const statusMaterial = new THREE.MeshStandardMaterial({
-        color: 0xc9c2bc, emissive: new THREE.Color(d.on),
-        emissiveIntensity: 0.02, roughness: 0.55, metalness: 0,
-        side: THREE.DoubleSide
-      });
-      const status = new THREE.Mesh(new THREE.PlaneGeometry(BTN_R * 1.18, HEIGHT * 0.016), statusMaterial);
-      status.position.set(bx, STATUS_Y, BUTTON_Z + 0.002);
-      wrapper.object3D.add(status);
+      // El indicador fisico (plano fino sobre el boton) se ha retirado: ocupaba
+      // exactamente la banda donde ahora va el chip ON/OFF impreso del display,
+      // que dice mucho mas con el mismo espacio.
 
       this.buttons.push({
-        id: d.id, mesh: btn, material, ring, ringMaterial, status, statusMaterial,
+        id: d.id, mesh: btn, material, ring, ringMaterial,
         offColor: d.off, onColor: d.on, upZ, downZ, pressT: 0,
         baseEmissive: material.emissiveIntensity
       });
@@ -3652,15 +4233,41 @@ AFRAME.registerComponent('reactor-control', {
     ya activos -- el brief pide justo lo contrario ("each button must toggle
     ON and OFF; clicking again must deactivate that state").
   */
+  /*
+    Los cuatro controles son interruptores independientes: cada clic invierte
+    su propio estado, en cualquier orden, sin bloqueos. NUTRIENTES ademas
+    funciona como ACCION -- cada pulsacion lanza una dosis visible.
+  */
   onButtonClick(id) {
     if (!(id in this.stage)) return;
     this.stage[id] = !this.stage[id];
     this.reactorLast = { id, on: this.stage[id] };
+    this.msgUntil = this.now() + 3800;
     const button = this.buttons.find((b) => b.id === id);
     if (button) button.pressT = 1;
+    if (id === 'nutrients') this.injectDose();
     this.recomputeTargets();
+    this.checkReward();
     this.updateButtonLooks();
     this.drawControlPanelTexture();
+  },
+
+  /*
+    La recompensa SISTEMA ACTIVO solo se dispara en la transicion de un
+    estado incompleto a los cuatro activos (wasComplete). Si el visitante
+    apaga un control el display vuelve a la normalidad, y al volver a
+    completar los cuatro puede reproducirse otra vez. Nunca por frame.
+
+    No es un protocolo cientifico: es una mecanica museografica para animar
+    a explorar los cuatro elementos, y el orden es indiferente.
+  */
+  checkReward() {
+    const complete = this.activeCount() === 4;
+    if (complete && !this.wasComplete) {
+      this.rewardUntil = this.now() + 2600;
+      this.rewardPulse = 1;
+    }
+    this.wasComplete = complete;
   },
 
   updateButtonLooks() {
@@ -3669,53 +4276,57 @@ AFRAME.registerComponent('reactor-control', {
       b.material.color.set(on ? b.onColor : b.offColor);
       b.material.emissive.set(b.onColor);
       if (b.ringMaterial) {
-        b.ringMaterial.opacity = on ? 0.82 : 0.34;
-        b.ringMaterial.emissiveIntensity = on ? 0.30 : 0.04;
+        b.ringMaterial.opacity = on ? 0.92 : 0.28;
+        b.ringMaterial.emissiveIntensity = on ? 0.65 : 0.03;
       }
       if (b.statusMaterial) {
         b.statusMaterial.color.set(on ? b.onColor : 0xc9c2bc);
-        b.statusMaterial.emissiveIntensity = on ? 0.30 : 0.02;
+        b.statusMaterial.emissiveIntensity = on ? 0.60 : 0.02;
       }
-      b.baseEmissive = on ? 0.42 : 0.14;
+      b.baseEmissive = on ? 0.75 : 0.12;
     });
   },
 
   tick(time, delta) {
     if (!this.wrapper) return;
     const dt = Math.min((delta || 16) / 1000, 0.1);
-    const speed = 1 - Math.pow(0.001, dt);   // suavizado exponencial, ~0.6s
+    const speed = 1 - Math.pow(0.004, dt);   // ~0.5 s, la transicion que pide el guion
 
-    // hover del reactor: mismo hoverId que ya calcula exhibit-info (raycast
-    // sobre selectableMeshes, que ahora incluye el cuerpo real del reactor
-    // -- ver "Bioreactor_" en exhibit-info.onLoaded). Se calcula ANTES de
-    // applyReactorState porque esta lee this.hoverGlow para el realce del
-    // cristal (ver alli).
     const info = this.el.components['exhibit-info'];
     const hoverId = info && info.hoverId;
-    const reactorHovered = hoverId === 'reactor01';
-    this.hoverGlow += ((reactorHovered ? 1 : 0) - this.hoverGlow) * 0.12;
+    this.hoverGlow += ((hoverId === 'reactor01' ? 1 : 0) - this.hoverGlow) * 0.12;
 
-    // Pulso de ACTIVATE: entra/sale con un fundido lento (~2-3 s, igual de
-    // suave que el resto de transiciones del reactor -- nunca un chasquido
-    // brusco), y mientras esta encendido oscila con un seno lento (periodo
-    // 1.6 s) entre 0 y 1. El resultado (this.activePulse) es lo que
-    // applyReactorState usa para el "latido" de foco/liquido/burbujas/cristal
-    // -- la señal que distingue ACTIVATE de un simple boton "mas brillo".
-    const activeOn = this.stage.active ? 1 : 0;
-    this.activePulseAmt += (activeOn - this.activePulseAmt) * 0.02;
-    const osc = this.activePulseAmt > 0.001 ? (Math.sin((time || 0) / 1000 * Math.PI * 2 / 1.6) * 0.5 + 0.5) : 0;
-    this.activePulse = osc * this.activePulseAmt;
+    // pulso de la recompensa (solo mientras dura el banner)
+    const rewarding = this.now() < this.rewardUntil;
+    const rewardTarget = rewarding ? (0.55 + 0.45 * Math.sin(this.now() / 150)) : 0;
+    this.rewardPulse += (rewardTarget - this.rewardPulse) * 0.25;
 
     this.curSpot += (this.targetSpot - this.curSpot) * speed;
     this.curBubbleI += (this.targetBubbleI - this.curBubbleI) * speed;
     this.curBubbleO += (this.targetBubbleO - this.curBubbleO) * speed;
     this.curLiquidI += (this.targetLiquidI - this.curLiquidI) * speed;
-    this.curFlowSpeed += (this.targetFlowSpeed - this.curFlowSpeed) * speed;
+    this.curFlowAmount += ((this.targetFlowAmount || 0) - this.curFlowAmount) * speed;
+    this.curAnimSpeed += ((this.targetAnimSpeed || 0) - this.curAnimSpeed) * speed;
     this.curNutrientLevel += ((this.targetNutrientLevel || 0) - this.curNutrientLevel) * speed;
     this.applyReactorState();
-    this.updateFlowParticles(time);
-    this.updateNutrientParticles(time);
-    this.updateActivityBubbles(time);
+    this.updateFlowParticles(dt);
+    this.updateNutrientParticles(dt);
+    this.updateActivityBubbles(dt, time);
+
+    // el display se redibuja mientras dura la recompensa (late) y una vez
+    // mas cuando caduca el mensaje de causa-efecto, para que vuelva solo a
+    // mostrar los estados.
+    if (rewarding) {
+      this.drawControlPanelTexture();
+      this._rewardWasOn = true;
+    } else if (this._rewardWasOn) {
+      this._rewardWasOn = false;
+      this.drawControlPanelTexture();
+    } else if (this.msgUntil && this.now() > this.msgUntil) {
+      this.msgUntil = 0;
+      this.drawControlPanelTexture();
+    }
+
     if ((time || 0) > this.nextLangCheck) {
       this.nextLangCheck = (time || 0) + 400;
       const lang = this.getReactorLang();
@@ -3725,19 +4336,18 @@ AFRAME.registerComponent('reactor-control', {
       }
     }
 
-    // hover de los 4 botones: mismo lenguaje que el resto del museo (escala
-    // + brillo muy sutiles), leyendo el hoverId que ya calcula exhibit-info.
+    // botones: hover minimo, hundido cuando estan ON y microrespuesta de
+    // ~180 ms al recibir el clic o el tap (pressT).
     this.buttons.forEach((b) => {
       const isHovered = hoverId === `reactorBtn_${b.id}`;
       const t = this._hoverT[b.id] + ((isHovered ? 1 : 0) - this._hoverT[b.id]) * 0.15;
       this._hoverT[b.id] = t;
-      const scale = 1 + t * 0.12;
-      b.mesh.scale.setScalar(scale);
-      if (b.ring) b.ring.scale.setScalar(1 + t * 0.08);
-      const targetZ = (this.stage[b.id] ? b.downZ : b.upZ) - (b.pressT || 0) * 0.004;
+      b.mesh.scale.setScalar(1 + t * 0.10 + (b.pressT || 0) * 0.06);
+      if (b.ring) b.ring.scale.setScalar(1 + t * 0.06);
+      const targetZ = (this.stage[b.id] ? b.downZ : b.upZ) - (b.pressT || 0) * 0.005;
       b.mesh.position.z += (targetZ - b.mesh.position.z) * 0.32;
       b.pressT = Math.max(0, (b.pressT || 0) - dt * 5.5);
-      b.material.emissiveIntensity = b.baseEmissive * (1 + t * 0.6);
+      b.material.emissiveIntensity = b.baseEmissive * (1 + t * 0.5 + (b.pressT || 0) * 0.8);
     });
   }
 });

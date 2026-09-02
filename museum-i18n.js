@@ -106,6 +106,72 @@
     }
   };
 
+  const electroactivity = {
+    en: {
+      title: 'ELECTRON UPTAKE',
+      flow: 'electrode → e⁻ → bacterium',
+      electrode: 'ELECTRODE',
+      electron: 'e⁻'
+    },
+    es: {
+      title: 'CAPTACIÓN DE ELECTRONES',
+      flow: 'electrodo → e⁻ → bacteria',
+      electrode: 'ELECTRODO',
+      electron: 'e⁻'
+    }
+  };
+
+  /*
+    Copia del display del reactor (Sala 2). Vive aqui, en el mismo sistema
+    ES/EN que el resto del museo: script.js la lee via
+    window.MUSEUM_I18N.reactorPanel y solo cae en su copia local de
+    seguridad si este fichero no hubiera cargado.
+  */
+  const reactorPanel = {
+    en: {
+      title: 'PHOTOBIOREACTOR',
+      statusTitle: 'SYSTEM STATUS',
+      idle: 'Tap a control to see what it changes inside the photobioreactor.',
+      systemActive: 'SYSTEM ACTIVE',
+      systemActiveText: 'CULTURE RUNNING',
+      on: 'ON',
+      off: 'OFF',
+      labels: { light: 'LIGHT', flow: 'FLOW', nutrients: 'NUTRIENTS', active: 'ACTIVITY' },
+      buttons: { light: 'LIGHT', flow: 'FLOW', nutrients: 'NUTRIENTS', active: 'ACTIVITY' },
+      messages: {
+        light: { onTitle: 'LIGHT', on: 'Energy for photosynthesis.',
+                 offTitle: 'LIGHT OFF', off: 'The light energy input stops.' },
+        flow: { onTitle: 'FLOW', on: 'The culture begins to circulate.',
+                offTitle: 'FLOW OFF', off: 'Circulation stops and the culture settles.' },
+        nutrients: { onTitle: 'NUTRIENTS', on: 'Nutrients enter the culture.',
+                     offTitle: 'NUTRIENTS OFF', off: 'The feed line closes.' },
+        active: { onTitle: 'ACTIVITY', on: 'Metabolic activity becomes visible.',
+                  offTitle: 'ACTIVITY OFF', off: 'Gas production fades out.' }
+      }
+    },
+    es: {
+      title: 'FOTOBIORREACTOR',
+      statusTitle: 'ESTADO DEL SISTEMA',
+      idle: 'Pulsa un control para ver qué cambia dentro del fotobiorreactor.',
+      systemActive: 'SISTEMA ACTIVO',
+      systemActiveText: 'CULTIVO EN FUNCIONAMIENTO',
+      on: 'ON',
+      off: 'OFF',
+      labels: { light: 'LUZ', flow: 'FLUJO', nutrients: 'NUTRIENTES', active: 'ACTIVIDAD' },
+      buttons: { light: 'LUZ', flow: 'FLUJO', nutrients: 'NUTRIENTES', active: 'ACTIVIDAD' },
+      messages: {
+        light: { onTitle: 'LUZ', on: 'Energía para la fotosíntesis.',
+                 offTitle: 'LUZ OFF', off: 'Se detiene el aporte de energía luminosa.' },
+        flow: { onTitle: 'FLUJO', on: 'El cultivo comienza a circular.',
+                offTitle: 'FLUJO OFF', off: 'La circulación se detiene y el cultivo se aquieta.' },
+        nutrients: { onTitle: 'NUTRIENTES', on: 'Se incorporan nutrientes al cultivo.',
+                     offTitle: 'NUTRIENTES OFF', off: 'Se cierra la línea de alimentación.' },
+        active: { onTitle: 'ACTIVIDAD', on: 'La actividad metabólica se hace visible.',
+                  offTitle: 'ACTIVIDAD OFF', off: 'La producción de gas se apaga poco a poco.' }
+      }
+    }
+  };
+
   const esContent = {
     bacteriaLarge01: {
       lead: 'Mucho más que fotosíntesis',
@@ -207,12 +273,18 @@
     }
   };
 
-  window.MUSEUM_I18N = { ui, reactor, content: { en: {}, es: esContent } };
+  window.MUSEUM_I18N = { ui, reactor, reactorPanel, electroactivity, content: { en: {}, es: esContent } };
   window.getMuseumUiText = function getMuseumUiText(key) {
     return (ui[language] && ui[language][key]) || ui.en[key] || key;
   };
   window.getMuseumReactorText = function getMuseumReactorText(id) {
     return (reactor[language] && reactor[language][id]) || reactor.en[id];
+  };
+  window.getMuseumReactorPanelText = function getMuseumReactorPanelText() {
+    return reactorPanel[language] || reactorPanel.en;
+  };
+  window.getMuseumElectroactivityText = function getMuseumElectroactivityText(key) {
+    return (electroactivity[language] && electroactivity[language][key]) || electroactivity.en[key] || key;
   };
 
   function applyHtmlLanguage() {
