@@ -349,6 +349,68 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
   else buildHud();
 })();
 
+(function setupCreditsPanel() {
+  const ready = () => {
+    const trigger = document.getElementById('credits-trigger');
+    const panel = document.getElementById('credits-panel');
+    if (!trigger || !panel) return;
+    const close = panel.querySelector('.credits-close');
+    const copy = window.getMuseumCreditsText ? window.getMuseumCreditsText() : null;
+    if (copy) {
+      const title = panel.querySelector('#credits-title');
+      const mediaTitle = panel.querySelector('#credits-media-title');
+      const scienceTitle = panel.querySelector('#credits-science-title');
+      if (title) title.textContent = copy.title || '';
+      if (mediaTitle) mediaTitle.textContent = copy.mediaTitle || '';
+      if (scienceTitle) scienceTitle.textContent = copy.scienceTitle || '';
+
+      const media = panel.querySelector('#credits-media');
+      if (media) {
+        media.innerHTML = '';
+        (copy.media || []).forEach((group) => {
+          const row = document.createElement('div');
+          row.className = 'credits-year';
+          const year = document.createElement('strong');
+          year.textContent = group.year || '';
+          const names = document.createElement('span');
+          names.textContent = (group.names || []).join(', ');
+          row.appendChild(year);
+          row.appendChild(names);
+          media.appendChild(row);
+        });
+      }
+
+      const science = panel.querySelector('#credits-science');
+      if (science) {
+        science.innerHTML = '';
+        (copy.science || []).forEach((note) => {
+          const p = document.createElement('span');
+          p.className = 'credits-note';
+          p.textContent = note;
+          science.appendChild(p);
+        });
+      }
+    }
+
+    const open = () => {
+      panel.classList.add('visible');
+      document.body.classList.add('panel-open');
+    };
+    const hide = () => {
+      panel.classList.remove('visible');
+      document.body.classList.remove('panel-open');
+    };
+    trigger.addEventListener('click', open);
+    if (close) close.addEventListener('click', hide);
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && panel.classList.contains('visible')) hide();
+    });
+  };
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready);
+  else ready();
+})();
+
 /* ==========================================================================
    HOTSPOT MUSEOGRAFICO COMPARTIDO.
 
@@ -3205,6 +3267,388 @@ AFRAME.registerComponent('image-windows', {
       puestas++;
     });
     console.log(`[image-windows] ${puestas} vitrinas de imagen`);
+  }
+});
+
+const MUSEO_APPLICATIONS = [
+  { id: 'window01', key: 'hydrogen', cap: 'hydrogen' },
+  { id: 'window02', key: 'pha', cap: 'pha' },
+  { id: 'window03', key: 'biomass', cap: 'biomass' },
+  { id: 'window04', key: 'electro', cap: 'electro' },
+  { id: 'window05', key: 'scale' }
+];
+
+function canvasRoundRect(ctx, x, y, w, h, r) {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.lineTo(x + w - rr, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+  ctx.lineTo(x + w, y + h - rr);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+  ctx.lineTo(x + rr, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - rr);
+  ctx.lineTo(x, y + rr);
+  ctx.quadraticCurveTo(x, y, x + rr, y);
+  ctx.closePath();
+}
+
+AFRAME.registerComponent('application-visuals', {
+  init() {
+    this.cards = [];
+    this.roomSigns = [];
+    this.nextDraw = 0;
+    this.tmp = new THREE.Vector3();
+    this.el.addEventListener('museo-modules-loaded', () => window.setTimeout(() => this.onLoaded(), 0));
+  },
+
+  onLoaded() {
+    const info = this.el.components['exhibit-info'];
+    if (!info || !info.items || !info.items.length) {
+      window.setTimeout(() => this.onLoaded(), 180);
+      return;
+    }
+
+    MUSEO_APPLICATIONS.forEach((def) => {
+      const it = info.items.find((item) => item.id === def.id);
+      if (it) this.createApplicationCard(info, it, def);
+    });
+    if (!this.cards.some((card) => card.def.key === 'scale')) {
+      this.createScaleFallbackCard(info);
+    }
+    this.createRoomSigns(info);
+    console.log(`[application-visuals] ${this.cards.length} aplicaciones visuales y ${this.roomSigns.length} señales de sala`);
+  },
+
+  makeTexture() {
+    const c = document.createElement('canvas');
+    c.width = 720;
+    c.height = 460;
+    const ctx = c.getContext('2d');
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    return { c, ctx, tex };
+  },
+
+  createApplicationCard(info, it, def) {
+    const pack = window.getMuseumApplicationText ? window.getMuseumApplicationText(def.key) : null;
+    const copy = pack || { title: def.key.toUpperCase(), short: '', steps: [] };
+    const dir = info.wallFacingDir ? info.wallFacingDir(it.pos) : { x: -1, z: 0 };
+    const front = new THREE.Vector3(dir.x, 0, dir.z).normalize();
+    const height = Math.min(0.54, Math.max(0.40, ((it.topY || it.pos.y + 0.4) - (it.bottomY || it.pos.y - 0.4)) * 0.34));
+    const width = height * 1.52;
+    const p = it.pos.clone().addScaledVector(front, 0.055);
+    p.y = it.pos.y + 0.03;
+
+    const canvas = this.makeTexture();
+    const mat = new THREE.MeshBasicMaterial({
+      map: canvas.tex, transparent: true, opacity: 0.94,
+      depthWrite: false, side: THREE.DoubleSide, toneMapped: true
+    });
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(width, height), mat);
+    plane.position.copy(p);
+    faceMuseoFront(plane, front);
+    plane.userData.museoExhibitId = it.id;
+    if (info.selectableMeshes) info.selectableMeshes.push(plane);
+    this.el.sceneEl.object3D.add(plane);
+
+    const card = { def, copy, canvas, mat, plane, t: Math.random() * 10, lastUnlocked: false };
+    this.cards.push(card);
+    this.drawApplicationCard(card, 0);
+  },
+
+  createScaleFallbackCard(info) {
+    const data = museumContent.window05;
+    const windows = info.items
+      .filter((item) => item.id.startsWith('window'))
+      .sort((a, b) => a.pos.z - b.pos.z);
+    const base = windows[windows.length - 1] || info.items.find((item) => item.id === 'reactor01');
+    if (!data || !base) return;
+
+    const dir = info.wallFacingDir ? info.wallFacingDir(base.pos) : { x: -1, z: 0 };
+    const side = new THREE.Vector3(dir.z, 0, -dir.x).normalize();
+    const bounds = window.MUSEO_BOUNDS;
+    const pos = base.pos.clone().addScaledVector(side, 0.72);
+    if (bounds) {
+      pos.x = THREE.MathUtils.clamp(pos.x, bounds.minX + 0.55, bounds.maxX - 0.55);
+      pos.z = THREE.MathUtils.clamp(pos.z, bounds.minZ + 0.55, bounds.maxZ - 0.55);
+    }
+    const item = {
+      id: 'window05',
+      data,
+      pos,
+      topY: base.topY,
+      bottomY: base.bottomY,
+      anchorObj: null
+    };
+    info.items.push(item);
+    this.createApplicationCard(info, item, { id: 'window05', key: 'scale' });
+  },
+
+  drawApplicationCard(card, seconds) {
+    const { ctx, tex, c } = card.canvas;
+    const copy = card.copy;
+    const w = c.width, h = c.height;
+    const phase = (seconds || 0) + card.t;
+    const unlocked = !!(card.def.cap && window.hasCapability && window.hasCapability(card.def.cap));
+    const accent = '#4FE4DC';
+    const ink = '#F7FCFA';
+    const muted = 'rgba(247,252,250,0.70)';
+
+    ctx.clearRect(0, 0, w, h);
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#071516');
+    g.addColorStop(1, '#1f2230');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(79,228,220,0.48)';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(20, 20, w - 40, h - 40);
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = accent;
+    this.fitCanvasFont(ctx, copy.title || '', 900, 34, w - 84, 20);
+    ctx.fillText(copy.title || '', 42, 62);
+
+    ctx.strokeStyle = 'rgba(79,228,220,0.30)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(42, 100);
+    ctx.lineTo(w - 42, 100);
+    ctx.stroke();
+
+    if (card.def.key === 'pha') this.drawPha(ctx, phase);
+    else if (card.def.key === 'hydrogen') this.drawHydrogen(ctx, phase);
+    else if (card.def.key === 'electro') this.drawElectro(ctx, phase);
+    else if (card.def.key === 'biomass') this.drawBiomass(ctx, phase);
+    else if (card.def.key === 'scale') this.drawScale(ctx, phase);
+
+    const barY = h - 72;
+    ctx.fillStyle = unlocked || card.def.key === 'scale' ? 'rgba(79,228,220,0.14)' : 'rgba(247,252,250,0.07)';
+    ctx.fillRect(42, barY, w - 84, 38);
+    ctx.fillStyle = unlocked || card.def.key === 'scale' ? accent : muted;
+    const bottomText = (unlocked || card.def.key === 'scale') ? (copy.short || '') : (copy.steps || []).join(' → ');
+    this.fitCanvasFont(ctx, bottomText, 900, 26, w - 116, 15);
+    ctx.fillText(bottomText, 58, barY + 20);
+
+    tex.needsUpdate = true;
+    card.lastUnlocked = unlocked;
+  },
+
+  arrow(ctx, x1, y1, x2, y2, color) {
+    const ang = Math.atan2(y2 - y1, x2 - x1);
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - Math.cos(ang - 0.55) * 18, y2 - Math.sin(ang - 0.55) * 18);
+    ctx.lineTo(x2 - Math.cos(ang + 0.55) * 18, y2 - Math.sin(ang + 0.55) * 18);
+    ctx.closePath();
+    ctx.fill();
+  },
+
+  pill(ctx, x, y, w, h, text, fill, color) {
+    canvasRoundRect(ctx, x, y, w, h, 14);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(247,252,250,0.20)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = color || '#F7FCFA';
+    this.fitCanvasFont(ctx, text, 900, 28, w - 18, 14);
+    ctx.textAlign = 'center';
+    ctx.fillText(text, x + w / 2, y + h / 2 + 2);
+  },
+
+  fitCanvasFont(ctx, text, weight, maxPx, maxWidth, minPx) {
+    let size = maxPx;
+    ctx.font = `${weight} ${size}px Arial, Helvetica, sans-serif`;
+    while (size > minPx && ctx.measureText(String(text || '')).width > maxWidth) {
+      size -= 2;
+      ctx.font = `${weight} ${size}px Arial, Helvetica, sans-serif`;
+    }
+  },
+
+  drawPha(ctx, phase) {
+    const e = 0.5 + 0.5 * Math.sin(phase * 1.4);
+    const granules = [[130, 202], [172, 230], [210, 196], [252, 228], [292, 204]];
+    granules.forEach((p, i) => {
+      ctx.fillStyle = `rgba(199,155,234,${0.42 + e * 0.38})`;
+      ctx.beginPath();
+      ctx.arc(p[0], p[1] + Math.sin(phase * 1.8 + i) * 5, 18, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    this.arrow(ctx, 328, 214, 406, 214, '#C79BEA');
+    this.pill(ctx, 420, 176, 116, 76, 'PHA', 'rgba(125,63,168,0.34)', '#F1D5FF');
+    this.arrow(ctx, 544, 214, 610, 214, '#C79BEA');
+    canvasRoundRect(ctx, 620, 178, 58, 72, 10);
+    ctx.fillStyle = `rgba(241,213,255,${0.42 + e * 0.35})`;
+    ctx.fill();
+    ctx.fillStyle = '#F7FCFA';
+    ctx.font = '900 22px Arial, Helvetica, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('BIO', 649, 214);
+  },
+
+  drawHydrogen(ctx, phase) {
+    this.pill(ctx, 78, 174, 190, 76, (this.cardStep('hydrogen', 0) || 'LIGHT / CULTURE'), 'rgba(255,242,168,0.15)', '#FFF2A8');
+    this.arrow(ctx, 292, 212, 404, 212, '#FFF2A8');
+    for (let i = 0; i < 6; i++) {
+      const t = (phase * 0.22 + i * 0.17) % 1;
+      const x = 460 + i * 26 + Math.sin(phase + i) * 8;
+      const y = 286 - t * 120;
+      ctx.strokeStyle = `rgba(185,242,251,${1 - t * 0.65})`;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(x, y, 14 + i % 2 * 4, 0, Math.PI * 2);
+      ctx.stroke();
+      if (i % 2 === 0) {
+        ctx.fillStyle = '#EAFBFF';
+        ctx.font = '900 22px Arial, Helvetica, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('H₂', x, y + 2);
+      }
+    }
+  },
+
+  drawElectro(ctx, phase) {
+    this.pill(ctx, 66, 176, 150, 72, (this.cardStep('electro', 0) || 'BACTERIUM'), 'rgba(125,63,168,0.22)', '#F1D5FF');
+    canvasRoundRect(ctx, 530, 148, 72, 128, 10);
+    ctx.fillStyle = 'rgba(247,252,250,0.12)';
+    ctx.fill();
+    ctx.strokeStyle = `rgba(79,228,220,${0.48 + 0.28 * Math.sin(phase * 2)})`;
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.fillStyle = '#BFFCF7';
+    ctx.font = '900 24px Arial, Helvetica, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(this.cardStep('electro', 2) || 'ELECTRODE', 566, 302);
+    ctx.strokeStyle = 'rgba(79,228,220,0.38)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(224, 212);
+    ctx.bezierCurveTo(310, 150, 410, 150, 520, 212);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(520, 228);
+    ctx.bezierCurveTo(410, 290, 310, 290, 224, 228);
+    ctx.stroke();
+    for (let i = 0; i < 5; i++) {
+      const t = (phase * 0.30 + i * 0.20) % 1;
+      const x = 224 + (520 - 224) * t;
+      const y = 212 + Math.sin(t * Math.PI * 2) * 48;
+      ctx.fillStyle = '#6FFCF2';
+      ctx.beginPath();
+      ctx.arc(x, y, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#052123';
+      ctx.font = '900 16px Arial, Helvetica, sans-serif';
+      ctx.fillText('e⁻', x, y + 1);
+    }
+  },
+
+  drawBiomass(ctx, phase) {
+    const grow = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(phase * 1.1));
+    this.pill(ctx, 72, 174, 150, 76, this.cardStep('biomass', 0) || 'CULTURE', 'rgba(79,228,220,0.13)', '#BFF6F1');
+    this.arrow(ctx, 250, 212, 350, 212, '#4FE4DC');
+    ctx.fillStyle = `rgba(176,108,232,${0.24 + grow * 0.32})`;
+    ctx.beginPath();
+    ctx.ellipse(432, 218, 54 + grow * 36, 26 + grow * 18, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#F7FCFA';
+    ctx.font = '900 28px Arial, Helvetica, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(this.cardStep('biomass', 1) || 'BIOMASS', 432, 218);
+    this.arrow(ctx, 526, 212, 590, 212, '#4FE4DC');
+    this.pill(ctx, 590, 178, 104, 68, this.cardStep('biomass', 2) || 'FOOD / FEED', 'rgba(247,252,250,0.10)', '#F7FCFA');
+  },
+
+  drawScale(ctx, phase) {
+    const values = [1, 4, 8, 16];
+    const active = Math.floor((phase * 0.55) % values.length);
+    values.forEach((value, i) => {
+      const x = 82 + i * 154;
+      const on = i <= active;
+      canvasRoundRect(ctx, x, 148, 94, 120, 16);
+      ctx.fillStyle = on ? 'rgba(79,228,220,0.18)' : 'rgba(247,252,250,0.07)';
+      ctx.fill();
+      ctx.strokeStyle = on ? '#4FE4DC' : 'rgba(247,252,250,0.16)';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      ctx.fillStyle = on ? '#BFF6F1' : 'rgba(247,252,250,0.42)';
+      ctx.font = '900 42px Arial, Helvetica, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(String(value), x + 47, 210);
+      if (i < values.length - 1) this.arrow(ctx, x + 108, 208, x + 142, 208, on ? '#4FE4DC' : 'rgba(247,252,250,0.24)');
+    });
+  },
+
+  cardStep(key, index) {
+    const copy = window.getMuseumApplicationText ? window.getMuseumApplicationText(key) : null;
+    return copy && copy.steps ? copy.steps[index] : null;
+  },
+
+  createRoomSigns(info) {
+    const room1 = this.averageItems(info.items.filter((it) => it.id.startsWith('bacteria')));
+    const room2 = this.averageItems(info.items.filter((it) => it.id.startsWith('window') || it.id === 'reactor01'));
+    if (room1) this.createRoomSign(window.getMuseumApplicationText('room01'), room1, 0.0);
+    if (room2) this.createRoomSign(window.getMuseumApplicationText('room02'), room2, Math.PI);
+  },
+
+  averageItems(items) {
+    if (!items.length) return null;
+    const p = new THREE.Vector3();
+    items.forEach((it) => p.add(it.pos));
+    return p.multiplyScalar(1 / items.length);
+  },
+
+  createRoomSign(copy, pos, rotY) {
+    if (!copy) return;
+    const c = document.createElement('canvas');
+    c.width = 720;
+    c.height = 150;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = 'rgba(6, 14, 17, 0.62)';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#4FE4DC';
+    ctx.fillRect(0, 0, 8, c.height);
+    ctx.fillStyle = '#4FE4DC';
+    ctx.font = '900 30px Arial, Helvetica, sans-serif';
+    ctx.fillText(copy.kicker || '', 34, 55);
+    ctx.fillStyle = '#F7FCFA';
+    ctx.font = '900 34px Arial, Helvetica, sans-serif';
+    ctx.fillText(copy.title || '', 34, 104);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.78, depthWrite: false, side: THREE.DoubleSide });
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.70, 0.146), mat);
+    const floor = window.MUSEO_SPAWN && typeof window.MUSEO_SPAWN.y === 'number' ? window.MUSEO_SPAWN.y : 0;
+    plane.position.set(pos.x, floor + 0.014, pos.z);
+    plane.rotation.set(-Math.PI / 2, 0, rotY);
+    this.el.sceneEl.object3D.add(plane);
+    this.roomSigns.push(plane);
+  },
+
+  tick(time) {
+    if (!this.cards.length || time < this.nextDraw) return;
+    this.nextDraw = time + 90;
+    const seconds = (time || 0) / 1000;
+    this.cards.forEach((card) => this.drawApplicationCard(card, seconds));
+  },
+
+  remove() {
+    this.cards.forEach((card) => {
+      if (card.plane && card.plane.parent) card.plane.parent.remove(card.plane);
+      if (card.mat) card.mat.dispose();
+    });
+    this.roomSigns.forEach((sign) => { if (sign.parent) sign.parent.remove(sign); });
   }
 });
 

@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <title>PURPLE BACTERIA</title>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <link rel="icon" href="data:,">
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <link rel="stylesheet" href="./style.css?v=92fa155">
 </head>
@@ -14,6 +15,8 @@
     <span aria-hidden="true">/</span>
     <button type="button" data-language="es" aria-pressed="false">ES</button>
   </div>
+
+  <button id="credits-trigger" type="button">CREDITS</button>
 
   <div id="loading-screen">
     <div id="loading-title">PURPLE BACTERIA</div>
@@ -88,6 +91,7 @@
       electroactivity-exhibit
       exhibit-lighting
       image-windows
+      application-visuals
       mood-lighting
       reactor-control
       co-hydrogen-exhibit
@@ -214,6 +218,22 @@
         <span class="panel-tags"></span>
       </div>
       <div class="panel-fade" aria-hidden="true"></div>
+    </div>
+  </aside>
+
+  <aside id="credits-panel" role="dialog" aria-modal="false" aria-labelledby="credits-title">
+    <button class="credits-close" type="button" aria-label="Close">&times;</button>
+    <span class="credits-section">00</span>
+    <h2 id="credits-title">CREDITS &amp; SOURCES</h2>
+    <div class="credits-scroll">
+      <section class="credits-block">
+        <h3 id="credits-media-title">IMAGES &amp; VIDEOS</h3>
+        <div id="credits-media"></div>
+      </section>
+      <section class="credits-block">
+        <h3 id="credits-science-title">SCIENTIFIC SOURCES</h3>
+        <div id="credits-science"></div>
+      </section>
     </div>
   </aside>
 

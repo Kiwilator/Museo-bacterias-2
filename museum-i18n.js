@@ -32,6 +32,7 @@
       intro: 'MOVE THROUGH THE SPACE AND APPROACH THE EXHIBITS TO DISCOVER MORE',
       close: 'Close',
       clickToExplore: 'CLICK TO EXPLORE',
+      credits: 'CREDITS',
       reactorTitle: 'BIOREACTOR',
       reactorPanel: 'CONTROL PANEL',
       on: 'ON',
@@ -50,12 +51,103 @@
       intro: 'RECORRE EL ESPACIO Y ACÉRCATE A LAS PIEZAS PARA DESCUBRIR MÁS',
       close: 'Cerrar',
       clickToExplore: 'PULSA PARA EXPLORAR',
+      credits: 'CRÉDITOS',
       reactorTitle: 'BIORREACTOR',
       reactorPanel: 'PANEL DE CONTROL',
       on: 'ON',
       off: 'OFF',
       reactorPrompt: 'Pulsa un control para descubrir qué función cumple dentro de un fotobiorreactor.',
       reactorFallback: 'Pulsa un control para descubrir cómo mantiene vivo el cultivo cada proceso.'
+    }
+  };
+
+  const credits = {
+    en: {
+      title: 'CREDITS & SOURCES',
+      mediaTitle: 'IMAGES & VIDEOS',
+      scienceTitle: 'SCIENTIFIC SOURCES',
+      media: [
+        { year: '2017', names: ['Berber Stevens', 'Demi Ligtenberg', 'Marta Cerruti', 'David Weissbrodt', 'Heleen Ouboter'] },
+        { year: '2019', names: ['Marta Cerruti', 'Guillaume Crosset-Perrotin', 'David Weissbrodt', 'Maria Paula Giulianetti de Almeida', 'Camille Mondini'] },
+        { year: '2020', names: ['Marta Cerruti', 'Mythili Ananth', 'David Weissbrodt'] }
+      ],
+      science: [
+        'Scientific references and DOI are not clearly available in the current museum content yet.'
+      ]
+    },
+    es: {
+      title: 'CRÉDITOS Y FUENTES',
+      mediaTitle: 'IMÁGENES Y VÍDEOS',
+      scienceTitle: 'FUENTES CIENTÍFICAS',
+      media: [
+        { year: '2017', names: ['Berber Stevens', 'Demi Ligtenberg', 'Marta Cerruti', 'David Weissbrodt', 'Heleen Ouboter'] },
+        { year: '2019', names: ['Marta Cerruti', 'Guillaume Crosset-Perrotin', 'David Weissbrodt', 'Maria Paula Giulianetti de Almeida', 'Camille Mondini'] },
+        { year: '2020', names: ['Marta Cerruti', 'Mythili Ananth', 'David Weissbrodt'] }
+      ],
+      science: [
+        'Las referencias científicas y DOI no están todavía claramente disponibles en el contenido actual del museo.'
+      ]
+    }
+  };
+
+  const applicationVisuals = {
+    en: {
+      room01: { kicker: 'ROOM 01', title: 'PURPLE PHOTOTROPHIC BACTERIA' },
+      room02: { kicker: 'ROOM 02', title: 'BIOTECHNOLOGICAL APPLICATIONS' },
+      hydrogen: {
+        title: 'BIOLOGICAL HYDROGEN PRODUCTION',
+        short: 'H₂ ✓ → HYDROGEN PRODUCTION',
+        steps: ['LIGHT / CULTURE', 'H₂']
+      },
+      pha: {
+        title: 'PHA → BIOPLASTIC',
+        short: 'PHA ✓ → BIOPLASTIC',
+        steps: ['PHA', 'MATERIAL', 'BIOPLASTIC']
+      },
+      biomass: {
+        title: 'CULTURE → BIOMASS',
+        short: 'BIO ✓ → FOOD / FEED',
+        steps: ['CULTURE', 'BIOMASS', 'FOOD / FEED']
+      },
+      electro: {
+        title: 'BIOELECTROCHEMISTRY',
+        short: 'e⁻ ✓ → BIOELECTROCHEMISTRY',
+        steps: ['BACTERIUM', 'e⁻', 'ELECTRODE']
+      },
+      scale: {
+        title: 'SCALE BY NUMBERING-UP',
+        short: '1 → 4 → 8 → 16',
+        steps: ['1', '4', '8', '16']
+      }
+    },
+    es: {
+      room01: { kicker: 'SALA 01', title: 'BACTERIAS FOTOTRÓFICAS PÚRPURAS' },
+      room02: { kicker: 'SALA 02', title: 'APLICACIONES BIOTECNOLÓGICAS' },
+      hydrogen: {
+        title: 'PRODUCCIÓN BIOLÓGICA DE HIDRÓGENO',
+        short: 'H₂ ✓ → PRODUCCIÓN DE HIDRÓGENO',
+        steps: ['LUZ / CULTIVO', 'H₂']
+      },
+      pha: {
+        title: 'PHA → BIOPLÁSTICO',
+        short: 'PHA ✓ → BIOPLÁSTICO',
+        steps: ['PHA', 'MATERIAL', 'BIOPLÁSTICO']
+      },
+      biomass: {
+        title: 'CULTIVO → BIOMASA',
+        short: 'BIO ✓ → FOOD / FEED',
+        steps: ['CULTIVO', 'BIOMASA', 'FOOD / FEED']
+      },
+      electro: {
+        title: 'BIOELECTROQUÍMICA',
+        short: 'e⁻ ✓ → BIOELECTROQUÍMICA',
+        steps: ['BACTERIA', 'e⁻', 'ELECTRODO']
+      },
+      scale: {
+        title: 'ESCALAR MULTIPLICANDO UNIDADES',
+        short: '1 → 4 → 8 → 16',
+        steps: ['1', '4', '8', '16']
+      }
     }
   };
 
@@ -375,7 +467,7 @@
     }
   };
 
-  window.MUSEUM_I18N = { ui, reactor, reactorPanel, electroactivity, capabilities, exhibitLabels, content: { en: {}, es: esContent } };
+  window.MUSEUM_I18N = { ui, reactor, reactorPanel, electroactivity, capabilities, exhibitLabels, credits, applicationVisuals, content: { en: {}, es: esContent } };
   window.getMuseumUiText = function getMuseumUiText(key) {
     return (ui[language] && ui[language][key]) || ui.en[key] || key;
   };
@@ -391,6 +483,13 @@
   window.getMuseumExhibitLabel = function getMuseumExhibitLabel(key) {
     const pack = exhibitLabels[language] || exhibitLabels.en;
     return pack[key] || exhibitLabels.en[key] || null;
+  };
+  window.getMuseumCreditsText = function getMuseumCreditsText() {
+    return credits[language] || credits.en;
+  };
+  window.getMuseumApplicationText = function getMuseumApplicationText(key) {
+    const pack = applicationVisuals[language] || applicationVisuals.en;
+    return pack[key] || applicationVisuals.en[key] || null;
   };
   window.getMuseumElectroactivityText = function getMuseumElectroactivityText(key) {
     return (electroactivity[language] && electroactivity[language][key]) || electroactivity.en[key] || key;
@@ -415,9 +514,12 @@
     setText('#intro-msg .hint-mobile .intro-swipe', t('swipe'));
     setText('#intro-msg .hint-mobile .intro-move', t('move'));
     setText('#intro-msg .hint-mobile .intro-look', t('look'));
+    setText('#credits-trigger', t('credits'));
 
     const close = document.querySelector('.panel-close');
     if (close) close.setAttribute('aria-label', t('close'));
+    const creditsClose = document.querySelector('.credits-close');
+    if (creditsClose) creditsClose.setAttribute('aria-label', t('close'));
 
     const switcher = document.getElementById('language-switcher');
     if (!switcher) return;

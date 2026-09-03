@@ -82,8 +82,35 @@ html, body {
 #language-switcher button:focus-visible { outline: 2px solid #7d3fa8; outline-offset: 2px; }
 #language-switcher button.active { color: #6f368f; opacity: 1; }
 
+#credits-trigger {
+  position: fixed;
+  right: 20px;
+  top: 58px;
+  z-index: 1200;
+  min-height: 32px;
+  padding: 7px 12px;
+  border: 1px solid rgba(245, 239, 228, 0.22);
+  border-radius: 999px;
+  background: rgba(20, 16, 12, 0.42);
+  color: rgba(245, 239, 228, 0.82);
+  box-shadow: 0 3px 14px rgba(18, 12, 22, 0.14);
+  backdrop-filter: blur(4px);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+}
+#credits-trigger:hover,
+#credits-trigger:focus-visible {
+  color: #ffffff;
+  border-color: rgba(79, 228, 220, 0.54);
+}
+#credits-trigger:focus-visible { outline: 2px solid #4fe4dc; outline-offset: 3px; }
+
 @media (max-width: 640px) {
   #language-switcher { top: 12px; right: 12px; }
+  #credits-trigger { right: 12px; top: 54px; min-height: 44px; padding: 10px 14px; }
 }
 
 @keyframes loading-spin {
@@ -368,6 +395,124 @@ a-scene canvas { touch-action: none; }
   border-top: 1px solid var(--mus-borde);
   font-size: 9.5px; letter-spacing: 0.16em; font-weight: 600;
   color: var(--mus-tinta); opacity: 0.45;
+}
+
+/* --- creditos y fuentes: misma familia visual que las fichas, pero acceso
+   discreto desde una esquina para no competir con la visita. --- */
+#credits-panel {
+  position: fixed;
+  right: 28px;
+  top: 96px;
+  z-index: 1201;
+  display: flex;
+  flex-direction: column;
+  width: 360px;
+  max-width: calc(100vw - 28px);
+  max-height: min(620px, calc(100vh - 96px));
+  padding: 22px 24px 20px;
+  border: 1px solid var(--mus-borde);
+  border-radius: 8px;
+  background: var(--mus-crema);
+  box-shadow: 0 18px 54px rgba(24, 12, 30, 0.22);
+  backdrop-filter: blur(7px);
+  color: var(--mus-tinta);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+#credits-panel.visible { opacity: 1; pointer-events: auto; transform: translateY(0); }
+#credits-panel .credits-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  border: 0;
+  background: none;
+  color: var(--mus-tinta);
+  font-size: 20px;
+  line-height: 1;
+  opacity: 0.5;
+  cursor: pointer;
+}
+#credits-panel .credits-close:hover,
+#credits-panel .credits-close:focus-visible { opacity: 1; }
+#credits-panel .credits-section {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  color: var(--mus-morado);
+  font-weight: 600;
+}
+#credits-panel h2 {
+  margin: 0 24px 14px 0;
+  font-size: 17px;
+  line-height: 1.28;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+#credits-panel .credits-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--mus-morado) transparent;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+#credits-panel .credits-scroll::-webkit-scrollbar { width: 5px; }
+#credits-panel .credits-scroll::-webkit-scrollbar-track { background: transparent; }
+#credits-panel .credits-scroll::-webkit-scrollbar-thumb {
+  background: var(--mus-morado);
+  border-radius: 3px;
+}
+#credits-panel .credits-block {
+  padding-top: 14px;
+  border-top: 1px solid var(--mus-borde);
+}
+#credits-panel .credits-block + .credits-block { margin-top: 18px; }
+#credits-panel h3 {
+  margin: 0 0 12px;
+  color: var(--mus-morado);
+  font-size: 11px;
+  line-height: 1.35;
+  letter-spacing: 0.14em;
+  font-weight: 800;
+}
+#credits-panel .credits-year {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(42, 38, 34, 0.07);
+}
+#credits-panel .credits-year:first-child { border-top: 0; padding-top: 0; }
+#credits-panel .credits-year strong {
+  color: var(--mus-morado);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+#credits-panel .credits-year span,
+#credits-panel .credits-note {
+  display: block;
+  font-size: 13px;
+  line-height: 1.55;
+  opacity: 0.82;
+}
+
+@media (max-width: 640px) {
+  #credits-panel {
+    left: 12px;
+    right: 12px;
+    top: 104px;
+    width: auto;
+    max-width: none;
+    max-height: min(560px, calc(100vh - 104px));
+    padding: 20px 18px 18px;
+  }
+  #credits-panel .credits-close { top: 4px; right: 6px; padding: 10px 12px; }
 }
 
 /* --- grafismo de sala --- */
