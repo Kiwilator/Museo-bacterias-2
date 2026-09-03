@@ -3858,6 +3858,7 @@ AFRAME.registerComponent('reactor-control', {
     this.reactorLast = { id: null, on: false };
     this.msgUntil = 0;        // el mensaje de causa-efecto vive 3.8 s y se va
     this.rewardUntil = 0;     // banner SISTEMA ACTIVO, ~2.6 s
+    this.rewardActiveAt = 0;  // primero se ve 4/4; despues SISTEMA ACTIVO
     this.wasComplete = false; // ver checkReward(): la recompensa solo salta en la transicion
     this.biomassAt = 0;       // instante en que se anota la capacidad, tras el banner
     this.rewardPulse = 0;
@@ -4440,6 +4441,7 @@ AFRAME.registerComponent('reactor-control', {
     const count = this.activeCount();
     const complete = count === 4;
     const rewarding = this.now() < this.rewardUntil;
+    const rewardActive = rewarding && this.now() >= this.rewardActiveAt;
 
     ctx.clearRect(0, 0, WPX, HPX);
     ctx.fillStyle = 'rgba(3, 10, 13, 0.92)';
@@ -4563,13 +4565,20 @@ AFRAME.registerComponent('reactor-control', {
     ctx.fillStyle = rewarding ? onColor : accentLight;
     ctx.fillRect(padX, stripY, 10, stripH);
     ctx.textAlign = 'left';
-    if (rewarding) {
+    if (rewardActive) {
       ctx.fillStyle = onColor;
       ctx.font = '900 44px Arial, Helvetica, sans-serif';
       ctx.fillText(copy.systemActive, padX + 34, stripY + stripH * 0.34);
       ctx.fillStyle = ink;
       ctx.font = '800 34px Arial, Helvetica, sans-serif';
       ctx.fillText(copy.systemActiveText, padX + 34, stripY + stripH * 0.74);
+    } else if (rewarding) {
+      ctx.fillStyle = onColor;
+      ctx.font = '900 44px Arial, Helvetica, sans-serif';
+      ctx.fillText('4 / 4', padX + 34, stripY + stripH * 0.34);
+      ctx.fillStyle = ink;
+      ctx.font = '800 34px Arial, Helvetica, sans-serif';
+      ctx.fillText(copy.statusTitle, padX + 34, stripY + stripH * 0.74);
     } else {
       ctx.fillStyle = accentLight;
       ctx.font = '900 30px Arial, Helvetica, sans-serif';
@@ -4840,7 +4849,9 @@ AFRAME.registerComponent('reactor-control', {
   checkReward() {
     const complete = this.activeCount() === 4;
     if (complete && !this.wasComplete) {
-      this.rewardUntil = this.now() + 2600;
+      const now = this.now();
+      this.rewardUntil = now + 2750;
+      this.rewardActiveAt = now + 1250;
       this.rewardPulse = 1;
       /*
         Conseguir los cuatro controles a la vez es la mecanica museografica
@@ -4849,12 +4860,12 @@ AFRAME.registerComponent('reactor-control', {
         convierte el 4/4 en un protocolo obligatorio: es el mismo premio
         visual de siempre, ahora tambien anotado en el HUD general.
 
-        Se retrasa 1.3 s a proposito: primero se lee SISTEMA ACTIVO / CULTIVO
-        EN FUNCIONAMIENTO en el propio display del reactor y solo despues
-        aparece el aviso de capacidad. Nunca las dos cosas a la vez.
+        Se retrasa casi 3 s a proposito: primero se lee 4/4 con el reactor
+        completo, despues SISTEMA ACTIVO / CULTIVO EN FUNCIONAMIENTO, y solo
+        tras una pausa aparece el aviso de capacidad. Nunca todo a la vez.
         unlockCapability ya se encarga de que no se repita.
       */
-      this.biomassAt = this.now() + 1300;
+      this.biomassAt = now + 3050;
     }
     this.wasComplete = complete;
   },
@@ -5512,7 +5523,13 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     this.h2.forEach((p) => {
       if (!p.active) return;
       p.t += p.speed * dt;
-      if (p.t >= 1) { p.active = false; p.mesh.visible = false; p.mat.opacity = 0; return; }
+      if (p.t >= 1) {
+        p.active = false;
+        p.mesh.visible = false;
+        p.mat.opacity = 0;
+        if (p.tag) { p.tag.visible = false; p.tagMat.opacity = 0; }
+        return;
+      }
       const rise = this.h2Rise * p.t;
       const wob = Math.sin(p.t * 6.5) * p.sway;
       p.mesh.position.set(
@@ -6712,8 +6729,8 @@ AFRAME.registerComponent('nitrogen-exhibit', {
   },
 
   /*
-    Cada N2 son dos esferas iguales unidas por un enlace corto: la lectura
-    quimica mas simple posible, sin etiquetas ni iconos.
+    Cada N2 son dos esferas iguales unidas por un enlace corto y una etiqueta
+    N2 discreta: doble molecula + nombre legible desde la distancia normal.
   */
   buildMolecules() {
     const scene = this.el.sceneEl.object3D;
@@ -6721,6 +6738,7 @@ AFRAME.registerComponent('nitrogen-exhibit', {
     const R = 0.0085, GAP = 0.0115;
     const atomGeo = new THREE.SphereGeometry(R, 14, 12);
     const bondGeo = new THREE.CylinderGeometry(R * 0.42, R * 0.42, GAP * 2, 10);
+    const tagTex = this.buildN2LabelTexture();
     this.atomGeo = atomGeo;
     this.bondGeo = bondGeo;
     // pequeño racimo alrededor del punto de espera, nunca en fila
@@ -6747,12 +6765,31 @@ AFRAME.registerComponent('nitrogen-exhibit', {
       group.position.copy(home);
       group.visible = false;
       scene.add(group);
+      const tagMat = new THREE.MeshBasicMaterial({ map: tagTex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+      const tag = new THREE.Mesh(new THREE.PlaneGeometry(0.032, 0.018), tagMat);
+      tag.visible = false;
+      scene.add(tag);
       this.mol.push({
-        group, mat, home, t: 0, moving: false, arrived: false,
-        delay: i * 0.38, speed: 1 / THREE.MathUtils.randFloat(2.4, 3.2),
+        group, mat, tag, tagMat, home, t: 0, moving: false, arrived: false,
+        delay: i * 1.25, speed: 1 / THREE.MathUtils.randFloat(0.95, 1.18),
         phase: Math.random() * Math.PI * 2, spin: THREE.MathUtils.randFloatSpread(0.35)
       });
     }
+  },
+
+  buildN2LabelTexture() {
+    const c = document.createElement('canvas');
+    c.width = 160; c.height = 90;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#D8F8FC';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '900 58px Arial, Helvetica, sans-serif';
+    ctx.fillText('N₂', c.width / 2, c.height / 2 + 3);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
   },
 
   buildLabel() {
@@ -6812,13 +6849,19 @@ AFRAME.registerComponent('nitrogen-exhibit', {
     this.mol.forEach((m) => {
       m.moving = false; m.arrived = false; m.t = 0;
       m.group.position.copy(m.home);
+      if (m.tag) { m.tag.visible = false; m.tagMat.opacity = 0; }
     });
   },
 
   updateMolecules(dt, secs) {
     let arrived = 0;
     this.mol.forEach((m) => {
-      if (m.arrived) { arrived += 1; m.group.visible = false; return; }
+      if (m.arrived) {
+        arrived += 1;
+        m.group.visible = false;
+        if (m.tag) { m.tag.visible = false; m.tagMat.opacity = 0; }
+        return;
+      }
       if (!m.moving) {
         // en espera: flotan muy despacio, girando apenas
         m.group.position.copy(m.home);
@@ -6827,11 +6870,17 @@ AFRAME.registerComponent('nitrogen-exhibit', {
         m.group.rotation.z += m.spin * dt * 0.25;
         m.group.visible = this.displayT > 0.02;
         m.mat.opacity = 0.92 * this.displayT;
+        m.tag.visible = this.displayT > 0.02;
+        m.tag.position.copy(m.group.position).add(new THREE.Vector3(0, 0.030, 0));
+        m.tagMat.opacity = 0.90 * this.displayT;
         return;
       }
       if (m.delay > 0 && this.seq < m.delay) {
         m.group.position.copy(m.home);
         m.group.visible = true;
+        m.tag.visible = true;
+        m.tag.position.copy(m.group.position).add(new THREE.Vector3(0, 0.030, 0));
+        m.tagMat.opacity = 0.82 * this.displayT;
         return;
       }
       m.t += m.speed * dt;
@@ -6839,10 +6888,16 @@ AFRAME.registerComponent('nitrogen-exhibit', {
       m.group.position.lerpVectors(m.home, this.arrival, Math.min(e, 1));
       m.group.rotation.z += m.spin * dt * 0.5;
       m.group.visible = true;
-      m.mat.opacity = 0.92 * this.displayT * (1 - THREE.MathUtils.clamp((m.t - 0.78) / 0.22, 0, 1));
+      const a = 0.92 * this.displayT * (1 - THREE.MathUtils.clamp((m.t - 0.78) / 0.22, 0, 1));
+      m.mat.opacity = a;
+      m.tag.visible = true;
+      m.tag.position.copy(m.group.position).add(new THREE.Vector3(0, 0.030, 0));
+      m.tagMat.opacity = a * 0.94;
       if (m.t >= 1) {
         m.arrived = true;
         m.group.visible = false;
+        m.tag.visible = false;
+        m.tagMat.opacity = 0;
         this.pulseT = 1;                        // pulso interno minimo
       }
     });
@@ -6900,6 +6955,7 @@ AFRAME.registerComponent('nitrogen-exhibit', {
     const cam = this.el.sceneEl.camera;
     const cw = cam ? cam.getWorldPosition(this.tmp) : null;
     if (cw && this.label) this.label.group.lookAt(cw);
+    if (cw) this.mol.forEach((m) => { if (m.tag && m.tag.visible) m.tag.lookAt(cw); });
     if (this.hotspot) {
       this.hotspot.tick(dt, cw, this.displayT,
         !!(window.hasCapability && window.hasCapability(this.data.capability)), running);
@@ -6911,7 +6967,10 @@ AFRAME.registerComponent('nitrogen-exhibit', {
     (this.mats || []).forEach(({ mat, base }) => { mat.emissiveIntensity = base; });
     this._wired.forEach((m) => { if (m.userData) delete m.userData.museoAction; });
     if (this.label && this.label.group && this.label.group.parent) this.label.group.parent.remove(this.label.group);
-    this.mol.forEach((m) => { if (m.group.parent) m.group.parent.remove(m.group); });
+    this.mol.forEach((m) => {
+      if (m.group.parent) m.group.parent.remove(m.group);
+      if (m.tag && m.tag.parent) m.tag.parent.remove(m.tag);
+    });
     if (this.atomGeo) this.atomGeo.dispose();
     if (this.bondGeo) this.bondGeo.dispose();
   }
