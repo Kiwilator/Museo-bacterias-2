@@ -144,7 +144,7 @@ window.MUSEO_MOVE_VECTOR = { x: 0, z: 0 };
    museum-i18n.js: ni el HUD ni el contador necesitan tocarse.
    ========================================================================== */
 const MUSEO_CAP_KEY = 'museum-capabilities';
-const MUSEO_CAP_ORDER = ['pha', 'co'];
+const MUSEO_CAP_ORDER = ['pha', 'co', 'hydrogen'];
 
 (function museumCapabilities() {
   const known = (id) => MUSEO_CAP_ORDER.indexOf(id) !== -1;
@@ -5020,7 +5020,9 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     const group = new THREE.Group();
     group.name = 'rubrivivax-microetiqueta';
     // por encima de la campana y muy por debajo de la imagen circular
-    group.position.set(this.coStart.x, Math.min(this.bellTop - 0.028, this.center.y + 0.20), this.coStart.z);
+    // justo por encima de la bacteria y del punto de entrada del CO: a la
+    // altura de la campana quedaba flotando lejos, sin relacion con la vitrina
+    group.position.set(this.coStart.x, Math.min(this.bellTop - 0.030, this.center.y + 0.115), this.coStart.z);
     this.el.sceneEl.object3D.add(group);
     const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
     group.add(new THREE.Mesh(new THREE.PlaneGeometry(0.170, 0.046), mat));
@@ -5028,19 +5030,21 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
   },
 
   /*
-    El tap sobre la bacteria sigue abriendo su ficha cientifica exactamente
-    como antes: aqui solo se envuelve la accion para que, ademas, lance la
-    secuencia intensa. Nada de lo que ya funcionaba se sustituye.
+    Solo la MALLA DE LA BACTERIA lanza la secuencia. La placa curva de la
+    peana ("PULSA PARA EXPLORAR") queda intacta y sigue siendo la que abre la
+    ficha cientifica, como en todas las piezas del museo.
+
+    Probado: si el tap sobre la bacteria abria tambien la ficha, el panel
+    tapaba justo la mitad donde ocurre la demostracion -- el visitante lanzaba
+    la interaccion y no podia verla. La placa se distingue porque no tiene
+    nombre (la crea createPedestalPlacard en tiempo de ejecucion, no viene del
+    glTF); las mallas de la bacteria si lo tienen.
   */
   wireClick(info) {
     (info.selectableMeshes || []).forEach((m) => {
       if (!m.userData || m.userData.museoExhibitId !== this.data.target) return;
-      if (m.userData.museoAction) return;
-      const id = m.userData.museoExhibitId;
-      m.userData.museoAction = () => {
-        this.burst();
-        if (info.open) info.open(id);
-      };
+      if (!m.name || m.userData.museoAction) return;
+      m.userData.museoAction = () => this.burst();
       this._wired.push(m);
     });
   },
@@ -5433,15 +5437,13 @@ AFRAME.registerComponent('pha-exhibit', {
     this.label = { group, mat };
   },
 
+  // Igual que en Rubrivivax: la secuencia la lanza la bacteria, y la placa de
+  // la peana sigue abriendo la ficha cientifica sin cambios.
   wireClick(info) {
     (info.selectableMeshes || []).forEach((m) => {
       if (!m.userData || m.userData.museoExhibitId !== this.data.target) return;
-      if (m.userData.museoAction) return;
-      const id = m.userData.museoExhibitId;
-      m.userData.museoAction = () => {
-        this.start();
-        if (info.open) info.open(id);
-      };
+      if (!m.name || m.userData.museoAction) return;
+      m.userData.museoAction = () => this.start();
       this._wired.push(m);
     });
   },
@@ -5563,5 +5565,444 @@ AFRAME.registerComponent('pha-exhibit', {
     this.granules.concat(this.carbon).forEach((x) => { if (x.mesh && x.mesh.parent) x.mesh.parent.remove(x.mesh); });
     if (this.granuleGeo) this.granuleGeo.dispose();
     if (this.carbonGeo) this.carbonGeo.dispose();
+  }
+});
+
+/* ==========================================================================
+   RHODOPSEUDOMONAS PALUSTRIS -- fotoproduccion de hidrogeno.
+
+   El documento fuente dice que R. palustris es especialmente eficaz
+   produciendo hidrogeno mediante fotofermentacion. Esta capa lo enseña de la
+   forma mas simple posible, sin inventar ningun protocolo quimico:
+
+        LUZ + CULTIVO  ->  H2
+
+   Al acercarse solo aparece un pequeño indicador H2 apagado, junto a la
+   vitrina. Al pulsar, un pulso de luz sobre el cultivo enciende el indicador
+   y empiezan a salir burbujas de tamaños distintos que suben despacio, con
+   movimiento organico; algunas llevan un H2 minusculo y todas desaparecen
+   antes de llegar al techo real de la campana. Pocas a la vez: nunca un
+   jacuzzi.
+
+   Geometria medida en tiempo de ejecucion sobre la bacteria, su campana y su
+   peana reales -- ninguna coordenada escrita a mano. No se toca el GLB: el
+   pulso escala un valor emisivo guardado y remove() lo restaura.
+   ========================================================================== */
+AFRAME.registerComponent('hydrogen-exhibit', {
+  schema: {
+    target: { type: 'string', default: 'bacteriaSmall06' },
+    trigger: { type: 'number', default: 2.2 },
+    release: { type: 'number', default: 2.8 },
+    capability: { type: 'string', default: 'hydrogen' }
+  },
+
+  init() {
+    this.ready = false;
+    this.near = false;
+    this.displayT = 0;
+    this.retry = 0;
+    this.seq = -1;          // < 0 = en reposo; si no, segundos desde el tap
+    this.awarded = false;
+    this.glow = 0;          // 0..1 del indicador
+    this.pulseT = 0;
+    this.nextBubble = 0;
+    this.bubbles = [];
+    this._wired = [];
+    this.tmp = new THREE.Vector3();
+    this.tmp2 = new THREE.Vector3();
+    this.el.addEventListener('museo-modules-loaded', () => window.setTimeout(() => this.setup(), 0));
+  },
+
+  copy() {
+    const fallback = { title: 'H₂', sub: 'PHOTOBIOLOGICAL HYDROGEN PRODUCTION', tag: 'H₂' };
+    return window.getMuseumExhibitLabel ? (window.getMuseumExhibitLabel('hydrogen') || fallback) : fallback;
+  },
+
+  setup() {
+    const info = this.el.components['exhibit-info'];
+    const item = info && info.items && info.items.find((it) => it.id === this.data.target);
+    const anchor = item && item.anchorObj;
+    if (!info || !item || !anchor) {
+      this.retry += 1;
+      if (this.retry < 30) window.setTimeout(() => this.setup(), 120);
+      else console.warn('[h2] no se pudo localizar R. palustris');
+      return;
+    }
+
+    const box = new THREE.Box3().setFromObject(anchor);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+
+    let bell = null;
+    this.el.object3D.traverse((o) => {
+      if (!o.isMesh || !o.name || o.name.indexOf('VITRINA_Campana') !== 0) return;
+      const b = new THREE.Box3().setFromObject(o);
+      if (center.x < b.min.x - 0.02 || center.x > b.max.x + 0.02) return;
+      if (center.z < b.min.z - 0.02 || center.z > b.max.z + 0.02) return;
+      if (!bell || b.max.y > bell.max.y) bell = b;
+    });
+    const bellCenter = bell ? bell.getCenter(new THREE.Vector3()) : center.clone();
+    const bellRadius = bell
+      ? Math.max(bell.max.x - bell.min.x, bell.max.z - bell.min.z) * 0.5
+      : Math.max(size.x, size.z) * 0.5 + 0.05;
+    const bellTop = bell ? bell.max.y : center.y + 0.2;
+
+    let peana = null, pd = Infinity;
+    (info.peanaBoxes || []).forEach((pb) => {
+      const d = Math.hypot(pb.center.x - center.x, pb.center.z - center.z);
+      if (d < pd) { pd = d; peana = pb; }
+    });
+    const standTop = peana ? peana.maxY : (bell ? bell.min.y - 0.06 : center.y - 0.2);
+
+    const front = (info._placardRowDir)
+      ? new THREE.Vector3(info._placardRowDir.x, 0, info._placardRowDir.z).normalize()
+      : new THREE.Vector3(0, 0, 1);
+    const right = new THREE.Vector3(front.z, 0, -front.x).normalize();
+
+    // El indicador se apoya en la tapa de la peana, a la derecha del visitante
+    // (el lado por el que "sale" el gas). Si por lo que sea no cupiera dentro
+    // de la piedra, se prueba el otro lado antes de acercarlo.
+    const place = (dir, lat) => bellCenter.clone().addScaledVector(dir, lat).addScaledVector(front, -0.018);
+    const fits = (p) => !peana || Math.hypot(p.x - peana.center.x, p.z - peana.center.z) <= peana.radius - 0.055;
+    let side = right.clone();
+    let lateral = bellRadius + 0.060;
+    let pos = place(side, lateral);
+    if (!fits(pos)) {
+      const alt = place(right.clone().negate(), lateral);
+      if (fits(alt)) { side = right.clone().negate(); pos = alt; }
+      else { while (lateral > bellRadius + 0.02 && !fits(pos)) { lateral -= 0.006; pos = place(side, lateral); } }
+    }
+    pos.y = standTop + 0.002;
+
+    this.info = info;
+    this.center = center;
+    this.front = front;
+    this.side = side;
+    this.indicatorBase = pos;
+    this.plateY = center.y - 0.004;                      // a la altura del cultivo
+    this.bellTop = bellTop;
+    this.riseFrom = center.y + size.y * 0.18;
+    this.riseTo = Math.min(bellTop - 0.035, this.riseFrom + 0.145);
+    this.spreadX = size.x * 0.30;
+    this.spreadZ = size.z * 0.30;
+
+    this.collectMaterials(anchor);
+    this.buildIndicator();
+    this.buildBubbles();
+    this.buildLabel();
+    this.wireClick(info);
+
+    this.ready = true;
+    console.log('[h2] R. palustris listo', {
+      bacteria: center.toArray().map((v) => +v.toFixed(3)),
+      indicador: pos.toArray().map((v) => +v.toFixed(3)),
+      subida: [+this.riseFrom.toFixed(3), +this.riseTo.toFixed(3)]
+    });
+  },
+
+  collectMaterials(anchor) {
+    const set = new Set();
+    anchor.traverse((n) => {
+      if (!n.isMesh || !n.material) return;
+      (Array.isArray(n.material) ? n.material : [n.material]).forEach((m) => { if (m && m.emissive) set.add(m); });
+    });
+    this.mats = Array.from(set).map((mat) => ({ mat, base: mat.emissiveIntensity || 0 }));
+  },
+
+  buildIndicatorTexture() {
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 168;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '900 96px Arial, Helvetica, sans-serif';
+    ctx.fillText(this.copy().tag || 'H₂', c.width / 2, c.height / 2 + 4);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  },
+
+  /*
+    Indicador: una placa pequeña sobre un pie minimo, de cara al visitante.
+    Apagado es gris muy tenue; durante la produccion se enciende en el cian
+    del propio hidrogeno. Nunca compite con la bacteria.
+  */
+  buildIndicator() {
+    const group = new THREE.Group();
+    group.name = 'palustris-indicador-h2';
+    group.position.copy(this.indicatorBase);
+    const face = this.front.clone();
+    group.rotation.y = Math.atan2(face.x, face.z);
+    this.el.sceneEl.object3D.add(group);
+
+    const W = 0.058, H = 0.038, T = 0.004;
+    const y = this.plateY - this.indicatorBase.y;
+
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: 0x1c2124, roughness: 0.5, metalness: 0.5,
+      emissive: 0x0c3b45, emissiveIntensity: 0, transparent: true, opacity: 0
+    });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, T), bodyMat);
+    body.position.set(0, y, 0);
+    group.add(body);
+
+    const tagMat = new THREE.MeshBasicMaterial({
+      map: this.buildIndicatorTexture(), transparent: true, opacity: 0,
+      depthWrite: false, color: 0x6d7578
+    });
+    const tag = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.82, H * 0.82), tagMat);
+    tag.position.set(0, y, T / 2 + 0.0006);
+    group.add(tag);
+
+    const stemMat = new THREE.MeshStandardMaterial({
+      color: 0x24282a, roughness: 0.5, metalness: 0.55, transparent: true, opacity: 0
+    });
+    const stemH = Math.max(0.004, y - H / 2);
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.0024, 0.003, stemH, 10), stemMat);
+    stem.position.set(0, stemH / 2, 0);
+    group.add(stem);
+    const foot = new THREE.Mesh(new THREE.CylinderGeometry(W * 0.30, W * 0.34, 0.005, 18), stemMat);
+    foot.position.set(0, 0.0025, 0);
+    group.add(foot);
+
+    const hit = new THREE.Mesh(
+      new THREE.PlaneGeometry(W * 2.2, H * 2.4),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false, side: THREE.DoubleSide })
+    );
+    hit.position.set(0, y, T / 2 + 0.004);
+    group.add(hit);
+    hit.userData.museoExhibitId = 'hydrogenIndicator';
+    hit.userData.museoAction = () => this.start();
+    if (this.info && this.info.selectableMeshes) this.info.selectableMeshes.push(hit);
+
+    this.indicator = { group, bodyMat, tagMat, stemMat, hit };
+  },
+
+  buildBubbleTagTexture() {
+    const c = document.createElement('canvas');
+    c.width = 160; c.height = 96;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#eafcff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '900 62px Arial, Helvetica, sans-serif';
+    ctx.fillText(this.copy().tag || 'H₂', c.width / 2, c.height / 2 + 3);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  },
+
+  buildBubbles() {
+    const scene = this.el.sceneEl.object3D;
+    const geo = new THREE.SphereGeometry(1, 12, 10);
+    const tagTex = this.buildBubbleTagTexture();
+    this.bubbleGeo = geo;
+    for (let i = 0; i < 10; i++) {
+      const mat = new THREE.MeshBasicMaterial({ color: 0xd8f7ff, transparent: true, opacity: 0, depthWrite: false });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.visible = false;
+      // una de cada tres lleva su H2; el resto son solo burbujas
+      const tagged = (i % 3 === 0);
+      let tag = null, tagMat = null;
+      if (tagged) {
+        tagMat = new THREE.MeshBasicMaterial({ map: tagTex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+        tag = new THREE.Mesh(new THREE.PlaneGeometry(0.024, 0.014), tagMat);
+        scene.add(tag);
+      }
+      scene.add(mesh);
+      this.bubbles.push({ mesh, mat, tag, tagMat, active: false, t: 0, speed: 0.3, r: 0.005, x: 0, z: 0, sway: 0, phase: 0 });
+    }
+  },
+
+  buildLabel() {
+    const c = document.createElement('canvas');
+    c.width = 760; c.height = 190;
+    const ctx = c.getContext('2d');
+    const copy = this.copy();
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.fillStyle = 'rgba(8, 12, 16, 0.60)';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#8FE6F5';
+    ctx.fillRect(0, 0, 7, c.height);
+    ctx.textAlign = 'left';
+    const fit = (text, weight, maxPx, boxW) => {
+      let size = maxPx;
+      ctx.font = weight + ' ' + size + 'px Arial, Helvetica, sans-serif';
+      while (size > 18 && ctx.measureText(text).width > boxW) {
+        size -= 2;
+        ctx.font = weight + ' ' + size + 'px Arial, Helvetica, sans-serif';
+      }
+    };
+    const boxW = c.width - 34 - 26;
+    ctx.fillStyle = '#B9F2FB';
+    fit(copy.title, '900', 58, boxW);
+    ctx.fillText(copy.title, 34, 76);
+    ctx.fillStyle = 'rgba(247, 251, 252, 0.86)';
+    fit(copy.sub, '700', 38, boxW);
+    ctx.fillText(copy.sub, 34, 142);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+
+    const group = new THREE.Group();
+    group.name = 'palustris-microetiqueta-h2';
+    group.position.set(
+      this.indicatorBase.x,
+      Math.min(this.bellTop - 0.030, this.center.y + 0.115),
+      this.indicatorBase.z
+    );
+    this.el.sceneEl.object3D.add(group);
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+    group.add(new THREE.Mesh(new THREE.PlaneGeometry(0.178, 0.045), mat));
+    this.label = { group, mat };
+  },
+
+  // La secuencia la lanza la bacteria (o el propio indicador). La placa de la
+  // peana sigue abriendo la ficha cientifica, sin tocarla.
+  wireClick(info) {
+    (info.selectableMeshes || []).forEach((m) => {
+      if (!m.userData || m.userData.museoExhibitId !== this.data.target) return;
+      if (!m.name || m.userData.museoAction) return;
+      m.userData.museoAction = () => this.start();
+      this._wired.push(m);
+    });
+  },
+
+  start() {
+    this.seq = 0;
+    this.pulseT = 1;
+    this.nextBubble = 0.30;
+  },
+
+  spawnBubble() {
+    const b = this.bubbles.find((x) => !x.active);
+    if (!b) return;
+    b.active = true;
+    b.t = 0;
+    b.r = THREE.MathUtils.randFloat(0.0035, 0.0085);      // tamaños distintos
+    b.speed = 1 / THREE.MathUtils.randFloat(2.6, 4.2);    // suben despacio
+    b.x = this.center.x + THREE.MathUtils.randFloatSpread(this.spreadX * 2);
+    b.z = this.center.z + THREE.MathUtils.randFloatSpread(this.spreadZ * 2);
+    b.sway = THREE.MathUtils.randFloat(0.003, 0.009);
+    b.phase = Math.random() * Math.PI * 2;
+    b.mesh.visible = true;
+    b.mat.opacity = 0;
+    if (b.tag) { b.tag.visible = true; b.tagMat.opacity = 0; }
+  },
+
+  updateBubbles(dt, secs) {
+    // Solo salen mientras dura la secuencia; las que ya van subiendo terminan
+    // su recorrido aunque la secuencia acabe (nada se corta de golpe).
+    if (this.seq >= 0 && this.seq < 3.8 && this.seq >= this.nextBubble) {
+      this.spawnBubble();
+      this.nextBubble = this.seq + THREE.MathUtils.randFloat(0.26, 0.44);
+    }
+    this.bubbles.forEach((b) => {
+      if (!b.active) return;
+      b.t += b.speed * dt;
+      if (b.t >= 1) {
+        b.active = false;
+        b.mesh.visible = false;
+        b.mat.opacity = 0;
+        if (b.tag) { b.tag.visible = false; b.tagMat.opacity = 0; }
+        return;
+      }
+      // movimiento organico: deriva lenta en dos ejes, no una linea recta
+      const wob = Math.sin(secs * 1.5 + b.phase) * b.sway;
+      const wob2 = Math.cos(secs * 1.1 + b.phase * 1.7) * b.sway * 0.7;
+      const y = THREE.MathUtils.lerp(this.riseFrom, this.riseTo, b.t);
+      b.mesh.position.set(b.x + wob, y, b.z + wob2);
+      b.mesh.scale.setScalar(b.r * (1 + b.t * 0.35));
+      const fadeIn = Math.min(1, b.t / 0.16);
+      const fadeOut = Math.min(1, (1 - b.t) / 0.30);
+      const a = 0.88 * Math.min(fadeIn, fadeOut);
+      b.mat.opacity = a;
+      if (b.tag) {
+        b.tag.position.set(b.mesh.position.x + b.r * 2.4, y + b.r * 1.4, b.mesh.position.z);
+        b.tagMat.opacity = a * 0.95;
+      }
+    });
+  },
+
+  updatePulse(dt) {
+    if (this.pulseT > 0) this.pulseT = Math.max(0, this.pulseT - dt / 0.45);
+    const p = Math.sin(this.pulseT * Math.PI);
+    (this.mats || []).forEach(({ mat, base }) => {
+      mat.emissiveIntensity = base + (base > 0.01 ? base * 0.34 : 0.10) * p;
+    });
+  },
+
+  tick(time, delta) {
+    if (!this.ready) return;
+    const rig = document.getElementById('rig');
+    if (!rig) return;
+    const p = rig.object3D.getWorldPosition(this.tmp2);
+    const d = Math.hypot(p.x - this.center.x, p.z - this.center.z);
+    if (!this.near && d <= this.data.trigger) this.near = true;
+    else if (this.near && d >= this.data.release) this.near = false;
+
+    const dt = Math.min(0.05, Math.max(0.001, (delta || 16) / 1000));
+    if (this.seq >= 0) {
+      this.seq += dt;
+      if (this.seq > 6.4) this.seq = -1;      // vuelta al reposo
+    }
+    const running = this.seq >= 0;
+
+    // Acercarse solo hace aparecer el indicador APAGADO y la etiqueta tenue.
+    this.displayT += (((this.near || running) ? 1 : 0) - this.displayT) * 0.07;
+    // El indicador se enciende con la produccion y se apaga al terminar.
+    const glowTarget = (running && this.seq > 0.15 && this.seq < 4.6) ? 1 : 0;
+    this.glow += (glowTarget - this.glow) * 0.09;
+
+    const eased = this.displayT * this.displayT * (3 - 2 * this.displayT);
+    if (this.indicator) {
+      const g = this.indicator;
+      g.group.visible = eased > 0.01;
+      g.bodyMat.opacity = 0.94 * eased;
+      g.stemMat.opacity = 0.94 * eased;
+      g.tagMat.opacity = eased * (0.55 + 0.45 * this.glow);
+      g.tagMat.color.setRGB(
+        THREE.MathUtils.lerp(0.43, 0.62, this.glow),
+        THREE.MathUtils.lerp(0.46, 0.95, this.glow),
+        THREE.MathUtils.lerp(0.47, 1.0, this.glow)
+      );
+      g.bodyMat.emissiveIntensity = 0.05 + this.glow * 0.55;
+    }
+    if (this.label) {
+      this.label.group.visible = eased > 0.03;
+      this.label.mat.opacity = eased * (running ? 0.95 : 0.52);
+    }
+
+    this.updateBubbles(dt, (time || 0) / 1000);
+    this.updatePulse(dt);
+
+    // Solo el tap concede la capacidad, y solo al completarse la secuencia.
+    if (running && !this.awarded && this.seq >= 4.0) {
+      this.awarded = true;
+      if (window.unlockCapability) window.unlockCapability(this.data.capability);
+    }
+    if (!running) this.awarded = false;
+
+    const cam = this.el.sceneEl.camera;
+    if (cam) {
+      const cw = cam.getWorldPosition(this.tmp);
+      if (this.label) this.label.group.lookAt(cw);
+      this.bubbles.forEach((b) => { if (b.tag && b.active) b.tag.lookAt(cw); });
+    }
+  },
+
+  remove() {
+    (this.mats || []).forEach(({ mat, base }) => { mat.emissiveIntensity = base; });
+    this._wired.forEach((m) => { if (m.userData) delete m.userData.museoAction; });
+    [this.indicator && this.indicator.group, this.label && this.label.group].forEach((g) => {
+      if (g && g.parent) g.parent.remove(g);
+    });
+    this.bubbles.forEach((b) => {
+      if (b.mesh && b.mesh.parent) b.mesh.parent.remove(b.mesh);
+      if (b.tag && b.tag.parent) b.tag.parent.remove(b.tag);
+    });
+    if (this.bubbleGeo) this.bubbleGeo.dispose();
   }
 });

@@ -183,10 +183,11 @@
       discovered: 'CAPABILITY DISCOVERED',
       pending: 'not discovered yet',
       found: 'discovered',
-      short: { pha: 'PHA', co: 'CO' },
+      short: { pha: 'PHA', co: 'CO', hydrogen: 'H₂' },
       long: {
         pha: 'PHA · CARBON STORAGE',
-        co: 'CO · CARBON MONOXIDE METABOLISM'
+        co: 'CO · CARBON MONOXIDE METABOLISM',
+        hydrogen: 'H₂ · HYDROGEN PRODUCTION'
       }
     },
     es: {
@@ -194,10 +195,11 @@
       discovered: 'CAPACIDAD DESCUBIERTA',
       pending: 'todavía sin descubrir',
       found: 'descubierta',
-      short: { pha: 'PHA', co: 'CO' },
+      short: { pha: 'PHA', co: 'CO', hydrogen: 'H₂' },
       long: {
         pha: 'PHA · ALMACENAMIENTO DE CARBONO',
-        co: 'CO · METABOLISMO DEL MONÓXIDO DE CARBONO'
+        co: 'CO · METABOLISMO DEL MONÓXIDO DE CARBONO',
+        hydrogen: 'H₂ · PRODUCCIÓN DE HIDRÓGENO'
       }
     }
   };
@@ -206,11 +208,13 @@
   const exhibitLabels = {
     en: {
       coHydrogen: { title: 'CO → H₂', sub: 'FROM GAS TO HYDROGEN', co: 'CO' },
-      pha: { title: 'PHA', sub: 'CARBON STORAGE' }
+      pha: { title: 'PHA', sub: 'CARBON STORAGE' },
+      hydrogen: { title: 'H₂', sub: 'PHOTOBIOLOGICAL HYDROGEN PRODUCTION', tag: 'H₂' }
     },
     es: {
       coHydrogen: { title: 'CO → H₂', sub: 'DEL GAS AL HIDRÓGENO', co: 'CO' },
-      pha: { title: 'PHA', sub: 'RESERVA DE CARBONO' }
+      pha: { title: 'PHA', sub: 'RESERVA DE CARBONO' },
+      hydrogen: { title: 'H₂', sub: 'FOTOPRODUCCIÓN DE HIDRÓGENO', tag: 'H₂' }
     }
   };
 
