@@ -497,3 +497,34 @@ a-scene canvas { touch-action: none; }
 .is-mobile.panel-open #capability-hud { opacity: 0.25; }
 .is-mobile #capability-toast { top: 14px; padding: 9px 16px; }
 .is-mobile #capability-toast .cap-toast-name { font-size: 11.5px; }
+
+/* Bienvenida del HUD: unos segundos al entrar, para que se entienda que es un
+   marcador de descubrimientos y no un adorno. Despues se encoge solo. */
+#capability-hud .cap-intro {
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 196px;
+  padding-top: 2px;
+}
+#capability-hud.intro .cap-intro { display: flex; }
+#capability-hud .cap-intro-title {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+  color: #e7d6f7;
+}
+#capability-hud .cap-intro-body {
+  font-size: 10.5px;
+  line-height: 1.35;
+  opacity: 0.78;
+}
+/* la linea que recuerda lo que el visitante acaba de ver */
+#capability-toast .cap-toast-result {
+  font-size: 12px;
+  letter-spacing: 0.10em;
+  font-weight: 700;
+  color: var(--mus-tinta);
+  opacity: 0.55;
+  padding-bottom: 2px;
+}

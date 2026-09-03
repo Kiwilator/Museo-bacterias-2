@@ -181,29 +181,67 @@
     en: {
       title: 'CAPABILITIES',
       discovered: 'CAPABILITY DISCOVERED',
+      introTitle: 'DISCOVER THEIR CAPABILITIES',
+      introBody: 'Interact with the exhibits.',
       pending: 'not discovered yet',
       found: 'discovered',
-      short: { pha: 'PHA', nitrogen: 'N₂', co: 'CO', hydrogen: 'H₂', biomass: 'BIO' },
+      short: { pha: 'PHA', nitrogen: 'N₂', electro: 'e⁻', co: 'CO', hydrogen: 'H₂', biomass: 'BIO' },
       long: {
         pha: 'PHA · CARBON STORAGE',
         nitrogen: 'N₂ · NITROGEN FIXATION',
+        electro: 'e⁻ · ELECTROACTIVITY',
         co: 'CO · CARBON MONOXIDE METABOLISM',
         hydrogen: 'H₂ · HYDROGEN PRODUCTION',
         biomass: 'BIOMASS · CULTIVATION'
+      },
+      // lo que el visitante acaba de ver, en una linea
+      result: {
+        pha: 'PHA ACCUMULATED',
+        nitrogen: 'N₂ FIXED',
+        electro: 'ELECTRONS TAKEN UP',
+        co: 'CO → H₂',
+        hydrogen: 'H₂ PRODUCED',
+        biomass: 'SYSTEM 4 / 4'
+      },
+      // verbo del hotspot de cada vitrina
+      verbs: {
+        pha: 'SHOW ACCUMULATION',
+        nitrogen: 'OBSERVE N₂',
+        electro: 'ACTIVATE ELECTRODE',
+        co: 'START REACTION',
+        hydrogen: 'PRODUCE H₂'
       }
     },
     es: {
       title: 'CAPACIDADES',
       discovered: 'CAPACIDAD DESCUBIERTA',
+      introTitle: 'DESCUBRE SUS CAPACIDADES',
+      introBody: 'Interactúa con las exposiciones.',
       pending: 'todavía sin descubrir',
       found: 'descubierta',
-      short: { pha: 'PHA', nitrogen: 'N₂', co: 'CO', hydrogen: 'H₂', biomass: 'BIO' },
+      short: { pha: 'PHA', nitrogen: 'N₂', electro: 'e⁻', co: 'CO', hydrogen: 'H₂', biomass: 'BIO' },
       long: {
         pha: 'PHA · ALMACENAMIENTO DE CARBONO',
         nitrogen: 'N₂ · FIJACIÓN DE NITRÓGENO',
+        electro: 'e⁻ · ELECTROACTIVIDAD',
         co: 'CO · METABOLISMO DEL MONÓXIDO DE CARBONO',
         hydrogen: 'H₂ · PRODUCCIÓN DE HIDRÓGENO',
         biomass: 'BIOMASA · CULTIVO'
+      },
+      result: {
+        pha: 'PHA ACUMULADO',
+        nitrogen: 'N₂ FIJADO',
+        electro: 'ELECTRONES CAPTADOS',
+        co: 'CO → H₂',
+        hydrogen: 'H₂ PRODUCIDO',
+        biomass: 'SISTEMA 4 / 4'
+      },
+      verbs: {
+        pha: 'MOSTRAR ACUMULACIÓN',
+        nitrogen: 'OBSERVAR N₂',
+        electro: 'ACTIVAR ELECTRODO',
+        co: 'ACTIVAR REACCIÓN',
+        hydrogen: 'PRODUCIR H₂'
       }
     }
   };

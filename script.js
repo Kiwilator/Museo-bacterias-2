@@ -144,7 +144,10 @@ window.MUSEO_MOVE_VECTOR = { x: 0, z: 0 };
    museum-i18n.js: ni el HUD ni el contador necesitan tocarse.
    ========================================================================== */
 const MUSEO_CAP_KEY = 'museum-capabilities';
-const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'co', 'hydrogen', 'biomass'];
+// Orden del recorrido real: fichas 01, 04, 06, 07, 08 y, ya en la Sala 2,
+// el reactor. Añadir una capacidad es añadir su id aqui y sus textos en
+// museum-i18n.js.
+const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomass'];
 
 (function museumCapabilities() {
   const known = (id) => MUSEO_CAP_ORDER.indexOf(id) !== -1;
@@ -189,15 +192,40 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'co', 'hydrogen', 'biomass'];
       chips[id] = chip;
     });
     hud.appendChild(row);
+
+    /*
+      Al entrar, unos segundos de explicacion: solo con los simbolos no se
+      entiende que el HUD es un marcador de descubrimientos. Despues se
+      encoge y queda el HUD normal.
+    */
+    const intro = document.createElement('div');
+    intro.className = 'cap-intro';
+    const introTitle = document.createElement('span');
+    introTitle.className = 'cap-intro-title';
+    introTitle.textContent = c.introTitle || 'DISCOVER THEIR CAPABILITIES';
+    const introBody = document.createElement('span');
+    introBody.className = 'cap-intro-body';
+    introBody.textContent = c.introBody || 'Interact with the exhibits.';
+    intro.appendChild(introTitle);
+    intro.appendChild(introBody);
+    hud.appendChild(intro);
+    hud.classList.add('intro');
+    window.setTimeout(() => hud.classList.remove('intro'), 6500);
+
     document.body.appendChild(hud);
 
     toast = document.createElement('div');
     toast.id = 'capability-toast';
     toast.setAttribute('role', 'status');
+    // La primera linea recuerda lo que el visitante ACABA de ver, para que
+    // pueda unir "he visto esto" con "por eso he descubierto esto".
+    const result = document.createElement('span');
+    result.className = 'cap-toast-result';
     const kicker = document.createElement('span');
     kicker.className = 'cap-toast-kicker';
     const name = document.createElement('span');
     name.className = 'cap-toast-name';
+    toast.appendChild(result);
     toast.appendChild(kicker);
     toast.appendChild(name);
     document.body.appendChild(toast);
@@ -221,11 +249,15 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'co', 'hydrogen', 'biomass'];
   function showToast(id) {
     if (!toast) return;
     const c = copy();
+    const res = (c.result && c.result[id]) || '';
+    const resEl = toast.querySelector('.cap-toast-result');
+    resEl.textContent = res;
+    resEl.style.display = res ? '' : 'none';
     toast.querySelector('.cap-toast-kicker').textContent = c.discovered || 'CAPABILITY DISCOVERED';
     toast.querySelector('.cap-toast-name').textContent = (c.long && c.long[id]) || id.toUpperCase();
     toast.classList.add('visible');
     window.clearTimeout(toastTimer);
-    toastTimer = window.setTimeout(() => toast.classList.remove('visible'), 3600);
+    toastTimer = window.setTimeout(() => toast.classList.remove('visible'), 4200);
   }
 
   window.hasCapability = function hasCapability(id) {
@@ -260,6 +292,158 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'co', 'hydrogen', 'biomass'];
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', buildHud);
   else buildHud();
 })();
+
+/* ==========================================================================
+   HOTSPOT MUSEOGRAFICO COMPARTIDO.
+
+   Un unico elemento reconocible para TODAS las microexperiencias del museo:
+   un punto turquesa emisivo y, a su lado, un verbo muy corto. Mismo tamaño,
+   mismo color, mismo comportamiento y mismo feedback en todas las vitrinas,
+   para que el visitante aprenda una sola regla: "donde veo este punto, puedo
+   interactuar".
+
+   Reparto de papeles, igual en todo el museo:
+     - la placa de la peana y la propia pieza  -> abren la FICHA CIENTIFICA
+     - este punto turquesa                     -> lanza la MICROEXPERIENCIA
+   Nunca el mismo click para las dos cosas.
+
+   Al acercarse el punto aparece; si su capacidad sigue bloqueada late muy
+   despacio, y si ya se descubrio deja de latir y le acompaña un ✓ pequeño.
+   Mientras la experiencia esta en marcha se atenua y no acepta un segundo
+   click, para que no se dispare dos veces.
+   ========================================================================== */
+const MUSEO_HOTSPOT_COLOR = 0x4fe4dc;
+
+function createMuseoHotspot(cfg) {
+  const scene = cfg.el.sceneEl.object3D;
+  const group = new THREE.Group();
+  group.name = 'museo-hotspot-' + (cfg.capability || 'x');
+  group.position.copy(cfg.position);
+  scene.add(group);
+
+  const dotMat = new THREE.MeshBasicMaterial({
+    color: MUSEO_HOTSPOT_COLOR, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide
+  });
+  const dot = new THREE.Mesh(new THREE.CircleGeometry(0.0102, 24), dotMat);
+  dot.position.z = 0.0008;
+  group.add(dot);
+
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: MUSEO_HOTSPOT_COLOR, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide
+  });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.0148, 0.0172, 28), ringMat);
+  group.add(ring);
+
+  // Verbo: mismo cuerpo de letra en todas las vitrinas; solo cambia el ancho
+  // del plano, calculado a partir del texto real.
+  const text = String(cfg.verb || '').toUpperCase();
+  const probe = document.createElement('canvas').getContext('2d');
+  const FONT = '800 52px Arial, Helvetica, sans-serif';
+  probe.font = FONT;
+  const c = document.createElement('canvas');
+  c.height = 84;
+  c.width = Math.max(64, Math.ceil(probe.measureText(text).width) + 26);
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.font = FONT;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#BFF6F1';
+  ctx.fillText(text, 12, c.height / 2 + 2);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const LABEL_H = 0.021;
+  const LABEL_W = LABEL_H * (c.width / c.height);
+  const labelMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+  const label = new THREE.Mesh(new THREE.PlaneGeometry(LABEL_W, LABEL_H), labelMat);
+  label.position.set(0.020 + LABEL_W / 2, 0, 0.0008);
+  group.add(label);
+
+  // ✓ discreto para las experiencias ya completadas
+  const cc = document.createElement('canvas');
+  cc.width = 64; cc.height = 64;
+  const cctx = cc.getContext('2d');
+  cctx.strokeStyle = '#BFF6F1';
+  cctx.lineWidth = 8;
+  cctx.lineCap = 'round';
+  cctx.beginPath();
+  cctx.moveTo(14, 34); cctx.lineTo(27, 47); cctx.lineTo(50, 18);
+  cctx.stroke();
+  const checkTex = new THREE.CanvasTexture(cc);
+  checkTex.colorSpace = THREE.SRGBColorSpace;
+  const checkMat = new THREE.MeshBasicMaterial({ map: checkTex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+  const check = new THREE.Mesh(new THREE.PlaneGeometry(0.016, 0.016), checkMat);
+  check.position.set(0.024 + LABEL_W, 0, 0.0008);
+  check.visible = false;
+  group.add(check);
+
+  const hit = new THREE.Mesh(
+    new THREE.PlaneGeometry(LABEL_W + 0.075, 0.048),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false, side: THREE.DoubleSide })
+  );
+  hit.position.set((0.020 + LABEL_W) * 0.5 - 0.012, 0, 0.004);
+  group.add(hit);
+
+  const api = {
+    group,
+    amount: 0,
+    busy: false,
+    pressT: 0,
+    activate() {
+      if (api.busy || api.amount < 0.25) return;    // ni oculto ni ya en marcha
+      api.pressT = 1;
+      if (cfg.onActivate) cfg.onActivate();
+    },
+    tick(dt, camera, visibleAmount, unlocked, busy) {
+      api.amount = visibleAmount;
+      api.busy = !!busy;
+      const eased = visibleAmount * visibleAmount * (3 - 2 * visibleAmount);
+      group.visible = eased > 0.01;
+      if (!group.visible) return;
+      if (camera) group.lookAt(camera);
+
+      api.pressT = Math.max(0, api.pressT - dt * 5.0);      // microrespuesta ~200 ms
+      // late solo mientras la capacidad siga sin descubrirse
+      const beat = unlocked ? 0 : (0.5 + 0.5 * Math.sin(performance.now() / 620));
+      const dim = busy ? 0.35 : 1;
+
+      dotMat.opacity = eased * dim * (0.72 + 0.28 * beat + api.pressT * 0.3);
+      dot.scale.setScalar(1 + beat * 0.10 + api.pressT * 0.45);
+      ringMat.opacity = eased * dim * (unlocked ? 0.20 : (0.16 + 0.34 * beat));
+      ring.scale.setScalar(1 + beat * 0.22 + api.pressT * 0.35);
+      labelMat.opacity = eased * dim * 0.92;
+      check.visible = !!unlocked;
+      checkMat.opacity = unlocked ? eased * 0.75 : 0;
+    },
+    dispose() {
+      if (group.parent) group.parent.remove(group);
+      [dotMat, ringMat, labelMat, checkMat].forEach((m) => m.dispose());
+    }
+  };
+
+  hit.userData.museoExhibitId = 'hotspot_' + (cfg.capability || 'x');
+  hit.userData.museoAction = () => api.activate();
+  if (cfg.info && cfg.info.selectableMeshes) {
+    cfg.info.selectableMeshes.push(hit);
+    api._hit = hit;
+  }
+  return api;
+}
+
+/*
+  Punto donde se coloca el hotspot de una vitrina: delante de la campana y un
+  poco por debajo de la pieza, de modo que nunca la tape ni tape la imagen
+  circular, y siempre en el mismo sitio relativo en todas las vitrinas.
+*/
+function museoHotspotSpot(bellBox, center, front) {
+  const bellCenter = bellBox ? bellBox.getCenter(new THREE.Vector3()) : center.clone();
+  const bellRadius = bellBox
+    ? Math.max(bellBox.max.x - bellBox.min.x, bellBox.max.z - bellBox.min.z) * 0.5
+    : 0.14;
+  const p = bellCenter.clone().addScaledVector(front, bellRadius + 0.075);
+  p.y = center.y - 0.055;
+  return p;
+}
 
 AFRAME.registerComponent('drag-look-controls', {
   schema: {
@@ -2965,10 +3149,12 @@ AFRAME.registerComponent('electroactivity-exhibit', {
 
   init() {
     this.ready = false;
-    this.active = false;
+    this.active = false;      // solo mientras corre la experiencia
+    this.near = false;        // solo enciende el hotspot y el electrodo
+    this.seq = -1;            // < 0 en reposo; si no, segundos desde el click
+    this.awarded = false;
     this.displayT = 0;
     this.nextSpawn = 0;
-    this.boostUntil = 0;
     this.pulseT = 0;
     this.retryCount = 0;
     this.tmp = new THREE.Vector3();
@@ -3117,6 +3303,13 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     this.createGuide();
     this.createElectronPool();
     this.createLabel();
+    this.hotspot = createMuseoHotspot({
+      el: this.el, info,
+      capability: 'electro',
+      verb: ((window.getMuseumCapabilityText && window.getMuseumCapabilityText().verbs) || {}).electro || 'ACTIVATE ELECTRODE',
+      position: museoHotspotSpot(bellBox, center, front),
+      onActivate: () => this.start()
+    });
 
     this.ready = true;
     console.log('[electroactivity] Rhodovulum listo', {
@@ -3211,7 +3404,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     hit.position.set(0, plateY, t / 2 + 0.004);
     group.add(hit);
     hit.userData.museoExhibitId = 'electroactivityElectrode';
-    hit.userData.museoAction = () => this.boostElectrons();
+    hit.userData.museoAction = () => this.start();
     if (this.info && this.info.selectableMeshes) this.info.selectableMeshes.push(hit);
 
     this.electrode = { group, graphite, turquoise, stemMat, faceMat, plateY, hit };
@@ -3373,12 +3566,20 @@ AFRAME.registerComponent('electroactivity-exhibit', {
 
   /* -------------------------------------------------------------------- */
 
-  boostElectrons() {
-    this.boostUntil = performance.now() + 3000;
+  /*
+    La experiencia SOLO arranca aqui, con un click consciente del visitante
+    sobre el hotspot o sobre el propio electrodo. Acercarse ya no pone
+    electrones a circular: antes parecia que la interaccion ya estaba pasando
+    sola y no habia nada que pulsar.
+  */
+  start() {
+    if (this.seq >= 0) return;
+    this.seq = 0;
     this.spawnElectron(true);
   },
 
-  isBoosting() { return performance.now() < this.boostUntil; },
+  // circulando = los primeros 4 s de la secuencia
+  isBoosting() { return this.seq >= 0 && this.seq < 4.0; },
 
   spawnElectron(force) {
     if (!this.ready || (!this.active && !force)) return;
@@ -3467,20 +3668,45 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     if (!rig) return;
     const p = rig.object3D.getWorldPosition(this.tmp2);
     const d = Math.hypot(p.x - this.targetCenter.x, p.z - this.targetCenter.z);
-    if (!this.active && d <= this.data.trigger) { this.active = true; this.nextSpawn = time + 140; }
-    else if (this.active && d >= this.data.release) this.active = false;
+    if (!this.near && d <= this.data.trigger) this.near = true;
+    else if (this.near && d >= this.data.release) this.near = false;
 
     const dt = Math.min(0.05, Math.max(0.001, (delta || 16) / 1000));
-    this.displayT += ((this.active ? 1 : 0) - this.displayT) * 0.075;
+    if (this.seq >= 0) {
+      this.seq += dt;
+      if (this.seq > 6.4) this.seq = -1;
+      if (this.seq === -1) this.nextSpawn = 0;
+    }
+    const running = this.seq >= 0;
+    this.active = this.isBoosting();          // solo circulan durante la experiencia
+
+    this.displayT += (((this.near || running) ? 1 : 0) - this.displayT) * 0.075;
     this.setVisibleAmount(this.displayT);
     this.updateParticles(dt, time);
     this.updateBacteriaPulse(dt);
-    if (this.label && this.el.sceneEl.camera) {
-      this.label.group.lookAt(this.el.sceneEl.camera.getWorldPosition(this.tmp));
+
+    /*
+      El aviso llega DESPUES: los electrones dejan de circular a los 4 s, el
+      resultado se queda quieto un momento y a los 4.9 s aparece "capacidad
+      descubierta". Asi el visitante puede unir lo que acaba de ver con el
+      premio, en vez de recibirlo encima de la animacion.
+    */
+    if (running && !this.awarded && this.seq >= 4.9) {
+      this.awarded = true;
+      if (window.unlockCapability) window.unlockCapability('electro');
+    }
+    if (!running) this.awarded = false;
+
+    const cam = this.el.sceneEl.camera ? this.el.sceneEl.camera.getWorldPosition(this.tmp) : null;
+    if (this.label && cam) this.label.group.lookAt(cam);
+    if (this.hotspot) {
+      this.hotspot.tick(dt, cam, this.displayT,
+        !!(window.hasCapability && window.hasCapability('electro')), running);
     }
   },
 
   remove() {
+    if (this.hotspot) this.hotspot.dispose();
     this.bacteriaMats.forEach(({ mat, base }) => { mat.emissiveIntensity = base; });
     [this.electrode && this.electrode.group, this.guide && this.guide.group, this.label && this.label.group]
       .forEach((g) => { if (g && g.parent) g.parent.remove(g); });
@@ -3515,6 +3741,7 @@ AFRAME.registerComponent('reactor-control', {
     this.msgUntil = 0;        // el mensaje de causa-efecto vive 3.8 s y se va
     this.rewardUntil = 0;     // banner SISTEMA ACTIVO, ~2.6 s
     this.wasComplete = false; // ver checkReward(): la recompensa solo salta en la transicion
+    this.biomassAt = 0;       // instante en que se anota la capacidad, tras el banner
     this.rewardPulse = 0;
     this.doses = [];          // dosis de nutrientes en curso (ver injectDose)
     this.needsRedraw = false;
@@ -4503,9 +4730,13 @@ AFRAME.registerComponent('reactor-control', {
         biomasa. No cambia el significado cientifico de ningun boton ni
         convierte el 4/4 en un protocolo obligatorio: es el mismo premio
         visual de siempre, ahora tambien anotado en el HUD general.
+
+        Se retrasa 1.3 s a proposito: primero se lee SISTEMA ACTIVO / CULTIVO
+        EN FUNCIONAMIENTO en el propio display del reactor y solo despues
+        aparece el aviso de capacidad. Nunca las dos cosas a la vez.
         unlockCapability ya se encarga de que no se repita.
       */
-      if (window.unlockCapability) window.unlockCapability('biomass');
+      this.biomassAt = this.now() + 1300;
     }
     this.wasComplete = complete;
   },
@@ -4538,6 +4769,10 @@ AFRAME.registerComponent('reactor-control', {
 
     // pulso de la recompensa (solo mientras dura el banner)
     const rewarding = this.now() < this.rewardUntil;
+    if (this.biomassAt && this.now() >= this.biomassAt) {
+      this.biomassAt = 0;
+      if (window.unlockCapability) window.unlockCapability('biomass');
+    }
     const rewardTarget = rewarding ? (0.55 + 0.45 * Math.sin(this.now() / 150)) : 0;
     this.rewardPulse += (rewardTarget - this.rewardPulse) * 0.25;
 
@@ -4790,10 +5025,12 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
 
   init() {
     this.ready = false;
-    this.active = false;
+    this.active = false;     // solo mientras corre la experiencia
+    this.near = false;       // acercarse solo enciende el hotspot
+    this.seq = -1;
+    this.awarded = false;
     this.displayT = 0;
     this.retry = 0;
-    this.burstUntil = 0;
     this.pulseT = 0;
     this.nextCO = 0;
     this.pendingH2 = [];
@@ -4898,7 +5135,13 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     this.buildCO();
     this.buildH2();
     this.buildLabel();
-    this.wireClick(info);
+    this.hotspot = createMuseoHotspot({
+      el: this.el, info,
+      capability: 'co',
+      verb: ((window.getMuseumCapabilityText && window.getMuseumCapabilityText().verbs) || {}).co || 'START REACTION',
+      position: museoHotspotSpot(bell, center, front),
+      onActivate: () => this.start()
+    });
 
     this.ready = true;
     console.log('[co-h2] Rubrivivax listo', {
@@ -5039,31 +5282,20 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     this.label = { group, mat };
   },
 
-  /*
-    Solo la MALLA DE LA BACTERIA lanza la secuencia. La placa curva de la
-    peana ("PULSA PARA EXPLORAR") queda intacta y sigue siendo la que abre la
-    ficha cientifica, como en todas las piezas del museo.
-
-    Probado: si el tap sobre la bacteria abria tambien la ficha, el panel
-    tapaba justo la mitad donde ocurre la demostracion -- el visitante lanzaba
-    la interaccion y no podia verla. La placa se distingue porque no tiene
-    nombre (la crea createPedestalPlacard en tiempo de ejecucion, no viene del
-    glTF); las mallas de la bacteria si lo tienen.
-  */
-  wireClick(info) {
-    (info.selectableMeshes || []).forEach((m) => {
-      if (!m.userData || m.userData.museoExhibitId !== this.data.target) return;
-      if (!m.name || m.userData.museoAction) return;
-      m.userData.museoAction = () => this.burst();
-      this._wired.push(m);
-    });
-  },
-
   now() { return (window.performance && performance.now) ? performance.now() : Date.now(); },
 
-  burst() {
+  // "en marcha" = los 3.6 s en que entra CO
+  isRunning() { return this.seq >= 0 && this.seq < 3.6; },
+
+  /*
+    La experiencia la lanza UNICAMENTE el hotspot turquesa. La bacteria y la
+    placa de su peana siguen abriendo la ficha cientifica, como en todo el
+    museo: informacion e interaccion nunca comparten el mismo click.
+  */
+  start() {
+    if (this.seq >= 0) return;
+    this.seq = 0;
     this.active = true;
-    this.burstUntil = this.now() + 3500;
     this.spawnCO(true);
   },
 
@@ -5093,7 +5325,7 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
 
   setVisibleAmount(t) {
     const eased = t * t * (3 - 2 * t);
-    const boosting = this.now() < this.burstUntil;
+    const boosting = this.isRunning();
     if (this.guide) {
       this.guide.group.visible = eased > 0.01;
       this.guide.mat.opacity = (0.04 + 0.22 * eased) * (boosting ? 1.5 : 1);
@@ -5105,7 +5337,7 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
   },
 
   updateCO(dt, time) {
-    const boosting = this.now() < this.burstUntil;
+    const boosting = this.isRunning();
     if (this.active && time >= this.nextCO) {
       this.spawnCO(false);
       this.nextCO = time + (boosting ? THREE.MathUtils.randFloat(280, 380) : THREE.MathUtils.randFloat(950, 1350));
@@ -5167,33 +5399,49 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     if (!rig) return;
     const p = rig.object3D.getWorldPosition(this.tmp2);
     const d = Math.hypot(p.x - this.center.x, p.z - this.center.z);
-    const boosting = this.now() < this.burstUntil;
-    if (!this.active && d <= this.data.trigger) { this.active = true; this.nextCO = time + 200; }
-    else if (this.active && !boosting && d >= this.data.release) this.active = false;
-
-    // El descubrimiento SOLO se concede al terminar la secuencia intensa que
-    // el visitante ha lanzado con su click/tap: acercarse no desbloquea nada.
-    if (this.burstUntil && !boosting) {
-      this.burstUntil = 0;
-      if (window.unlockCapability) window.unlockCapability(this.data.capability);
-    }
+    const boosting = this.isRunning();
+    if (!this.near && d <= this.data.trigger) this.near = true;
+    else if (this.near && d >= this.data.release) this.near = false;
 
     const dt = Math.min(0.05, Math.max(0.001, (delta || 16) / 1000));
-    this.displayT += ((this.active ? 1 : 0) - this.displayT) * 0.07;
+    if (this.seq >= 0) {
+      this.seq += dt;
+      if (this.seq > 7.6) this.seq = -1;
+    }
+    const running = this.seq >= 0;
+    this.active = this.isRunning();
+
+    /*
+      Orden deliberado: el CO deja de entrar a los 3.6 s, el H2 que ya sube
+      termina de verse, y solo a los 5.0 s aparece el aviso de capacidad. El
+      premio nunca cae encima de la animacion.
+    */
+    if (running && !this.awarded && this.seq >= 5.0) {
+      this.awarded = true;
+      if (window.unlockCapability) window.unlockCapability(this.data.capability);
+    }
+    if (!running) this.awarded = false;
+
+    this.displayT += (((this.near || running) ? 1 : 0) - this.displayT) * 0.07;
     this.setVisibleAmount(this.displayT);
     this.updateCO(dt, time);
     this.updateH2(dt);
     this.updatePulse(dt);
 
     const cam = this.el.sceneEl.camera;
-    if (cam) {
-      const cw = cam.getWorldPosition(this.tmp);
+    const cw = cam ? cam.getWorldPosition(this.tmp) : null;
+    if (cw) {
       if (this.label) this.label.group.lookAt(cw);
       this.co.forEach((x) => { if (x.active) x.tag.lookAt(cw); });
+    }
+    if (this.hotspot) {
+      this.hotspot.tick(dt, cw, this.displayT,
+        !!(window.hasCapability && window.hasCapability(this.data.capability)), running);
     }
   },
 
   remove() {
+    if (this.hotspot) this.hotspot.dispose();
     this.bacteriaMats.forEach(({ mat, base }) => { mat.emissiveIntensity = base; });
     this._wired.forEach((m) => { if (m.userData) delete m.userData.museoAction; });
     [this.guide && this.guide.group, this.label && this.label.group].forEach((g) => {
@@ -5330,7 +5578,13 @@ AFRAME.registerComponent('pha-exhibit', {
     this.buildGranules();
     this.buildCarbon();
     this.buildLabel();
-    this.wireClick(info);
+    this.hotspot = createMuseoHotspot({
+      el: this.el, info,
+      capability: 'pha',
+      verb: ((window.getMuseumCapabilityText && window.getMuseumCapabilityText().verbs) || {}).pha || 'SHOW ACCUMULATION',
+      position: museoHotspotSpot(bell, center, front),
+      onActivate: () => this.start()
+    });
 
     this.ready = true;
     console.log('[pha] R. rubrum listo', {
@@ -5447,16 +5701,11 @@ AFRAME.registerComponent('pha-exhibit', {
     this.label = { group, mat };
   },
 
-  // Igual que en Rubrivivax: la secuencia la lanza la bacteria, y la placa de
-  // la peana sigue abriendo la ficha cientifica sin cambios.
-  wireClick(info) {
-    (info.selectableMeshes || []).forEach((m) => {
-      if (!m.userData || m.userData.museoExhibitId !== this.data.target) return;
-      if (!m.name || m.userData.museoAction) return;
-      m.userData.museoAction = () => this.start();
-      this._wired.push(m);
-    });
-  },
+  /*
+    La microexperiencia la lanza UNICAMENTE el hotspot turquesa comun a todo
+    el museo. La pieza y la placa de su peana siguen abriendo la ficha
+    cientifica: informacion e interaccion nunca comparten el mismo click.
+  */
 
   start() {
     this.seq = 0;
@@ -5558,17 +5807,27 @@ AFRAME.registerComponent('pha-exhibit', {
     this.updateCarbon(dt);
     const done = this.updateGranules();   // en reposo (seq < 0) devuelve 0 y los oculta
 
-    if (running && !this.awarded && done >= this.granules.length) {
+    /*
+      Los cinco granulos terminan de aparecer hacia los 3.2 s. El aviso espera
+      a los 4.2 s: primero se ve el resultado quieto, despues llega el premio.
+    */
+    if (running && !this.awarded && done >= this.granules.length && this.seq >= 4.2) {
       this.awarded = true;
       if (window.unlockCapability) window.unlockCapability(this.data.capability);
     }
     if (!running) this.awarded = false;   // permite repetir la secuencia; el desbloqueo ya no se repite
 
     const cam = this.el.sceneEl.camera;
-    if (cam && this.label) this.label.group.lookAt(cam.getWorldPosition(this.tmp));
+    const cw = cam ? cam.getWorldPosition(this.tmp) : null;
+    if (cw && this.label) this.label.group.lookAt(cw);
+    if (this.hotspot) {
+      this.hotspot.tick(dt, cw, this.displayT,
+        !!(window.hasCapability && window.hasCapability(this.data.capability)), running);
+    }
   },
 
   remove() {
+    if (this.hotspot) this.hotspot.dispose();
     (this.mats || []).forEach(({ mat, base }) => { mat.emissiveIntensity = base; });
     this._wired.forEach((m) => { if (m.userData) delete m.userData.museoAction; });
     if (this.label && this.label.group && this.label.group.parent) this.label.group.parent.remove(this.label.group);
@@ -5700,7 +5959,13 @@ AFRAME.registerComponent('hydrogen-exhibit', {
     this.buildIndicator();
     this.buildBubbles();
     this.buildLabel();
-    this.wireClick(info);
+    this.hotspot = createMuseoHotspot({
+      el: this.el, info,
+      capability: 'hydrogen',
+      verb: ((window.getMuseumCapabilityText && window.getMuseumCapabilityText().verbs) || {}).hydrogen || 'PRODUCE H₂',
+      position: museoHotspotSpot(bell, center, front),
+      onActivate: () => this.start()
+    });
 
     this.ready = true;
     console.log('[h2] R. palustris listo', {
@@ -5867,16 +6132,11 @@ AFRAME.registerComponent('hydrogen-exhibit', {
     this.label = { group, mat };
   },
 
-  // La secuencia la lanza la bacteria (o el propio indicador). La placa de la
-  // peana sigue abriendo la ficha cientifica, sin tocarla.
-  wireClick(info) {
-    (info.selectableMeshes || []).forEach((m) => {
-      if (!m.userData || m.userData.museoExhibitId !== this.data.target) return;
-      if (!m.name || m.userData.museoAction) return;
-      m.userData.museoAction = () => this.start();
-      this._wired.push(m);
-    });
-  },
+  /*
+    La microexperiencia la lanzan el hotspot turquesa comun y el propio
+    indicador H2 de la instalacion. La pieza y la placa de su peana siguen
+    abriendo la ficha cientifica.
+  */
 
   start() {
     this.seq = 0;
@@ -5954,7 +6214,7 @@ AFRAME.registerComponent('hydrogen-exhibit', {
     const dt = Math.min(0.05, Math.max(0.001, (delta || 16) / 1000));
     if (this.seq >= 0) {
       this.seq += dt;
-      if (this.seq > 6.4) this.seq = -1;      // vuelta al reposo
+      if (this.seq > 7.8) this.seq = -1;      // vuelta al reposo
     }
     const running = this.seq >= 0;
 
@@ -5986,22 +6246,30 @@ AFRAME.registerComponent('hydrogen-exhibit', {
     this.updateBubbles(dt, (time || 0) / 1000);
     this.updatePulse(dt);
 
-    // Solo el tap concede la capacidad, y solo al completarse la secuencia.
-    if (running && !this.awarded && this.seq >= 4.0) {
+    /*
+      Las burbujas dejan de salir a los 3.8 s; el aviso espera a los 5.0 s
+      para que primero se vea el hidrogeno y despues llegue el premio.
+    */
+    if (running && !this.awarded && this.seq >= 5.0) {
       this.awarded = true;
       if (window.unlockCapability) window.unlockCapability(this.data.capability);
     }
     if (!running) this.awarded = false;
 
     const cam = this.el.sceneEl.camera;
-    if (cam) {
-      const cw = cam.getWorldPosition(this.tmp);
+    const cw = cam ? cam.getWorldPosition(this.tmp) : null;
+    if (cw) {
       if (this.label) this.label.group.lookAt(cw);
       this.bubbles.forEach((b) => { if (b.tag && b.active) b.tag.lookAt(cw); });
+    }
+    if (this.hotspot) {
+      this.hotspot.tick(dt, cw, this.displayT,
+        !!(window.hasCapability && window.hasCapability(this.data.capability)), running);
     }
   },
 
   remove() {
+    if (this.hotspot) this.hotspot.dispose();
     (this.mats || []).forEach(({ mat, base }) => { mat.emissiveIntensity = base; });
     this._wired.forEach((m) => { if (m.userData) delete m.userData.museoAction; });
     [this.indicator && this.indicator.group, this.label && this.label.group].forEach((g) => {
@@ -6049,6 +6317,7 @@ AFRAME.registerComponent('nitrogen-exhibit', {
     this.retry = 0;
     this.seq = -1;
     this.awarded = false;
+    this.arrivedAt = null;
     this.pulseT = 0;
     this.labelT = 0;
     this.mol = [];
@@ -6130,7 +6399,13 @@ AFRAME.registerComponent('nitrogen-exhibit', {
     this.collectMaterials(anchor);
     this.buildMolecules();
     this.buildLabel();
-    this.wireClick(info);
+    this.hotspot = createMuseoHotspot({
+      el: this.el, info,
+      capability: 'nitrogen',
+      verb: ((window.getMuseumCapabilityText && window.getMuseumCapabilityText().verbs) || {}).nitrogen || 'OBSERVE N₂',
+      position: museoHotspotSpot(bell, center, front),
+      onActivate: () => this.start()
+    });
 
     this.ready = true;
     console.log('[n2] R. capsulatus listo', {
@@ -6233,20 +6508,16 @@ AFRAME.registerComponent('nitrogen-exhibit', {
     this.label = { group, mat };
   },
 
-  // El tap sobre la bacteria lanza la secuencia; la placa de la peana sigue
-  // abriendo la ficha cientifica, sin tocarla.
-  wireClick(info) {
-    (info.selectableMeshes || []).forEach((m) => {
-      if (!m.userData || m.userData.museoExhibitId !== this.data.target) return;
-      if (!m.name || m.userData.museoAction) return;
-      m.userData.museoAction = () => this.start();
-      this._wired.push(m);
-    });
-  },
+  /*
+    La microexperiencia la lanza UNICAMENTE el hotspot turquesa comun a todo
+    el museo. La pieza y la placa de su peana siguen abriendo la ficha
+    cientifica: informacion e interaccion nunca comparten el mismo click.
+  */
 
   start() {
     if (this.seq >= 0) return;                 // ya esta en marcha
     this.seq = 0;
+    this.arrivedAt = null;
     this.mol.forEach((m) => { m.moving = true; m.arrived = false; m.t = 0; });
   },
 
@@ -6328,18 +6599,28 @@ AFRAME.registerComponent('nitrogen-exhibit', {
       this.label.mat.opacity = 0.94 * this.labelT;
     }
 
-    // Solo el tap concede la capacidad, y solo cuando ha llegado todo el N2.
-    if (running && !this.awarded && arrived >= this.mol.length) {
+    /*
+      Al llegar la ultima molecula se guarda el momento; el aviso llega 0.9 s
+      despues, con la etiqueta N2 FIJADO ya visible. Nunca encima del viaje.
+    */
+    if (running && arrived >= this.mol.length && this.arrivedAt === null) this.arrivedAt = this.seq;
+    if (running && !this.awarded && this.arrivedAt !== null && this.seq >= this.arrivedAt + 0.9) {
       this.awarded = true;
       if (window.unlockCapability) window.unlockCapability(this.data.capability);
     }
-    if (!running) this.awarded = false;
+    if (!running) { this.awarded = false; this.arrivedAt = null; }
 
     const cam = this.el.sceneEl.camera;
-    if (cam && this.label) this.label.group.lookAt(cam.getWorldPosition(this.tmp));
+    const cw = cam ? cam.getWorldPosition(this.tmp) : null;
+    if (cw && this.label) this.label.group.lookAt(cw);
+    if (this.hotspot) {
+      this.hotspot.tick(dt, cw, this.displayT,
+        !!(window.hasCapability && window.hasCapability(this.data.capability)), running);
+    }
   },
 
   remove() {
+    if (this.hotspot) this.hotspot.dispose();
     (this.mats || []).forEach(({ mat, base }) => { mat.emissiveIntensity = base; });
     this._wired.forEach((m) => { if (m.userData) delete m.userData.museoAction; });
     if (this.label && this.label.group && this.label.group.parent) this.label.group.parent.remove(this.label.group);
