@@ -124,6 +124,143 @@ window.MUSEO_MOVE_VECTOR = { x: 0, z: 0 };
   window.addEventListener('touchcancel', end);
 })();
 
+/* ==========================================================================
+   CAPACIDADES DESCUBIERTAS -- capa de juego transversal del museo.
+
+   Es una capa independiente: no toca el GLB, ni las fichas cientificas, ni
+   ninguna exposicion. Solo mantiene una lista de capacidades que el visitante
+   ha llegado a descubrir interactuando, la guarda en el navegador y la muestra
+   en un HUD discreto arriba a la izquierda (la esquina libre: el selector de
+   idioma vive arriba a la derecha, la ayuda de controles abajo al centro y el
+   joystick tactil abajo a la izquierda).
+
+   Cada exposicion solo tiene que llamar a unlockCapability('<id>') cuando su
+   interaccion se complete. La funcion es idempotente: devuelve true la primera
+   vez y false siempre despues, asi que una capacidad no puede descubrirse dos
+   veces ni el aviso repetirse.
+
+   Para añadir una capacidad nueva (por ejemplo H2 en Rhodopseudomonas
+   palustris) basta con poner su id en MUSEO_CAP_ORDER y sus textos en
+   museum-i18n.js: ni el HUD ni el contador necesitan tocarse.
+   ========================================================================== */
+const MUSEO_CAP_KEY = 'museum-capabilities';
+const MUSEO_CAP_ORDER = ['pha', 'co'];
+
+(function museumCapabilities() {
+  const known = (id) => MUSEO_CAP_ORDER.indexOf(id) !== -1;
+
+  let unlocked = [];
+  try {
+    const raw = window.localStorage.getItem(MUSEO_CAP_KEY);
+    if (raw) unlocked = (JSON.parse(raw) || []).filter(known);
+  } catch (e) { unlocked = []; }
+
+  const copy = () => (window.getMuseumCapabilityText ? window.getMuseumCapabilityText() : {});
+
+  let hud = null, toast = null, counter = null, toastTimer = 0;
+  const chips = {};
+
+  function buildHud() {
+    if (hud || !document.body) return;
+    const c = copy();
+
+    hud = document.createElement('div');
+    hud.id = 'capability-hud';
+    hud.setAttribute('aria-live', 'polite');
+
+    const head = document.createElement('div');
+    head.className = 'cap-head';
+    const title = document.createElement('span');
+    title.className = 'cap-title';
+    title.textContent = c.title || 'CAPABILITIES';
+    counter = document.createElement('span');
+    counter.className = 'cap-counter';
+    head.appendChild(title);
+    head.appendChild(counter);
+    hud.appendChild(head);
+
+    const row = document.createElement('div');
+    row.className = 'cap-row';
+    MUSEO_CAP_ORDER.forEach((id) => {
+      const chip = document.createElement('span');
+      chip.className = 'cap-chip';
+      chip.textContent = (c.short && c.short[id]) || id.toUpperCase();
+      row.appendChild(chip);
+      chips[id] = chip;
+    });
+    hud.appendChild(row);
+    document.body.appendChild(hud);
+
+    toast = document.createElement('div');
+    toast.id = 'capability-toast';
+    toast.setAttribute('role', 'status');
+    const kicker = document.createElement('span');
+    kicker.className = 'cap-toast-kicker';
+    const name = document.createElement('span');
+    name.className = 'cap-toast-name';
+    toast.appendChild(kicker);
+    toast.appendChild(name);
+    document.body.appendChild(toast);
+
+    render();
+  }
+
+  function render() {
+    if (!hud) return;
+    const c = copy();
+    MUSEO_CAP_ORDER.forEach((id) => {
+      const on = unlocked.indexOf(id) !== -1;
+      chips[id].classList.toggle('unlocked', on);
+      const long = (c.long && c.long[id]) || id.toUpperCase();
+      chips[id].setAttribute('aria-label', long + ' — ' + (on ? (c.found || '') : (c.pending || '')));
+    });
+    counter.textContent = unlocked.length + ' / ' + MUSEO_CAP_ORDER.length;
+    hud.classList.toggle('complete', unlocked.length === MUSEO_CAP_ORDER.length);
+  }
+
+  function showToast(id) {
+    if (!toast) return;
+    const c = copy();
+    toast.querySelector('.cap-toast-kicker').textContent = c.discovered || 'CAPABILITY DISCOVERED';
+    toast.querySelector('.cap-toast-name').textContent = (c.long && c.long[id]) || id.toUpperCase();
+    toast.classList.add('visible');
+    window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => toast.classList.remove('visible'), 3600);
+  }
+
+  window.hasCapability = function hasCapability(id) {
+    return unlocked.indexOf(id) !== -1;
+  };
+
+  /*
+    Devuelve true SOLO la primera vez. Cualquier exposicion puede llamarla
+    tantas veces como quiera sin comprobar nada por su cuenta: aqui esta el
+    unico sitio donde se decide si algo es un descubrimiento nuevo.
+  */
+  window.unlockCapability = function unlockCapability(id) {
+    if (!known(id)) { console.warn('[capacidades] id no registrado:', id); return false; }
+    if (window.hasCapability(id)) return false;
+    unlocked.push(id);
+    try { window.localStorage.setItem(MUSEO_CAP_KEY, JSON.stringify(unlocked)); } catch (e) {}
+    buildHud();
+    render();
+    showToast(id);
+    console.log('[capacidades] descubierta ' + id + ' (' + unlocked.length + '/' + MUSEO_CAP_ORDER.length + ')');
+    return true;
+  };
+
+  // utilidad de prueba: vacia lo descubierto para poder repetir el recorrido
+  window.resetCapabilities = function resetCapabilities() {
+    unlocked = [];
+    try { window.localStorage.removeItem(MUSEO_CAP_KEY); } catch (e) {}
+    render();
+    return true;
+  };
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', buildHud);
+  else buildHud();
+})();
+
 AFRAME.registerComponent('drag-look-controls', {
   schema: {
     sensitivity: { type: 'number', default: 0.2 } // degrees per pixel of drag
@@ -4613,3 +4750,818 @@ AFRAME.scenes[0]?.addEventListener('loaded', () => {
   if (!bar) return;
   setTimeout(() => bar.classList.add('faded'), 6000);
 })();
+
+/* ==========================================================================
+   RUBRIVIVAX GELATINOSUS -- demostracion CO -> bacteria -> H2.
+
+   El documento fuente lo resume asi: el monoxido de carbono es toxico para
+   muchos organismos, pero R. gelatinosus puede oxidarlo en anaerobiosis y ese
+   metabolismo puede ir ligado a la produccion de hidrogeno. Esta capa lo
+   enseña en tres tiempos, sin añadir ni una afirmacion nueva:
+
+        CO  ->  [RUBRIVIVAX]  ->  H2
+
+   Toda la geometria se mide en tiempo de ejecucion sobre las piezas reales
+   (la bacteria, su campana de cristal, su base y su peana), como en el resto
+   de microinstalaciones: no hay coordenadas escritas a mano.
+
+   Medido: el cuerpo de la bacteria ocupa casi todo el diametro interior de la
+   campana (deja ~1.7 cm por lado), asi que el CO no cabe "dentro" de la
+   vitrina como pieza aparte. Entra por el lado izquierdo del visitante,
+   cruzando el cristal, y el H2 sale por el extremo opuesto de la propia
+   bacteria y sube: dos comportamientos distintos que no pueden confundirse.
+   ========================================================================== */
+AFRAME.registerComponent('co-hydrogen-exhibit', {
+  schema: {
+    target: { type: 'string', default: 'bacteriaSmall05' },
+    trigger: { type: 'number', default: 2.2 },
+    release: { type: 'number', default: 2.8 },
+    capability: { type: 'string', default: 'co' }
+  },
+
+  init() {
+    this.ready = false;
+    this.active = false;
+    this.displayT = 0;
+    this.retry = 0;
+    this.burstUntil = 0;
+    this.pulseT = 0;
+    this.nextCO = 0;
+    this.pendingH2 = [];
+    this.co = [];
+    this.h2 = [];
+    this.bacteriaMats = [];
+    this._wired = [];
+    this.tmp = new THREE.Vector3();
+    this.tmp2 = new THREE.Vector3();
+    this.el.addEventListener('museo-modules-loaded', () => window.setTimeout(() => this.setup(), 0));
+  },
+
+  copy() {
+    const fallback = { title: 'CO → H₂', sub: 'FROM GAS TO HYDROGEN', co: 'CO' };
+    return window.getMuseumExhibitLabel ? (window.getMuseumExhibitLabel('coHydrogen') || fallback) : fallback;
+  },
+
+  findVitrine(center) {
+    let bell = null, base = null;
+    this.el.object3D.traverse((o) => {
+      if (!o.isMesh || !o.name) return;
+      const isBell = o.name.indexOf('VITRINA_Campana') === 0;
+      const isBase = o.name.indexOf('VITRINA_Base') === 0;
+      if (!isBell && !isBase) return;
+      const b = new THREE.Box3().setFromObject(o);
+      if (center.x < b.min.x - 0.02 || center.x > b.max.x + 0.02) return;
+      if (center.z < b.min.z - 0.02 || center.z > b.max.z + 0.02) return;
+      if (isBell && (!bell || b.max.y > bell.max.y)) bell = b;
+      if (isBase && (!base || b.max.y > base.max.y)) base = b;
+    });
+    return { bell, base };
+  },
+
+  setup() {
+    const info = this.el.components['exhibit-info'];
+    const item = info && info.items && info.items.find((it) => it.id === this.data.target);
+    const anchor = item && item.anchorObj;
+    if (!info || !item || !anchor) {
+      this.retry += 1;
+      if (this.retry < 30) window.setTimeout(() => this.setup(), 120);
+      else console.warn('[co-h2] no se pudo localizar Rubrivivax');
+      return;
+    }
+
+    const box = new THREE.Box3().setFromObject(anchor);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+
+    const vit = this.findVitrine(center);
+    const bell = vit.bell;
+    const bellCenter = bell ? bell.getCenter(new THREE.Vector3()) : center.clone();
+    const bellRadius = bell
+      ? Math.max(bell.max.x - bell.min.x, bell.max.z - bell.min.z) * 0.5
+      : Math.max(size.x, size.z) * 0.5 + 0.05;
+    const bellTop = bell ? bell.max.y : center.y + 0.2;
+
+    let peana = null, pd = Infinity;
+    (info.peanaBoxes || []).forEach((pb) => {
+      const d = Math.hypot(pb.center.x - center.x, pb.center.z - center.z);
+      if (d < pd) { pd = d; peana = pb; }
+    });
+
+    const front = (info._placardRowDir)
+      ? new THREE.Vector3(info._placardRowDir.x, 0, info._placardRowDir.z).normalize()
+      : new THREE.Vector3(0, 0, 1);
+    // derecha del visitante (mira hacia -front) y, por tanto, su izquierda
+    const right = new THREE.Vector3(front.z, 0, -front.x).normalize();
+    const left = right.clone().negate();
+
+    // El CO llega por la izquierda del visitante y el H2 sale por la derecha:
+    // se lee de izquierda a derecha, como el propio rotulo CO -> H2.
+    let lateral = bellRadius + 0.060;
+    const entry = () => bellCenter.clone().addScaledVector(left, lateral);
+    if (peana) {
+      const margin = 0.055;
+      while (lateral > bellRadius + 0.02 &&
+             Math.hypot(entry().x - peana.center.x, entry().z - peana.center.z) > peana.radius - margin) {
+        lateral -= 0.006;
+      }
+    }
+    const halfSide = 0.5 * (Math.abs(left.x) * size.x + Math.abs(left.z) * size.z);
+    const start = entry();
+    start.y = center.y + 0.012;
+    const coTarget = center.clone().addScaledVector(left, halfSide * 0.5);
+    const h2Origin = center.clone().addScaledVector(right, halfSide * 0.45);
+    h2Origin.y = center.y + 0.012;
+
+    this.info = info;
+    this.center = center;
+    this.left = left;
+    this.right = right;
+    this.front = front;
+    this.coStart = start;
+    this.coTarget = coTarget;
+    this.h2Origin = h2Origin;
+    this.h2Rise = Math.min(0.16, Math.max(0.09, (bellTop - 0.035) - h2Origin.y));
+    this.bellTop = bellTop;
+
+    this.collectMaterials(anchor);
+    this.buildPath();
+    this.buildGuide();
+    this.buildCO();
+    this.buildH2();
+    this.buildLabel();
+    this.wireClick(info);
+
+    this.ready = true;
+    console.log('[co-h2] Rubrivivax listo', {
+      bacteria: center.toArray().map((v) => +v.toFixed(3)),
+      entradaCO: start.toArray().map((v) => +v.toFixed(3)),
+      salidaH2: h2Origin.toArray().map((v) => +v.toFixed(3)),
+      subidaH2: +this.h2Rise.toFixed(3)
+    });
+  },
+
+  collectMaterials(anchor) {
+    const set = new Set();
+    anchor.traverse((n) => {
+      if (!n.isMesh || !n.material) return;
+      (Array.isArray(n.material) ? n.material : [n.material]).forEach((m) => { if (m && m.emissive) set.add(m); });
+    });
+    this.bacteriaMats = Array.from(set).map((mat) => ({ mat, base: mat.emissiveIntensity || 0 }));
+  },
+
+  buildPath() {
+    const mid = this.coStart.clone().lerp(this.coTarget, 0.5);
+    mid.y += 0.014;
+    this.path = new THREE.QuadraticBezierCurve3(this.coStart.clone(), mid, this.coTarget.clone());
+  },
+
+  // Refuerzo direccional: una linea finisima y una punta minuscula, para que
+  // incluso en una captura fija se entienda de donde viene el CO.
+  buildGuide() {
+    const g = new THREE.Group();
+    g.name = 'rubrivivax-guia-co';
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xe0b483, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide
+    });
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(this.path, 30, 0.0011, 6, false), mat));
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.0055, 0.014, 12), mat);
+    const t = 0.62;
+    head.position.copy(this.path.getPointAt(t));
+    head.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), this.path.getTangentAt(t).normalize());
+    g.add(head);
+    this.el.sceneEl.object3D.add(g);
+    this.guide = { group: g, mat };
+  },
+
+  buildCOLabelTexture() {
+    const c = document.createElement('canvas');
+    c.width = 192; c.height = 96;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#3a2a18';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '900 58px Arial, Helvetica, sans-serif';
+    ctx.fillText(this.copy().co || 'CO', c.width / 2, c.height / 2 + 3);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  },
+
+  /*
+    CO: moleculas etiquetadas, calidas, que avanzan en horizontal hacia la
+    bacteria y se apagan al entrar. Nunca suben.
+  */
+  buildCO() {
+    const scene = this.el.sceneEl.object3D;
+    const geo = new THREE.SphereGeometry(0.0075, 12, 10);
+    const tex = this.buildCOLabelTexture();
+    this.coGeo = geo;
+    for (let i = 0; i < 6; i++) {
+      const mat = new THREE.MeshBasicMaterial({ color: 0xe8c089, transparent: true, opacity: 0, depthWrite: false });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.visible = false;
+      const tagMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+      const tag = new THREE.Mesh(new THREE.PlaneGeometry(0.030, 0.015), tagMat);
+      tag.position.set(0, 0.019, 0);
+      mesh.add(tag);
+      scene.add(mesh);
+      this.co.push({ mesh, mat, tag, tagMat, active: false, t: 0, speed: 0.5 });
+    }
+  },
+
+  /*
+    H2: burbujas mas pequeñas, frias, sin etiqueta, que nacen en el extremo
+    opuesto de la bacteria, suben un poco y se desvanecen. Comportamiento
+    deliberadamente distinto del CO para que no puedan leerse como lo mismo.
+  */
+  buildH2() {
+    const scene = this.el.sceneEl.object3D;
+    const geo = new THREE.SphereGeometry(0.005, 10, 8);
+    this.h2Geo = geo;
+    for (let i = 0; i < 8; i++) {
+      const mat = new THREE.MeshBasicMaterial({ color: 0xd6f6ff, transparent: true, opacity: 0, depthWrite: false });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.visible = false;
+      scene.add(mesh);
+      this.h2.push({ mesh, mat, active: false, t: 0, speed: 0.5, sway: 0, dx: 0, dz: 0 });
+    }
+  },
+
+  buildLabel() {
+    const c = document.createElement('canvas');
+    c.width = 700; c.height = 190;
+    const ctx = c.getContext('2d');
+    const copy = this.copy();
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.fillStyle = 'rgba(10, 8, 14, 0.60)';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#C79BEA';
+    ctx.fillRect(0, 0, 7, c.height);
+    ctx.textAlign = 'left';
+    const fit = (text, weight, maxPx, boxW) => {
+      let size = maxPx;
+      ctx.font = weight + ' ' + size + 'px Arial, Helvetica, sans-serif';
+      while (size > 20 && ctx.measureText(text).width > boxW) {
+        size -= 2;
+        ctx.font = weight + ' ' + size + 'px Arial, Helvetica, sans-serif';
+      }
+    };
+    const boxW = c.width - 34 - 26;
+    ctx.fillStyle = '#E8C089';
+    fit(copy.title, '900', 58, boxW);
+    ctx.fillText(copy.title, 34, 78);
+    ctx.fillStyle = 'rgba(247, 244, 250, 0.86)';
+    fit(copy.sub, '700', 40, boxW);
+    ctx.fillText(copy.sub, 34, 142);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+
+    const group = new THREE.Group();
+    group.name = 'rubrivivax-microetiqueta';
+    // por encima de la campana y muy por debajo de la imagen circular
+    group.position.set(this.coStart.x, Math.min(this.bellTop - 0.028, this.center.y + 0.20), this.coStart.z);
+    this.el.sceneEl.object3D.add(group);
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+    group.add(new THREE.Mesh(new THREE.PlaneGeometry(0.170, 0.046), mat));
+    this.label = { group, mat };
+  },
+
+  /*
+    El tap sobre la bacteria sigue abriendo su ficha cientifica exactamente
+    como antes: aqui solo se envuelve la accion para que, ademas, lance la
+    secuencia intensa. Nada de lo que ya funcionaba se sustituye.
+  */
+  wireClick(info) {
+    (info.selectableMeshes || []).forEach((m) => {
+      if (!m.userData || m.userData.museoExhibitId !== this.data.target) return;
+      if (m.userData.museoAction) return;
+      const id = m.userData.museoExhibitId;
+      m.userData.museoAction = () => {
+        this.burst();
+        if (info.open) info.open(id);
+      };
+      this._wired.push(m);
+    });
+  },
+
+  now() { return (window.performance && performance.now) ? performance.now() : Date.now(); },
+
+  burst() {
+    this.active = true;
+    this.burstUntil = this.now() + 3500;
+    this.spawnCO(true);
+  },
+
+  spawnCO(force) {
+    if (!this.ready || (!this.active && !force)) return;
+    const p = this.co.find((x) => !x.active);
+    if (!p) return;
+    p.active = true;
+    p.t = 0;
+    p.speed = 1 / THREE.MathUtils.randFloat(2.6, 3.6);
+    p.mesh.visible = true;
+    p.mat.opacity = 0;
+  },
+
+  spawnH2() {
+    const p = this.h2.find((x) => !x.active);
+    if (!p) return;
+    p.active = true;
+    p.t = 0;
+    p.speed = 1 / THREE.MathUtils.randFloat(2.0, 3.0);
+    p.sway = THREE.MathUtils.randFloat(0.004, 0.010);
+    const a = Math.random() * Math.PI * 2;
+    p.dx = Math.cos(a); p.dz = Math.sin(a);
+    p.mesh.visible = true;
+    p.mat.opacity = 0;
+  },
+
+  setVisibleAmount(t) {
+    const eased = t * t * (3 - 2 * t);
+    const boosting = this.now() < this.burstUntil;
+    if (this.guide) {
+      this.guide.group.visible = eased > 0.01;
+      this.guide.mat.opacity = (0.04 + 0.22 * eased) * (boosting ? 1.5 : 1);
+    }
+    if (this.label) {
+      this.label.group.visible = eased > 0.03;
+      this.label.mat.opacity = 0.94 * Math.max(0, (eased - 0.03) / 0.97);
+    }
+  },
+
+  updateCO(dt, time) {
+    const boosting = this.now() < this.burstUntil;
+    if (this.active && time >= this.nextCO) {
+      this.spawnCO(false);
+      this.nextCO = time + (boosting ? THREE.MathUtils.randFloat(280, 380) : THREE.MathUtils.randFloat(950, 1350));
+    }
+    this.co.forEach((p) => {
+      if (!p.active) return;
+      p.t += p.speed * dt;
+      const tt = Math.min(p.t, 1);
+      p.mesh.position.copy(this.path.getPointAt(tt));
+      const fadeIn = THREE.MathUtils.clamp(p.t / 0.12, 0, 1);
+      const fadeOut = THREE.MathUtils.clamp((1 - p.t) / 0.20, 0, 1);
+      const a = 0.95 * this.displayT * fadeIn * fadeOut;
+      p.mat.opacity = a;
+      p.tagMat.opacity = a * 0.92;
+      if (p.t >= 1) {
+        p.active = false;
+        p.mesh.visible = false;
+        this.pulseT = 1;                                   // pulso minimo de la bacteria
+        this.pendingH2.push(this.now() + 250);             // el H2 sale un instante despues
+      }
+    });
+  },
+
+  updateH2(dt) {
+    const now = this.now();
+    while (this.pendingH2.length && this.pendingH2[0] <= now) {
+      this.pendingH2.shift();
+      this.spawnH2();
+    }
+    this.h2.forEach((p) => {
+      if (!p.active) return;
+      p.t += p.speed * dt;
+      if (p.t >= 1) { p.active = false; p.mesh.visible = false; p.mat.opacity = 0; return; }
+      const rise = this.h2Rise * p.t;
+      const wob = Math.sin(p.t * 6.5) * p.sway;
+      p.mesh.position.set(
+        this.h2Origin.x + p.dx * (0.006 + p.t * 0.014) + wob * 0.4,
+        this.h2Origin.y + rise,
+        this.h2Origin.z + p.dz * (0.006 + p.t * 0.014)
+      );
+      p.mesh.scale.setScalar(1 + p.t * 0.45);              // la burbuja crece al subir
+      const fadeIn = Math.min(1, p.t / 0.14);
+      const fadeOut = Math.min(1, (1 - p.t) / 0.34);
+      p.mat.opacity = 0.9 * this.displayT * Math.min(fadeIn, fadeOut);
+    });
+  },
+
+  updatePulse(dt) {
+    if (this.pulseT > 0) this.pulseT = Math.max(0, this.pulseT - dt / 0.34);
+    const p = Math.sin(this.pulseT * Math.PI);
+    this.bacteriaMats.forEach(({ mat, base }) => {
+      mat.emissiveIntensity = base + (base > 0.01 ? base * 0.26 : 0.08) * p;
+    });
+  },
+
+  tick(time, delta) {
+    if (!this.ready) return;
+    const rig = document.getElementById('rig');
+    if (!rig) return;
+    const p = rig.object3D.getWorldPosition(this.tmp2);
+    const d = Math.hypot(p.x - this.center.x, p.z - this.center.z);
+    const boosting = this.now() < this.burstUntil;
+    if (!this.active && d <= this.data.trigger) { this.active = true; this.nextCO = time + 200; }
+    else if (this.active && !boosting && d >= this.data.release) this.active = false;
+
+    // El descubrimiento SOLO se concede al terminar la secuencia intensa que
+    // el visitante ha lanzado con su click/tap: acercarse no desbloquea nada.
+    if (this.burstUntil && !boosting) {
+      this.burstUntil = 0;
+      if (window.unlockCapability) window.unlockCapability(this.data.capability);
+    }
+
+    const dt = Math.min(0.05, Math.max(0.001, (delta || 16) / 1000));
+    this.displayT += ((this.active ? 1 : 0) - this.displayT) * 0.07;
+    this.setVisibleAmount(this.displayT);
+    this.updateCO(dt, time);
+    this.updateH2(dt);
+    this.updatePulse(dt);
+
+    const cam = this.el.sceneEl.camera;
+    if (cam) {
+      const cw = cam.getWorldPosition(this.tmp);
+      if (this.label) this.label.group.lookAt(cw);
+      this.co.forEach((x) => { if (x.active) x.tag.lookAt(cw); });
+    }
+  },
+
+  remove() {
+    this.bacteriaMats.forEach(({ mat, base }) => { mat.emissiveIntensity = base; });
+    this._wired.forEach((m) => { if (m.userData) delete m.userData.museoAction; });
+    [this.guide && this.guide.group, this.label && this.label.group].forEach((g) => {
+      if (g && g.parent) g.parent.remove(g);
+    });
+    this.co.concat(this.h2).forEach((x) => { if (x.mesh && x.mesh.parent) x.mesh.parent.remove(x.mesh); });
+    if (this.coGeo) this.coGeo.dispose();
+    if (this.h2Geo) this.h2Geo.dispose();
+  }
+});
+
+/* ==========================================================================
+   RHODOSPIRILLUM RUBRUM -- acumulacion de PHA.
+
+   El documento fuente dice que R. rubrum puede acumular PHA en forma de
+   granulos intracelulares, que actuan como reserva de carbono para la celula.
+   Esto lo enseña, y nada mas:
+
+        CARBONO  ->  ACUMULACION  ->  GRANULOS DE PHA
+
+   Nada ocurre por acercarse: solo una microetiqueta muy tenue. La secuencia
+   (particulas de carbono entrando + granulos apareciendo de uno en uno) la
+   lanza el visitante al pulsar sobre la bacteria, y solo al completarla se
+   concede la capacidad.
+
+   Medido en la escena: Bacteria_Mat es OPACO (transparent:false, opacity 1,
+   transmission 0), asi que un granulo colocado literalmente dentro del volumen
+   no se veria. Cada granulo se coloca por tanto sobre la superficie que mira
+   al visitante, ligeramente hundido, de modo que solo asoma su casquete: se
+   lee como una inclusion bajo la membrana. No se modifica ningun material del
+   GLB de forma permanente (el pulso parte de un valor guardado y se restaura).
+   ========================================================================== */
+AFRAME.registerComponent('pha-exhibit', {
+  schema: {
+    target: { type: 'string', default: 'bacteriaLarge01' },
+    trigger: { type: 'number', default: 3.2 },
+    release: { type: 'number', default: 4.0 },
+    granules: { type: 'number', default: 5 },
+    capability: { type: 'string', default: 'pha' }
+  },
+
+  init() {
+    this.ready = false;
+    this.near = false;
+    this.displayT = 0;
+    this.retry = 0;
+    this.seq = -1;            // < 0 = en reposo; si no, segundos desde el click
+    this.awarded = false;
+    this.granules = [];
+    this.carbon = [];
+    this.nextCarbon = 0;
+    this._wired = [];
+    this.tmp = new THREE.Vector3();
+    this.tmp2 = new THREE.Vector3();
+    this.el.addEventListener('museo-modules-loaded', () => window.setTimeout(() => this.setup(), 0));
+  },
+
+  copy() {
+    const fallback = { title: 'PHA', sub: 'CARBON STORAGE' };
+    return window.getMuseumExhibitLabel ? (window.getMuseumExhibitLabel('pha') || fallback) : fallback;
+  },
+
+  setup() {
+    const info = this.el.components['exhibit-info'];
+    const item = info && info.items && info.items.find((it) => it.id === this.data.target);
+    const anchor = item && item.anchorObj;
+    if (!info || !item || !anchor) {
+      this.retry += 1;
+      if (this.retry < 30) window.setTimeout(() => this.setup(), 120);
+      else console.warn('[pha] no se pudo localizar R. rubrum');
+      return;
+    }
+
+    // Cuerpo celular real (no los pili): es la superficie sobre la que tienen
+    // sentido las inclusiones.
+    let body = null;
+    anchor.traverse((o) => {
+      if (!o.isMesh || !o.material) return;
+      if (o.material.name === 'Bacteria_Mat' && !body) body = o;
+    });
+    if (!body) body = anchor;
+
+    const box = new THREE.Box3().setFromObject(body);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+
+    const front = (info._placardRowDir)
+      ? new THREE.Vector3(info._placardRowDir.x, 0, info._placardRowDir.z).normalize()
+      : new THREE.Vector3(1, 0, 0);
+
+    // Eje largo real del cuerpo, medido, no supuesto.
+    const axes = [
+      { v: new THREE.Vector3(1, 0, 0), len: size.x },
+      { v: new THREE.Vector3(0, 1, 0), len: size.y },
+      { v: new THREE.Vector3(0, 0, 1), len: size.z }
+    ].sort((a, b) => b.len - a.len);
+    const along = axes[0];
+    /*
+      De los dos ejes de la seccion, el "A" tiene que ser el que MIRA AL
+      VISITANTE, no simplemente el mas largo de los dos. Ordenandolos solo por
+      tamaño, en esta pieza (0.310 x 0.327 x 0.721) salia elegido el eje Y y
+      los granulos aparecian en el lomo de la celula, donde no se ven desde la
+      sala. Se ordena por alineacion con la direccion del visitante.
+    */
+    const cross = axes.slice(1).sort((a, b) => Math.abs(b.v.dot(front)) - Math.abs(a.v.dot(front)));
+
+    // campana grande de esta pieza (para que nada se salga de ella)
+    let bell = null;
+    this.el.object3D.traverse((o) => {
+      if (!o.isMesh || !o.name || o.name.indexOf('VITRINA_Campana') !== 0) return;
+      const b = new THREE.Box3().setFromObject(o);
+      if (center.x < b.min.x || center.x > b.max.x || center.z < b.min.z || center.z > b.max.z) return;
+      if (!bell || (b.max.y - b.min.y) > (bell.max.y - bell.min.y)) bell = b;
+    });
+    const bellTop = bell ? bell.max.y : center.y + 0.5;
+    const bellRadius = bell
+      ? Math.min(bell.max.x - bell.min.x, bell.max.z - bell.min.z) * 0.5
+      : Math.max(size.x, size.z);
+
+    this.info = info;
+    this.bodyMesh = body;
+    this.center = center;
+    this.halfLong = along.len * 0.5;
+    this.axisLong = along.v;
+    this.axisA = cross[0].v;                 // semiejes de la seccion
+    this.axisB = cross[1].v;
+    this.radA = cross[0].len * 0.5;
+    this.radB = cross[1].len * 0.5;
+    this.front = front;
+    this.bellTop = bellTop;
+    this.bellRadius = bellRadius;
+
+    this.collectMaterials(anchor);
+    this.buildGranules();
+    this.buildCarbon();
+    this.buildLabel();
+    this.wireClick(info);
+
+    this.ready = true;
+    console.log('[pha] R. rubrum listo', {
+      cuerpo: center.toArray().map((v) => +v.toFixed(3)),
+      tamano: size.toArray().map((v) => +v.toFixed(3)),
+      granulos: this.granules.length,
+      campanaTop: +bellTop.toFixed(3)
+    });
+  },
+
+  collectMaterials(anchor) {
+    const set = new Set();
+    anchor.traverse((n) => {
+      if (!n.isMesh || !n.material) return;
+      (Array.isArray(n.material) ? n.material : [n.material]).forEach((m) => { if (m && m.emissive) set.add(m); });
+    });
+    this.mats = Array.from(set).map((mat) => ({ mat, base: mat.emissiveIntensity || 0 }));
+  },
+
+  /*
+    Punto sobre la superficie del cuerpo que mira al visitante. u recorre el
+    eje largo (-1..1) y theta gira alrededor de ese eje; theta cerca de 0
+    apunta hacia el lado del visitante. El estrechamiento (taper) evita que un
+    granulo quede colgando fuera de los extremos redondeados.
+  */
+  surfacePoint(u, theta, sink) {
+    const taper = Math.sqrt(Math.max(0.18, 1 - u * u * 0.92));
+    const ca = Math.cos(theta), sb = Math.sin(theta);
+    const dirFront = this.axisA.dot(this.front) >= 0 ? 1 : -1;
+    const p = this.center.clone()
+      .addScaledVector(this.axisLong, u * this.halfLong)
+      .addScaledVector(this.axisA, dirFront * this.radA * taper * ca)
+      .addScaledVector(this.axisB, this.radB * taper * sb);
+    const n = new THREE.Vector3()
+      .addScaledVector(this.axisA, dirFront * ca / Math.max(this.radA, 1e-4))
+      .addScaledVector(this.axisB, sb / Math.max(this.radB, 1e-4))
+      .normalize();
+    if (sink) p.addScaledVector(n, sink);
+    return { p, n };
+  },
+
+  buildGranules() {
+    const scene = this.el.sceneEl.object3D;
+    const n = THREE.MathUtils.clamp(Math.round(this.data.granules), 3, 6);
+    const geo = new THREE.SphereGeometry(1, 18, 14);
+    this.granuleGeo = geo;
+    for (let i = 0; i < n; i++) {
+      // repartidos a lo largo del eje, ligeramente alternados arriba/abajo
+      const u = -0.62 + (i + 0.5) * (1.24 / n) + ((i % 2) ? 0.05 : -0.05);
+      const theta = (i % 2 ? 1 : -1) * (0.18 + (i % 3) * 0.16);
+      const r = 0.034 + ((i * 7) % 3) * 0.008;
+      const { p } = this.surfacePoint(u, theta, -r * 0.24);
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0x7d3fa8, emissive: 0x3d1c58, emissiveIntensity: 0.30,
+        roughness: 0.30, metalness: 0.04, transparent: true, opacity: 0
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.copy(p);
+      mesh.scale.setScalar(0.001);
+      mesh.visible = false;
+      scene.add(mesh);
+      this.granules.push({ mesh, mat, radius: r, t: 0 });
+    }
+  },
+
+  buildCarbon() {
+    const scene = this.el.sceneEl.object3D;
+    const geo = new THREE.SphereGeometry(0.0075, 10, 8);
+    this.carbonGeo = geo;
+    for (let i = 0; i < 14; i++) {
+      const mat = new THREE.MeshBasicMaterial({ color: 0xefe0c4, transparent: true, opacity: 0, depthWrite: false });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.visible = false;
+      scene.add(mesh);
+      this.carbon.push({ mesh, mat, active: false, t: 0, speed: 0.5, from: new THREE.Vector3(), to: new THREE.Vector3() });
+    }
+  },
+
+  buildLabel() {
+    const c = document.createElement('canvas');
+    c.width = 640; c.height = 190;
+    const ctx = c.getContext('2d');
+    const copy = this.copy();
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.fillStyle = 'rgba(10, 8, 14, 0.58)';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#C79BEA';
+    ctx.fillRect(0, 0, 7, c.height);
+    ctx.textAlign = 'left';
+    const fit = (text, weight, maxPx, boxW) => {
+      let size = maxPx;
+      ctx.font = weight + ' ' + size + 'px Arial, Helvetica, sans-serif';
+      while (size > 20 && ctx.measureText(text).width > boxW) {
+        size -= 2;
+        ctx.font = weight + ' ' + size + 'px Arial, Helvetica, sans-serif';
+      }
+    };
+    const boxW = c.width - 34 - 26;
+    ctx.fillStyle = '#D9B6F2';
+    fit(copy.title, '900', 60, boxW);
+    ctx.fillText(copy.title, 34, 78);
+    ctx.fillStyle = 'rgba(247, 244, 250, 0.86)';
+    fit(copy.sub, '700', 40, boxW);
+    ctx.fillText(copy.sub, 34, 142);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+
+    const group = new THREE.Group();
+    group.name = 'rubrum-microetiqueta-pha';
+    group.position.set(this.center.x, this.bellTop + 0.075, this.center.z);
+    this.el.sceneEl.object3D.add(group);
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+    group.add(new THREE.Mesh(new THREE.PlaneGeometry(0.205, 0.061), mat));
+    this.label = { group, mat };
+  },
+
+  wireClick(info) {
+    (info.selectableMeshes || []).forEach((m) => {
+      if (!m.userData || m.userData.museoExhibitId !== this.data.target) return;
+      if (m.userData.museoAction) return;
+      const id = m.userData.museoExhibitId;
+      m.userData.museoAction = () => {
+        this.start();
+        if (info.open) info.open(id);
+      };
+      this._wired.push(m);
+    });
+  },
+
+  start() {
+    this.seq = 0;
+    this.nextCarbon = 0;
+    this.granules.forEach((g) => { g.t = 0; g.mesh.visible = false; g.mat.opacity = 0; g.mesh.scale.setScalar(0.001); });
+  },
+
+  spawnCarbon() {
+    const p = this.carbon.find((x) => !x.active);
+    if (!p) return;
+    // nace en una esfera alrededor de la celula, siempre dentro de la campana
+    const a = Math.random() * Math.PI * 2;
+    const b = (Math.random() - 0.5) * 1.1;
+    const rad = Math.min(this.bellRadius * 0.80, Math.max(this.radA, this.radB) + 0.28);
+    p.from.set(
+      this.center.x + Math.cos(a) * rad,
+      this.center.y + Math.sin(b) * rad * 0.55,
+      this.center.z + Math.sin(a) * rad
+    );
+    const u = (Math.random() * 2 - 1) * 0.7;
+    const theta = (Math.random() - 0.5) * 1.5;
+    p.to.copy(this.surfacePoint(u, theta, 0).p);
+    p.active = true;
+    p.t = 0;
+    p.speed = 1 / THREE.MathUtils.randFloat(1.1, 1.7);
+    p.mesh.visible = true;
+    p.mat.opacity = 0;
+  },
+
+  updateCarbon(dt) {
+    // Fase 1 de la secuencia: el carbono entra durante los ~2 primeros
+    // segundos; despues deja de aparecer y solo terminan los que van de camino.
+    if (this.seq >= 0 && this.seq < 2.0 && this.seq >= this.nextCarbon) {
+      this.spawnCarbon();
+      this.nextCarbon = this.seq + THREE.MathUtils.randFloat(0.10, 0.18);
+    }
+    this.carbon.forEach((p) => {
+      if (!p.active) return;
+      p.t += p.speed * dt;
+      if (p.t >= 1) { p.active = false; p.mesh.visible = false; p.mat.opacity = 0; return; }
+      const e = p.t * p.t * (3 - 2 * p.t);
+      p.mesh.position.lerpVectors(p.from, p.to, e);
+      const fadeIn = Math.min(1, p.t / 0.16);
+      const fadeOut = Math.min(1, (1 - p.t) / 0.22);
+      p.mat.opacity = 0.92 * Math.min(fadeIn, fadeOut);
+    });
+  },
+
+  /*
+    Fase 2: los granulos aparecen DE UNO EN UNO (1 -> 2 -> 3 ...), cada uno
+    creciendo suavemente desde cero. Al terminar el ultimo se concede la
+    capacidad. Pasados unos segundos todo vuelve a un estado tranquilo, pero
+    el HUD conserva el descubrimiento.
+  */
+  updateGranules() {
+    const START = 1.0, STEP = 0.42, GROW = 0.55, HOLD = 7.4, FADE = 1.6;
+    let done = 0;
+    this.granules.forEach((g, i) => {
+      const t0 = START + i * STEP;
+      let a = 0;
+      if (this.seq >= t0) {
+        const grow = THREE.MathUtils.clamp((this.seq - t0) / GROW, 0, 1);
+        const fade = 1 - THREE.MathUtils.clamp((this.seq - HOLD) / FADE, 0, 1);
+        a = grow * fade;
+        if (grow >= 1) done += 1;
+      }
+      g.t = a;
+      const eased = a * a * (3 - 2 * a);
+      g.mesh.visible = eased > 0.01;
+      g.mesh.scale.setScalar(Math.max(0.001, g.radius * (0.55 + 0.45 * eased)));
+      g.mat.opacity = 0.94 * eased;
+    });
+    return done;
+  },
+
+  tick(time, delta) {
+    if (!this.ready) return;
+    const rig = document.getElementById('rig');
+    if (!rig) return;
+    const p = rig.object3D.getWorldPosition(this.tmp2);
+    const d = Math.hypot(p.x - this.center.x, p.z - this.center.z);
+    if (!this.near && d <= this.data.trigger) this.near = true;
+    else if (this.near && d >= this.data.release) this.near = false;
+
+    const dt = Math.min(0.05, Math.max(0.001, (delta || 16) / 1000));
+    if (this.seq >= 0) {
+      this.seq += dt;
+      if (this.seq > 9.4) this.seq = -1;     // vuelta al reposo
+    }
+    const running = this.seq >= 0;
+
+    // Acercarse solo enciende la microetiqueta, muy tenue. Nunca desbloquea.
+    this.displayT += (((this.near || running) ? 1 : 0) - this.displayT) * 0.07;
+    if (this.label) {
+      this.label.group.visible = this.displayT > 0.03;
+      this.label.mat.opacity = this.displayT * (running ? 0.95 : 0.5);
+    }
+
+    this.updateCarbon(dt);
+    const done = this.updateGranules();   // en reposo (seq < 0) devuelve 0 y los oculta
+
+    if (running && !this.awarded && done >= this.granules.length) {
+      this.awarded = true;
+      if (window.unlockCapability) window.unlockCapability(this.data.capability);
+    }
+    if (!running) this.awarded = false;   // permite repetir la secuencia; el desbloqueo ya no se repite
+
+    const cam = this.el.sceneEl.camera;
+    if (cam && this.label) this.label.group.lookAt(cam.getWorldPosition(this.tmp));
+  },
+
+  remove() {
+    (this.mats || []).forEach(({ mat, base }) => { mat.emissiveIntensity = base; });
+    this._wired.forEach((m) => { if (m.userData) delete m.userData.museoAction; });
+    if (this.label && this.label.group && this.label.group.parent) this.label.group.parent.remove(this.label.group);
+    this.granules.concat(this.carbon).forEach((x) => { if (x.mesh && x.mesh.parent) x.mesh.parent.remove(x.mesh); });
+    if (this.granuleGeo) this.granuleGeo.dispose();
+    if (this.carbonGeo) this.carbonGeo.dispose();
+  }
+});

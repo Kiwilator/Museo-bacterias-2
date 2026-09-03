@@ -172,6 +172,48 @@
     }
   };
 
+  /*
+    Capa de juego: capacidades que el visitante descubre interactuando.
+    El HUD y unlockCapability() (script.js) leen de aqui, asi que añadir una
+    capacidad nueva es añadir su id y sus textos en estos dos bloques.
+  */
+  const capabilities = {
+    en: {
+      title: 'CAPABILITIES',
+      discovered: 'CAPABILITY DISCOVERED',
+      pending: 'not discovered yet',
+      found: 'discovered',
+      short: { pha: 'PHA', co: 'CO' },
+      long: {
+        pha: 'PHA · CARBON STORAGE',
+        co: 'CO · CARBON MONOXIDE METABOLISM'
+      }
+    },
+    es: {
+      title: 'CAPACIDADES',
+      discovered: 'CAPACIDAD DESCUBIERTA',
+      pending: 'todavía sin descubrir',
+      found: 'descubierta',
+      short: { pha: 'PHA', co: 'CO' },
+      long: {
+        pha: 'PHA · ALMACENAMIENTO DE CARBONO',
+        co: 'CO · METABOLISMO DEL MONÓXIDO DE CARBONO'
+      }
+    }
+  };
+
+  /* Microetiquetas 3D de las microinstalaciones dentro de las vitrinas. */
+  const exhibitLabels = {
+    en: {
+      coHydrogen: { title: 'CO → H₂', sub: 'FROM GAS TO HYDROGEN', co: 'CO' },
+      pha: { title: 'PHA', sub: 'CARBON STORAGE' }
+    },
+    es: {
+      coHydrogen: { title: 'CO → H₂', sub: 'DEL GAS AL HIDRÓGENO', co: 'CO' },
+      pha: { title: 'PHA', sub: 'RESERVA DE CARBONO' }
+    }
+  };
+
   const esContent = {
     bacteriaLarge01: {
       lead: 'Mucho más que fotosíntesis',
@@ -273,7 +315,7 @@
     }
   };
 
-  window.MUSEUM_I18N = { ui, reactor, reactorPanel, electroactivity, content: { en: {}, es: esContent } };
+  window.MUSEUM_I18N = { ui, reactor, reactorPanel, electroactivity, capabilities, exhibitLabels, content: { en: {}, es: esContent } };
   window.getMuseumUiText = function getMuseumUiText(key) {
     return (ui[language] && ui[language][key]) || ui.en[key] || key;
   };
@@ -282,6 +324,13 @@
   };
   window.getMuseumReactorPanelText = function getMuseumReactorPanelText() {
     return reactorPanel[language] || reactorPanel.en;
+  };
+  window.getMuseumCapabilityText = function getMuseumCapabilityText() {
+    return capabilities[language] || capabilities.en;
+  };
+  window.getMuseumExhibitLabel = function getMuseumExhibitLabel(key) {
+    const pack = exhibitLabels[language] || exhibitLabels.en;
+    return pack[key] || exhibitLabels.en[key] || null;
   };
   window.getMuseumElectroactivityText = function getMuseumElectroactivityText(key) {
     return (electroactivity[language] && electroactivity[language][key]) || electroactivity.en[key] || key;

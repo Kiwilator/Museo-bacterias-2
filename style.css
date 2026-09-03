@@ -377,3 +377,121 @@ a-scene canvas { touch-action: none; }
   fill: none; stroke: #6b4b8a; stroke-width: 1.1;
 }
 @media (max-width: 640px) { #wall-graphic { width: 84px; height: 84px; left: 14px; top: 14px; } }
+
+/* ==========================================================================
+   HUD de capacidades descubiertas.
+   Vive arriba a la izquierda, la unica esquina libre de la interfaz: el
+   selector de idioma esta arriba a la derecha, la ayuda de controles abajo al
+   centro y el joystick tactil abajo a la izquierda. No recibe eventos
+   (pointer-events: none), asi que nunca compite con el arrastre de camara ni
+   con el tap sobre las piezas.
+   ========================================================================== */
+#capability-hud {
+  position: fixed;
+  top: 18px;
+  left: 18px;
+  z-index: 420;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 128px;
+  padding: 9px 13px 10px;
+  border-radius: 8px;
+  background: rgba(20, 16, 12, 0.42);
+  border: 1px solid rgba(245, 239, 228, 0.16);
+  backdrop-filter: blur(4px);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  color: #f5efe4;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+#capability-hud .cap-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+#capability-hud .cap-title {
+  font-size: 9.5px;
+  letter-spacing: 0.2em;
+  font-weight: 600;
+  opacity: 0.7;
+}
+#capability-hud .cap-counter {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  opacity: 0.92;
+}
+#capability-hud .cap-row { display: flex; gap: 6px; }
+#capability-hud .cap-chip {
+  min-width: 30px;
+  text-align: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  border: 1px solid rgba(245, 239, 228, 0.22);
+  color: rgba(245, 239, 228, 0.4);
+  transition: color 0.45s ease, border-color 0.45s ease, background 0.45s ease;
+}
+#capability-hud .cap-chip.unlocked {
+  background: rgba(176, 108, 232, 0.24);
+  border-color: rgba(176, 108, 232, 0.78);
+  color: #f1e4fc;
+}
+#capability-hud.complete .cap-counter { color: #d7b4f3; }
+
+/* Aviso de descubrimiento: misma tarjeta de museo que la ficha cientifica
+   (crema, tinta, morado de acento), arriba al centro y durante ~3.6 s. */
+#capability-toast {
+  position: fixed;
+  top: 22px;
+  left: 50%;
+  transform: translate(-50%, -10px);
+  z-index: 430;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  max-width: calc(100vw - 32px);
+  padding: 11px 22px;
+  border-radius: 8px;
+  background: var(--mus-crema);
+  border: 1px solid var(--mus-borde);
+  box-shadow: 0 8px 26px rgba(30, 20, 40, 0.18);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+#capability-toast.visible { opacity: 1; transform: translate(-50%, 0); }
+#capability-toast .cap-toast-kicker {
+  font-size: 9.5px;
+  letter-spacing: 0.2em;
+  font-weight: 700;
+  color: var(--mus-morado);
+}
+#capability-toast .cap-toast-name {
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: var(--mus-tinta);
+}
+
+/* En movil el HUD se compacta para no comerse la pantalla, y con una ficha
+   abierta se aparta igual que hace el joystick. */
+.is-mobile #capability-hud {
+  top: 12px;
+  left: 12px;
+  min-width: 0;
+  padding: 7px 10px 8px;
+  gap: 5px;
+}
+.is-mobile #capability-hud .cap-title { font-size: 8.5px; }
+.is-mobile #capability-hud .cap-chip { font-size: 9px; padding: 2px 7px; }
+.is-mobile.panel-open #capability-hud { opacity: 0.25; }
+.is-mobile #capability-toast { top: 14px; padding: 9px 16px; }
+.is-mobile #capability-toast .cap-toast-name { font-size: 11.5px; }
