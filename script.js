@@ -144,7 +144,7 @@ window.MUSEO_MOVE_VECTOR = { x: 0, z: 0 };
    museum-i18n.js: ni el HUD ni el contador necesitan tocarse.
    ========================================================================== */
 const MUSEO_CAP_KEY = 'museum-capabilities';
-const MUSEO_CAP_ORDER = ['pha', 'co', 'hydrogen'];
+const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'co', 'hydrogen', 'biomass'];
 
 (function museumCapabilities() {
   const known = (id) => MUSEO_CAP_ORDER.indexOf(id) !== -1;
@@ -4497,6 +4497,15 @@ AFRAME.registerComponent('reactor-control', {
     if (complete && !this.wasComplete) {
       this.rewardUntil = this.now() + 2600;
       this.rewardPulse = 1;
+      /*
+        Conseguir los cuatro controles a la vez es la mecanica museografica
+        que da por explorado el reactor, y con ella se descubre el cultivo de
+        biomasa. No cambia el significado cientifico de ningun boton ni
+        convierte el 4/4 en un protocolo obligatorio: es el mismo premio
+        visual de siempre, ahora tambien anotado en el HUD general.
+        unlockCapability ya se encarga de que no se repita.
+      */
+      if (window.unlockCapability) window.unlockCapability('biomass');
     }
     this.wasComplete = complete;
   },
@@ -5022,7 +5031,8 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     // por encima de la campana y muy por debajo de la imagen circular
     // justo por encima de la bacteria y del punto de entrada del CO: a la
     // altura de la campana quedaba flotando lejos, sin relacion con la vitrina
-    group.position.set(this.coStart.x, Math.min(this.bellTop - 0.030, this.center.y + 0.115), this.coStart.z);
+    group.position.copy(this.coStart).addScaledVector(this.left, 0.048);
+    group.position.y = Math.min(this.bellTop - 0.030, this.center.y + 0.115);
     this.el.sceneEl.object3D.add(group);
     const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
     group.add(new THREE.Mesh(new THREE.PlaneGeometry(0.170, 0.046), mat));
@@ -5809,7 +5819,7 @@ AFRAME.registerComponent('hydrogen-exhibit', {
       let tag = null, tagMat = null;
       if (tagged) {
         tagMat = new THREE.MeshBasicMaterial({ map: tagTex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
-        tag = new THREE.Mesh(new THREE.PlaneGeometry(0.024, 0.014), tagMat);
+        tag = new THREE.Mesh(new THREE.PlaneGeometry(0.030, 0.017), tagMat);
         scene.add(tag);
       }
       scene.add(mesh);
@@ -5848,14 +5858,12 @@ AFRAME.registerComponent('hydrogen-exhibit', {
 
     const group = new THREE.Group();
     group.name = 'palustris-microetiqueta-h2';
-    group.position.set(
-      this.indicatorBase.x,
-      Math.min(this.bellTop - 0.030, this.center.y + 0.115),
-      this.indicatorBase.z
-    );
+    // desplazada hacia fuera para que no se monte sobre la campana
+    group.position.copy(this.indicatorBase).addScaledVector(this.side, 0.052);
+    group.position.y = Math.min(this.bellTop - 0.030, this.center.y + 0.115);
     this.el.sceneEl.object3D.add(group);
     const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
-    group.add(new THREE.Mesh(new THREE.PlaneGeometry(0.178, 0.045), mat));
+    group.add(new THREE.Mesh(new THREE.PlaneGeometry(0.205, 0.052), mat));
     this.label = { group, mat };
   },
 
@@ -6004,5 +6012,339 @@ AFRAME.registerComponent('hydrogen-exhibit', {
       if (b.tag && b.tag.parent) b.tag.parent.remove(b.tag);
     });
     if (this.bubbleGeo) this.bubbleGeo.dispose();
+  }
+});
+
+/* ==========================================================================
+   RHODOBACTER CAPSULATUS -- fijacion de nitrogeno.
+
+   El documento fuente relaciona en esta especie la fotosintesis, la FIJACION
+   DE NITROGENO y el equilibrio redox. Aqui se enseña unicamente eso, la
+   captacion del nitrogeno, sin representar ningun producto posterior ni
+   ninguna reaccion que el documento no describa:
+
+        N2  ->  [RHODOBACTER CAPSULATUS]
+
+   Al acercarse aparecen tres moleculas de N2 (parejas de esferas unidas),
+   claramente fuera de la bacteria y de su campana, flotando despacio. Al
+   pulsar se desplazan hacia la celula, se apagan al llegar, la bacteria da un
+   pulso interno minimo y la microetiqueta aparece unos segundos.
+
+   Geometria medida en tiempo de ejecucion sobre la bacteria, su campana y su
+   peana: ninguna coordenada escrita a mano.
+   ========================================================================== */
+AFRAME.registerComponent('nitrogen-exhibit', {
+  schema: {
+    target: { type: 'string', default: 'bacteriaSmall03' },
+    trigger: { type: 'number', default: 2.2 },
+    release: { type: 'number', default: 2.8 },
+    molecules: { type: 'number', default: 3 },
+    capability: { type: 'string', default: 'nitrogen' }
+  },
+
+  init() {
+    this.ready = false;
+    this.near = false;
+    this.displayT = 0;
+    this.retry = 0;
+    this.seq = -1;
+    this.awarded = false;
+    this.pulseT = 0;
+    this.labelT = 0;
+    this.mol = [];
+    this._wired = [];
+    this.tmp = new THREE.Vector3();
+    this.tmp2 = new THREE.Vector3();
+    this.el.addEventListener('museo-modules-loaded', () => window.setTimeout(() => this.setup(), 0));
+  },
+
+  copy() {
+    const fallback = { title: 'N₂', sub: 'NITROGEN FIXATION' };
+    return window.getMuseumExhibitLabel ? (window.getMuseumExhibitLabel('nitrogen') || fallback) : fallback;
+  },
+
+  setup() {
+    const info = this.el.components['exhibit-info'];
+    const item = info && info.items && info.items.find((it) => it.id === this.data.target);
+    const anchor = item && item.anchorObj;
+    if (!info || !item || !anchor) {
+      this.retry += 1;
+      if (this.retry < 30) window.setTimeout(() => this.setup(), 120);
+      else console.warn('[n2] no se pudo localizar R. capsulatus');
+      return;
+    }
+
+    const box = new THREE.Box3().setFromObject(anchor);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+
+    let bell = null;
+    this.el.object3D.traverse((o) => {
+      if (!o.isMesh || !o.name || o.name.indexOf('VITRINA_Campana') !== 0) return;
+      const b = new THREE.Box3().setFromObject(o);
+      if (center.x < b.min.x - 0.02 || center.x > b.max.x + 0.02) return;
+      if (center.z < b.min.z - 0.02 || center.z > b.max.z + 0.02) return;
+      if (!bell || b.max.y > bell.max.y) bell = b;
+    });
+    const bellCenter = bell ? bell.getCenter(new THREE.Vector3()) : center.clone();
+    const bellRadius = bell
+      ? Math.max(bell.max.x - bell.min.x, bell.max.z - bell.min.z) * 0.5
+      : Math.max(size.x, size.z) * 0.5 + 0.05;
+    const bellTop = bell ? bell.max.y : center.y + 0.2;
+
+    let peana = null, pd = Infinity;
+    (info.peanaBoxes || []).forEach((pb) => {
+      const d = Math.hypot(pb.center.x - center.x, pb.center.z - center.z);
+      if (d < pd) { pd = d; peana = pb; }
+    });
+
+    const front = (info._placardRowDir)
+      ? new THREE.Vector3(info._placardRowDir.x, 0, info._placardRowDir.z).normalize()
+      : new THREE.Vector3(0, 0, 1);
+    const right = new THREE.Vector3(front.z, 0, -front.x).normalize();
+    const left = right.clone().negate();
+
+    // Las moleculas esperan fuera de la campana, sobre la tapa de la peana.
+    const place = (dir, lat) => bellCenter.clone().addScaledVector(dir, lat);
+    const fits = (p) => !peana || Math.hypot(p.x - peana.center.x, p.z - peana.center.z) <= peana.radius - 0.050;
+    let side = left.clone();
+    let lateral = bellRadius + 0.070;
+    let hub = place(side, lateral);
+    if (!fits(hub)) {
+      const alt = place(right, lateral);
+      if (fits(alt)) { side = right.clone(); hub = alt; }
+      else { while (lateral > bellRadius + 0.025 && !fits(hub)) { lateral -= 0.006; hub = place(side, lateral); } }
+    }
+    hub.y = center.y + 0.008;
+
+    this.info = info;
+    this.center = center;
+    this.front = front;
+    this.side = side;
+    this.hub = hub;
+    this.bellTop = bellTop;
+    // punto de llegada: el flanco de la celula que da al lado de las moleculas
+    const halfSide = 0.5 * (Math.abs(side.x) * size.x + Math.abs(side.z) * size.z);
+    this.arrival = center.clone().addScaledVector(side, halfSide * 0.45);
+
+    this.collectMaterials(anchor);
+    this.buildMolecules();
+    this.buildLabel();
+    this.wireClick(info);
+
+    this.ready = true;
+    console.log('[n2] R. capsulatus listo', {
+      bacteria: center.toArray().map((v) => +v.toFixed(3)),
+      moleculas: this.mol.length,
+      espera: hub.toArray().map((v) => +v.toFixed(3))
+    });
+  },
+
+  collectMaterials(anchor) {
+    const set = new Set();
+    anchor.traverse((n) => {
+      if (!n.isMesh || !n.material) return;
+      (Array.isArray(n.material) ? n.material : [n.material]).forEach((m) => { if (m && m.emissive) set.add(m); });
+    });
+    this.mats = Array.from(set).map((mat) => ({ mat, base: mat.emissiveIntensity || 0 }));
+  },
+
+  /*
+    Cada N2 son dos esferas iguales unidas por un enlace corto: la lectura
+    quimica mas simple posible, sin etiquetas ni iconos.
+  */
+  buildMolecules() {
+    const scene = this.el.sceneEl.object3D;
+    const n = THREE.MathUtils.clamp(Math.round(this.data.molecules), 2, 4);
+    const R = 0.0085, GAP = 0.0115;
+    const atomGeo = new THREE.SphereGeometry(R, 14, 12);
+    const bondGeo = new THREE.CylinderGeometry(R * 0.42, R * 0.42, GAP * 2, 10);
+    this.atomGeo = atomGeo;
+    this.bondGeo = bondGeo;
+    // pequeño racimo alrededor del punto de espera, nunca en fila
+    const spots = [
+      { f: 0.000, u: 0.030 },
+      { f: 0.034, u: -0.010 },
+      { f: -0.030, u: -0.026 },
+      { f: 0.006, u: -0.052 }
+    ];
+    for (let i = 0; i < n; i++) {
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0x8fd9e3, emissive: 0x2f6f7c, emissiveIntensity: 0.35,
+        roughness: 0.34, metalness: 0.05, transparent: true, opacity: 0
+      });
+      const group = new THREE.Group();
+      const a = new THREE.Mesh(atomGeo, mat); a.position.set(0, GAP, 0);
+      const b = new THREE.Mesh(atomGeo, mat); b.position.set(0, -GAP, 0);
+      const bond = new THREE.Mesh(bondGeo, mat);
+      group.add(a); group.add(b); group.add(bond);
+      group.rotation.z = Math.PI / 2 + THREE.MathUtils.randFloatSpread(0.8);
+      const home = this.hub.clone()
+        .addScaledVector(this.front, spots[i].f)
+        .add(new THREE.Vector3(0, spots[i].u, 0));
+      group.position.copy(home);
+      group.visible = false;
+      scene.add(group);
+      this.mol.push({
+        group, mat, home, t: 0, moving: false, arrived: false,
+        delay: i * 0.38, speed: 1 / THREE.MathUtils.randFloat(2.4, 3.2),
+        phase: Math.random() * Math.PI * 2, spin: THREE.MathUtils.randFloatSpread(0.35)
+      });
+    }
+  },
+
+  buildLabel() {
+    const c = document.createElement('canvas');
+    c.width = 700; c.height = 190;
+    const ctx = c.getContext('2d');
+    const copy = this.copy();
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.fillStyle = 'rgba(9, 11, 16, 0.60)';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#8FD9E3';
+    ctx.fillRect(0, 0, 7, c.height);
+    ctx.textAlign = 'left';
+    const fit = (text, weight, maxPx, boxW) => {
+      let size = maxPx;
+      ctx.font = weight + ' ' + size + 'px Arial, Helvetica, sans-serif';
+      while (size > 18 && ctx.measureText(text).width > boxW) {
+        size -= 2;
+        ctx.font = weight + ' ' + size + 'px Arial, Helvetica, sans-serif';
+      }
+    };
+    const boxW = c.width - 34 - 26;
+    ctx.fillStyle = '#B7E9F1';
+    fit(copy.title, '900', 58, boxW);
+    ctx.fillText(copy.title, 34, 76);
+    ctx.fillStyle = 'rgba(247, 251, 252, 0.86)';
+    fit(copy.sub, '700', 38, boxW);
+    ctx.fillText(copy.sub, 34, 142);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+
+    const group = new THREE.Group();
+    group.name = 'capsulatus-microetiqueta-n2';
+    group.position.copy(this.hub)
+      .addScaledVector(this.side, 0.050);
+    group.position.y = Math.min(this.bellTop - 0.030, this.center.y + 0.118);
+    this.el.sceneEl.object3D.add(group);
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+    group.add(new THREE.Mesh(new THREE.PlaneGeometry(0.190, 0.048), mat));
+    this.label = { group, mat };
+  },
+
+  // El tap sobre la bacteria lanza la secuencia; la placa de la peana sigue
+  // abriendo la ficha cientifica, sin tocarla.
+  wireClick(info) {
+    (info.selectableMeshes || []).forEach((m) => {
+      if (!m.userData || m.userData.museoExhibitId !== this.data.target) return;
+      if (!m.name || m.userData.museoAction) return;
+      m.userData.museoAction = () => this.start();
+      this._wired.push(m);
+    });
+  },
+
+  start() {
+    if (this.seq >= 0) return;                 // ya esta en marcha
+    this.seq = 0;
+    this.mol.forEach((m) => { m.moving = true; m.arrived = false; m.t = 0; });
+  },
+
+  resetMolecules() {
+    this.mol.forEach((m) => {
+      m.moving = false; m.arrived = false; m.t = 0;
+      m.group.position.copy(m.home);
+    });
+  },
+
+  updateMolecules(dt, secs) {
+    let arrived = 0;
+    this.mol.forEach((m) => {
+      if (m.arrived) { arrived += 1; m.group.visible = false; return; }
+      if (!m.moving) {
+        // en espera: flotan muy despacio, girando apenas
+        m.group.position.copy(m.home);
+        m.group.position.y += Math.sin(secs * 0.7 + m.phase) * 0.006;
+        m.group.position.x += Math.cos(secs * 0.5 + m.phase) * 0.004;
+        m.group.rotation.z += m.spin * dt * 0.25;
+        m.group.visible = this.displayT > 0.02;
+        m.mat.opacity = 0.92 * this.displayT;
+        return;
+      }
+      if (m.delay > 0 && this.seq < m.delay) {
+        m.group.position.copy(m.home);
+        m.group.visible = true;
+        return;
+      }
+      m.t += m.speed * dt;
+      const e = m.t * m.t * (3 - 2 * m.t);
+      m.group.position.lerpVectors(m.home, this.arrival, Math.min(e, 1));
+      m.group.rotation.z += m.spin * dt * 0.5;
+      m.group.visible = true;
+      m.mat.opacity = 0.92 * this.displayT * (1 - THREE.MathUtils.clamp((m.t - 0.78) / 0.22, 0, 1));
+      if (m.t >= 1) {
+        m.arrived = true;
+        m.group.visible = false;
+        this.pulseT = 1;                        // pulso interno minimo
+      }
+    });
+    return arrived;
+  },
+
+  updatePulse(dt) {
+    if (this.pulseT > 0) this.pulseT = Math.max(0, this.pulseT - dt / 0.36);
+    const p = Math.sin(this.pulseT * Math.PI);
+    (this.mats || []).forEach(({ mat, base }) => {
+      mat.emissiveIntensity = base + (base > 0.01 ? base * 0.28 : 0.09) * p;
+    });
+  },
+
+  tick(time, delta) {
+    if (!this.ready) return;
+    const rig = document.getElementById('rig');
+    if (!rig) return;
+    const p = rig.object3D.getWorldPosition(this.tmp2);
+    const d = Math.hypot(p.x - this.center.x, p.z - this.center.z);
+    if (!this.near && d <= this.data.trigger) this.near = true;
+    else if (this.near && d >= this.data.release) this.near = false;
+
+    const dt = Math.min(0.05, Math.max(0.001, (delta || 16) / 1000));
+    if (this.seq >= 0) {
+      this.seq += dt;
+      if (this.seq > 8.0) { this.seq = -1; this.resetMolecules(); }   // vuelve a estar listo
+    }
+    const running = this.seq >= 0;
+
+    this.displayT += (((this.near || running) ? 1 : 0) - this.displayT) * 0.07;
+    const arrived = this.updateMolecules(dt, (time || 0) / 1000);
+    this.updatePulse(dt);
+
+    // La etiqueta aparece al llegar el nitrogeno y se va sola unos segundos
+    // despues: no esta puesta de forma permanente sobre la vitrina.
+    const showLabel = running && arrived > 0 && this.seq < 7.0;
+    this.labelT += ((showLabel ? 1 : 0) - this.labelT) * 0.09;
+    if (this.label) {
+      this.label.group.visible = this.labelT > 0.02;
+      this.label.mat.opacity = 0.94 * this.labelT;
+    }
+
+    // Solo el tap concede la capacidad, y solo cuando ha llegado todo el N2.
+    if (running && !this.awarded && arrived >= this.mol.length) {
+      this.awarded = true;
+      if (window.unlockCapability) window.unlockCapability(this.data.capability);
+    }
+    if (!running) this.awarded = false;
+
+    const cam = this.el.sceneEl.camera;
+    if (cam && this.label) this.label.group.lookAt(cam.getWorldPosition(this.tmp));
+  },
+
+  remove() {
+    (this.mats || []).forEach(({ mat, base }) => { mat.emissiveIntensity = base; });
+    this._wired.forEach((m) => { if (m.userData) delete m.userData.museoAction; });
+    if (this.label && this.label.group && this.label.group.parent) this.label.group.parent.remove(this.label.group);
+    this.mol.forEach((m) => { if (m.group.parent) m.group.parent.remove(m.group); });
+    if (this.atomGeo) this.atomGeo.dispose();
+    if (this.bondGeo) this.bondGeo.dispose();
   }
 });

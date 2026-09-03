@@ -423,7 +423,9 @@ a-scene canvas { touch-action: none; }
   letter-spacing: 0.06em;
   opacity: 0.92;
 }
-#capability-hud .cap-row { display: flex; gap: 6px; }
+/* con cinco capacidades la fila puede no caber en un movil estrecho: envuelve
+   en vez de desbordar la pantalla */
+#capability-hud .cap-row { display: flex; flex-wrap: wrap; gap: 6px; max-width: 210px; }
 #capability-hud .cap-chip {
   min-width: 30px;
   text-align: center;

@@ -183,11 +183,13 @@
       discovered: 'CAPABILITY DISCOVERED',
       pending: 'not discovered yet',
       found: 'discovered',
-      short: { pha: 'PHA', co: 'CO', hydrogen: 'H₂' },
+      short: { pha: 'PHA', nitrogen: 'N₂', co: 'CO', hydrogen: 'H₂', biomass: 'BIO' },
       long: {
         pha: 'PHA · CARBON STORAGE',
+        nitrogen: 'N₂ · NITROGEN FIXATION',
         co: 'CO · CARBON MONOXIDE METABOLISM',
-        hydrogen: 'H₂ · HYDROGEN PRODUCTION'
+        hydrogen: 'H₂ · HYDROGEN PRODUCTION',
+        biomass: 'BIOMASS · CULTIVATION'
       }
     },
     es: {
@@ -195,11 +197,13 @@
       discovered: 'CAPACIDAD DESCUBIERTA',
       pending: 'todavía sin descubrir',
       found: 'descubierta',
-      short: { pha: 'PHA', co: 'CO', hydrogen: 'H₂' },
+      short: { pha: 'PHA', nitrogen: 'N₂', co: 'CO', hydrogen: 'H₂', biomass: 'BIO' },
       long: {
         pha: 'PHA · ALMACENAMIENTO DE CARBONO',
+        nitrogen: 'N₂ · FIJACIÓN DE NITRÓGENO',
         co: 'CO · METABOLISMO DEL MONÓXIDO DE CARBONO',
-        hydrogen: 'H₂ · PRODUCCIÓN DE HIDRÓGENO'
+        hydrogen: 'H₂ · PRODUCCIÓN DE HIDRÓGENO',
+        biomass: 'BIOMASA · CULTIVO'
       }
     }
   };
@@ -209,12 +213,14 @@
     en: {
       coHydrogen: { title: 'CO → H₂', sub: 'FROM GAS TO HYDROGEN', co: 'CO' },
       pha: { title: 'PHA', sub: 'CARBON STORAGE' },
-      hydrogen: { title: 'H₂', sub: 'PHOTOBIOLOGICAL HYDROGEN PRODUCTION', tag: 'H₂' }
+      hydrogen: { title: 'H₂', sub: 'PHOTOBIOLOGICAL HYDROGEN PRODUCTION', tag: 'H₂' },
+      nitrogen: { title: 'N₂', sub: 'NITROGEN FIXATION' }
     },
     es: {
       coHydrogen: { title: 'CO → H₂', sub: 'DEL GAS AL HIDRÓGENO', co: 'CO' },
       pha: { title: 'PHA', sub: 'RESERVA DE CARBONO' },
-      hydrogen: { title: 'H₂', sub: 'FOTOPRODUCCIÓN DE HIDRÓGENO', tag: 'H₂' }
+      hydrogen: { title: 'H₂', sub: 'FOTOPRODUCCIÓN DE HIDRÓGENO', tag: 'H₂' },
+      nitrogen: { title: 'N₂', sub: 'FIJACIÓN DE NITRÓGENO' }
     }
   };
 
