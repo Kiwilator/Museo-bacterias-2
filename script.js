@@ -370,12 +370,23 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
    ========================================================================== */
 const MUSEO_HOTSPOT_COLOR = 0x4fe4dc;
 
+function faceMuseoFront(object3D, front) {
+  if (!object3D || !front) return false;
+  const dir = new THREE.Vector3(front.x || 0, 0, front.z || 0);
+  if (dir.lengthSq() < 0.000001) return false;
+  dir.normalize();
+  object3D.lookAt(object3D.position.clone().add(dir));
+  object3D.userData.museoFixedFront = { x: dir.x, z: dir.z };
+  return true;
+}
+
 function createMuseoHotspot(cfg) {
   const scene = cfg.el.sceneEl.object3D;
   const group = new THREE.Group();
   group.name = 'museo-hotspot-' + (cfg.capability || 'x');
   group.position.copy(cfg.position);
   scene.add(group);
+  const fixedFront = faceMuseoFront(group, cfg.faceDirection || cfg.front);
 
   const dotMat = new THREE.MeshBasicMaterial({
     color: MUSEO_HOTSPOT_COLOR, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide
@@ -476,7 +487,7 @@ function createMuseoHotspot(cfg) {
       const eased = visibleAmount * visibleAmount * (3 - 2 * visibleAmount);
       group.visible = eased > 0.01;
       if (!group.visible) return;
-      if (camera) group.lookAt(camera);
+      if (!fixedFront && camera) group.lookAt(camera);
 
       api.pressT = Math.max(0, api.pressT - dt * 5.0);      // microrespuesta ~200 ms
       // late solo mientras la capacidad siga sin descubrirse
@@ -2103,10 +2114,8 @@ AFRAME.registerComponent('exhibit-info', {
     // pared curva -- calcular "hacia el centro de la sala" por separado para
     // cada una (como se hacia antes) da un angulo distinto por pieza y las
     // placas terminan mirando "de lado" unas respecto a otras. Con una unica
-    // direccion compartida, las 6 quedan paralelas entre si, como una fila
-    // coherente vista desde el paso del visitante. Las 2 piezas grandes no
-    // forman fila: cada una calcula su propio frente hacia MUSEO_SPAWN (ver
-    // createPedestalPlacard).
+    // direccion compartida, las placas de la sala quedan paralelas entre si,
+    // como un sistema coherente visto desde el paso del visitante.
     this._placardRowDir = null;
     {
       const secondary = this.items.filter((i) => i.data.tier === 'secondary' && i.id.startsWith('bacteria'));
@@ -2522,10 +2531,13 @@ AFRAME.registerComponent('exhibit-info', {
       pz = nearest.center.z;   // el centroide de la bacteria que lleva encima
     }
 
-    // Direccion frontal: fila compartida para las 6 secundarias, calculo
-    // propio hacia MUSEO_SPAWN para las 2 grandes (ver comentario arriba).
+    // Direccion frontal: fila compartida para la sala cuando se ha podido
+    // calcular. Asi las placas principales leen como un sistema unico, no
+    // cada una apuntando hacia un punto distinto. Si por algun motivo no
+    // existe esa fila compartida, se conserva la red de seguridad hacia el
+    // punto de entrada del visitante.
     let dirX = 0, dirZ = 1;
-    if (it.data.tier === 'secondary' && this._placardRowDir) {
+    if (this._placardRowDir) {
       dirX = this._placardRowDir.x;
       dirZ = this._placardRowDir.z;
     } else {
@@ -3391,6 +3403,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
       capability: 'electro',
       verb: ((window.getMuseumCapabilityText && window.getMuseumCapabilityText().verbs) || {}).electro || 'ACTIVATE ELECTRODE',
       position: museoHotspotSpot(bellBox, center, front),
+      faceDirection: front,
       onActivate: () => this.start()
     });
 
@@ -3630,6 +3643,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     const y = Math.min(topPlate + 0.048, bellTop - 0.030);
     group.position.set(base.x + this.side.x * 0.022, y, base.z + this.side.z * 0.022);
     sceneObj.add(group);
+    faceMuseoFront(group, this.front);
 
     const tex = this.buildLabelTexture();
     const mat = new THREE.MeshBasicMaterial({
@@ -3814,7 +3828,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     if (!running) this.awarded = false;
 
     const cam = this.el.sceneEl.camera ? this.el.sceneEl.camera.getWorldPosition(this.tmp) : null;
-    if (this.label && cam) this.label.group.lookAt(cam);
+    if (this.label && cam && !this.label.group.userData.museoFixedFront) this.label.group.lookAt(cam);
     if (cam) this.electrons.forEach((e) => { if (e.tag && e.active) e.tag.lookAt(cam); });
     if (this.hotspot) {
       this.hotspot.tick(dt, cam, this.displayT,
@@ -5269,6 +5283,7 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
       capability: 'co',
       verb: ((window.getMuseumCapabilityText && window.getMuseumCapabilityText().verbs) || {}).co || 'START REACTION',
       position: museoHotspotSpot(bell, center, front),
+      faceDirection: front,
       onActivate: () => this.start()
     });
 
@@ -5429,6 +5444,7 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     group.position.copy(this.coStart).addScaledVector(this.left, 0.048);
     group.position.y = Math.min(this.bellTop - 0.030, this.center.y + 0.115);
     this.el.sceneEl.object3D.add(group);
+    faceMuseoFront(group, this.front);
     const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
     group.add(new THREE.Mesh(new THREE.PlaneGeometry(0.170, 0.046), mat));
     this.label = { group, mat };
@@ -5596,7 +5612,7 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     const cam = this.el.sceneEl.camera;
     const cw = cam ? cam.getWorldPosition(this.tmp) : null;
     if (cw) {
-      if (this.label) this.label.group.lookAt(cw);
+      if (this.label && !this.label.group.userData.museoFixedFront) this.label.group.lookAt(cw);
       this.co.forEach((x) => { if (x.active) x.tag.lookAt(cw); });
       this.h2.forEach((x) => { if (x.tag && x.active) x.tag.lookAt(cw); });
     }
@@ -5752,6 +5768,7 @@ AFRAME.registerComponent('pha-exhibit', {
       capability: 'pha',
       verb: ((window.getMuseumCapabilityText && window.getMuseumCapabilityText().verbs) || {}).pha || 'SHOW ACCUMULATION',
       position: museoHotspotSpot(bell, center, front),
+      faceDirection: front,
       onActivate: () => this.start()
     });
 
@@ -5888,6 +5905,7 @@ AFRAME.registerComponent('pha-exhibit', {
     group.name = 'rubrum-microetiqueta-pha';
     group.position.set(this.center.x, this.bellTop + 0.075, this.center.z);
     this.el.sceneEl.object3D.add(group);
+    faceMuseoFront(group, this.front);
     const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
     group.add(new THREE.Mesh(new THREE.PlaneGeometry(0.205, 0.061), mat));
     this.label = { group, mat };
@@ -5912,6 +5930,7 @@ AFRAME.registerComponent('pha-exhibit', {
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.048, 0.024), mat);
     plane.position.copy(this.granules[0].mesh.position).addScaledVector(this.front, 0.075).add(new THREE.Vector3(0, 0.045, 0));
     scene.add(plane);
+    faceMuseoFront(plane, this.front);
     const lineMat = new THREE.LineBasicMaterial({ color: 0xd9b6f2, transparent: true, opacity: 0, depthWrite: false });
     const lineGeo = new THREE.BufferGeometry().setFromPoints([
       plane.position.clone().add(new THREE.Vector3(0, -0.010, 0)),
@@ -6024,7 +6043,7 @@ AFRAME.registerComponent('pha-exhibit', {
     this.phaCallout.line.visible = t > 0.02;
     this.phaCallout.mat.opacity = t * 0.92;
     this.phaCallout.lineMat.opacity = t * 0.70;
-    if (cam && t > 0.02) this.phaCallout.plane.lookAt(cam);
+    if (cam && t > 0.02 && !this.phaCallout.plane.userData.museoFixedFront) this.phaCallout.plane.lookAt(cam);
   },
 
   tick(time, delta) {
@@ -6065,7 +6084,7 @@ AFRAME.registerComponent('pha-exhibit', {
 
     const cam = this.el.sceneEl.camera;
     const cw = cam ? cam.getWorldPosition(this.tmp) : null;
-    if (cw && this.label) this.label.group.lookAt(cw);
+    if (cw && this.label && !this.label.group.userData.museoFixedFront) this.label.group.lookAt(cw);
     this.updatePhaCallout(done, cw);
     if (cw) this.carbon.forEach((c) => { if (c.tag && c.active) c.tag.lookAt(cw); });
     if (this.hotspot) {
@@ -6224,6 +6243,7 @@ AFRAME.registerComponent('hydrogen-exhibit', {
       capability: 'hydrogen',
       verb: ((window.getMuseumCapabilityText && window.getMuseumCapabilityText().verbs) || {}).hydrogen || 'PRODUCE H₂',
       position: museoHotspotSpot(bell, center, front),
+      faceDirection: front,
       onActivate: () => this.start()
     });
 
@@ -6407,6 +6427,7 @@ AFRAME.registerComponent('hydrogen-exhibit', {
     group.position.copy(this.indicatorBase).addScaledVector(this.side, 0.052);
     group.position.y = Math.min(this.bellTop - 0.030, this.center.y + 0.115);
     this.el.sceneEl.object3D.add(group);
+    faceMuseoFront(group, this.front);
     const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
     group.add(new THREE.Mesh(new THREE.PlaneGeometry(0.205, 0.052), mat));
     this.label = { group, mat };
@@ -6561,7 +6582,7 @@ AFRAME.registerComponent('hydrogen-exhibit', {
     const cam = this.el.sceneEl.camera;
     const cw = cam ? cam.getWorldPosition(this.tmp) : null;
     if (cw) {
-      if (this.label) this.label.group.lookAt(cw);
+      if (this.label && !this.label.group.userData.museoFixedFront) this.label.group.lookAt(cw);
       this.bubbles.forEach((b) => { if (b.tag && b.active) b.tag.lookAt(cw); });
     }
     if (this.hotspot) {
@@ -6708,6 +6729,7 @@ AFRAME.registerComponent('nitrogen-exhibit', {
       capability: 'nitrogen',
       verb: ((window.getMuseumCapabilityText && window.getMuseumCapabilityText().verbs) || {}).nitrogen || 'OBSERVE N₂',
       position: museoHotspotSpot(bell, center, front),
+      faceDirection: front,
       onActivate: () => this.start()
     });
 
@@ -6827,6 +6849,7 @@ AFRAME.registerComponent('nitrogen-exhibit', {
       .addScaledVector(this.side, 0.050);
     group.position.y = Math.min(this.bellTop - 0.030, this.center.y + 0.118);
     this.el.sceneEl.object3D.add(group);
+    faceMuseoFront(group, this.front);
     const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
     group.add(new THREE.Mesh(new THREE.PlaneGeometry(0.190, 0.048), mat));
     this.label = { group, mat };
@@ -6954,7 +6977,7 @@ AFRAME.registerComponent('nitrogen-exhibit', {
 
     const cam = this.el.sceneEl.camera;
     const cw = cam ? cam.getWorldPosition(this.tmp) : null;
-    if (cw && this.label) this.label.group.lookAt(cw);
+    if (cw && this.label && !this.label.group.userData.museoFixedFront) this.label.group.lookAt(cw);
     if (cw) this.mol.forEach((m) => { if (m.tag && m.tag.visible) m.tag.lookAt(cw); });
     if (this.hotspot) {
       this.hotspot.tick(dt, cw, this.displayT,
