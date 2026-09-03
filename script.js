@@ -143,7 +143,10 @@ window.MUSEO_MOVE_VECTOR = { x: 0, z: 0 };
    palustris) basta con poner su id en MUSEO_CAP_ORDER y sus textos en
    museum-i18n.js: ni el HUD ni el contador necesitan tocarse.
    ========================================================================== */
+const MUSEUM_GAME_VERSION = '2';
 const MUSEO_CAP_KEY = 'museum-capabilities';
+const MUSEO_CAP_VERSION_KEY = 'museum-game-version';
+const MUSEO_CAP_FINAL_KEY = 'museum-capabilities-final-version';
 // Orden del recorrido real: fichas 01, 04, 06, 07, 08 y, ya en la Sala 2,
 // el reactor. Añadir una capacidad es añadir su id aqui y sus textos en
 // museum-i18n.js.
@@ -151,6 +154,15 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
 
 (function museumCapabilities() {
   const known = (id) => MUSEO_CAP_ORDER.indexOf(id) !== -1;
+
+  try {
+    const savedVersion = window.localStorage.getItem(MUSEO_CAP_VERSION_KEY);
+    if (savedVersion !== MUSEUM_GAME_VERSION) {
+      window.localStorage.removeItem(MUSEO_CAP_KEY);
+      window.localStorage.removeItem(MUSEO_CAP_FINAL_KEY);
+      window.localStorage.setItem(MUSEO_CAP_VERSION_KEY, MUSEUM_GAME_VERSION);
+    }
+  } catch (e) {}
 
   let unlocked = [];
   try {
@@ -160,7 +172,7 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
 
   const copy = () => (window.getMuseumCapabilityText ? window.getMuseumCapabilityText() : {});
 
-  let hud = null, toast = null, counter = null, toastTimer = 0;
+  let hud = null, toast = null, finalCard = null, counter = null, toastTimer = 0, finalTimer = 0;
   const chips = {};
 
   function buildHud() {
@@ -230,6 +242,17 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
     toast.appendChild(name);
     document.body.appendChild(toast);
 
+    finalCard = document.createElement('div');
+    finalCard.id = 'capability-final';
+    finalCard.setAttribute('role', 'status');
+    finalCard.setAttribute('aria-live', 'polite');
+    ['count', 'title', 'lead', 'body'].forEach((part) => {
+      const span = document.createElement('span');
+      span.className = 'cap-final-' + part;
+      finalCard.appendChild(span);
+    });
+    document.body.appendChild(finalCard);
+
     render();
   }
 
@@ -260,6 +283,32 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
     toastTimer = window.setTimeout(() => toast.classList.remove('visible'), 4200);
   }
 
+  function showFinalCard() {
+    if (!finalCard) return;
+    const c = copy();
+    const f = c.final || {};
+    finalCard.querySelector('.cap-final-count').textContent = f.count || (MUSEO_CAP_ORDER.length + ' / ' + MUSEO_CAP_ORDER.length);
+    finalCard.querySelector('.cap-final-title').textContent = f.title || 'CAPABILITIES DISCOVERED';
+    finalCard.querySelector('.cap-final-lead').textContent = f.lead || 'YOU HAVE DISCOVERED THEIR FULL POTENTIAL';
+    finalCard.querySelector('.cap-final-body').textContent = f.body || 'Continue exploring the museum.';
+    finalCard.classList.add('visible');
+    if (hud) hud.classList.add('final-pulse');
+    window.clearTimeout(finalTimer);
+    finalTimer = window.setTimeout(() => {
+      finalCard.classList.remove('visible');
+      if (hud) hud.classList.remove('final-pulse');
+    }, 5600);
+  }
+
+  function maybeShowFinalCard(previousCount) {
+    if (previousCount !== MUSEO_CAP_ORDER.length - 1 || unlocked.length !== MUSEO_CAP_ORDER.length) return;
+    try {
+      if (window.localStorage.getItem(MUSEO_CAP_FINAL_KEY) === MUSEUM_GAME_VERSION) return;
+      window.localStorage.setItem(MUSEO_CAP_FINAL_KEY, MUSEUM_GAME_VERSION);
+    } catch (e) {}
+    window.setTimeout(showFinalCard, 4450);
+  }
+
   window.hasCapability = function hasCapability(id) {
     return unlocked.indexOf(id) !== -1;
   };
@@ -272,11 +321,13 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
   window.unlockCapability = function unlockCapability(id) {
     if (!known(id)) { console.warn('[capacidades] id no registrado:', id); return false; }
     if (window.hasCapability(id)) return false;
+    const previousCount = unlocked.length;
     unlocked.push(id);
     try { window.localStorage.setItem(MUSEO_CAP_KEY, JSON.stringify(unlocked)); } catch (e) {}
     buildHud();
     render();
     showToast(id);
+    maybeShowFinalCard(previousCount);
     console.log('[capacidades] descubierta ' + id + ' (' + unlocked.length + '/' + MUSEO_CAP_ORDER.length + ')');
     return true;
   };
@@ -284,10 +335,15 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
   // utilidad de prueba: vacia lo descubierto para poder repetir el recorrido
   window.resetCapabilities = function resetCapabilities() {
     unlocked = [];
-    try { window.localStorage.removeItem(MUSEO_CAP_KEY); } catch (e) {}
+    try {
+      window.localStorage.removeItem(MUSEO_CAP_KEY);
+      window.localStorage.removeItem(MUSEO_CAP_FINAL_KEY);
+    } catch (e) {}
     render();
     return true;
   };
+
+  window.MUSEUM_GAME_VERSION = MUSEUM_GAME_VERSION;
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', buildHud);
   else buildHud();
@@ -342,14 +398,34 @@ function createMuseoHotspot(cfg) {
   probe.font = FONT;
   const c = document.createElement('canvas');
   c.height = 84;
-  c.width = Math.max(64, Math.ceil(probe.measureText(text).width) + 26);
+  c.width = Math.max(64, Math.ceil(probe.measureText(text).width) + 30);
   const ctx = c.getContext('2d');
   ctx.clearRect(0, 0, c.width, c.height);
+  /*
+    Placa oscura muy tenue detras del verbo: probado sobre Rhodovulum, el
+    texto cruzaba la tapa negra de la vitrina y seguia sobre la piedra clara
+    de la peana, y en ese tramo se perdia. Con el fondo se lee igual encima de
+    cualquier superficie del museo.
+  */
+  const R = c.height * 0.34;
+  ctx.beginPath();
+  ctx.moveTo(R, 6);
+  ctx.lineTo(c.width - R, 6);
+  ctx.quadraticCurveTo(c.width - 2, 6, c.width - 2, 6 + R);
+  ctx.lineTo(c.width - 2, c.height - 6 - R);
+  ctx.quadraticCurveTo(c.width - 2, c.height - 6, c.width - R, c.height - 6);
+  ctx.lineTo(R, c.height - 6);
+  ctx.quadraticCurveTo(2, c.height - 6, 2, c.height - 6 - R);
+  ctx.lineTo(2, 6 + R);
+  ctx.quadraticCurveTo(2, 6, R, 6);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(8, 14, 16, 0.62)';
+  ctx.fill();
   ctx.font = FONT;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#BFF6F1';
-  ctx.fillText(text, 12, c.height / 2 + 2);
+  ctx.fillText(text, 14, c.height / 2 + 2);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   const LABEL_H = 0.021;
@@ -2179,7 +2255,8 @@ AFRAME.registerComponent('exhibit-info', {
     // (Sala 1: PLACARD_HEIGHT=0.26, cuerda de arco ~0.28) -- antes esta
     // placa era mas ancha y mucho mas baja (0.30x0.165), lo que la hacia
     // sentir mas grande/torpe y desproporcionada frente al sistema morado.
-    const WIDTH = 0.28, HEIGHT = 0.26;
+    const HEIGHT = 0.26;
+    const WIDTH = it.id === 'window04' ? 0.392 : 0.28;
 
     // Soporte de pared -> soporte de poste independiente del muro. Alinear
     // una placa exactamente al ras de un muro curvo, sin poder verificarlo
@@ -2341,7 +2418,7 @@ AFRAME.registerComponent('exhibit-info', {
     // especie como texto principal, cita mas pequeña y discreta. Margenes
     // generosos arriba/abajo y a los lados -- nada pegado al borde.
     const numberSizePx = heightM * 0.105 * pxPerM;
-    const titleSizePx = heightM * 0.125 * pxPerM;
+    let titleSizePx = heightM * 0.125 * pxPerM;
     const cueSizePx = heightM * 0.070 * pxPerM;
     const gap1Px = heightM * 0.050 * pxPerM;     // numero -> titulo
     const gap2Px = heightM * 0.055 * pxPerM;     // titulo -> cita
@@ -2353,7 +2430,13 @@ AFRAME.registerComponent('exhibit-info', {
     ctx.textBaseline = 'alphabetic';
 
     ctx.font = `600 ${titleSizePx}px Helvetica, Arial, sans-serif`;
-    const lines = title ? this.wrapCanvasText(ctx, title, maxTextWidth) : [];
+    let lines = title ? this.wrapCanvasText(ctx, title, maxTextWidth) : [];
+    while (lines.some((line) => ctx.measureText(line).width > maxTextWidth) &&
+           titleSizePx > heightM * 0.078 * pxPerM) {
+      titleSizePx -= 2;
+      ctx.font = `600 ${titleSizePx}px Helvetica, Arial, sans-serif`;
+      lines = this.wrapCanvasText(ctx, title, maxTextWidth);
+    }
     const titleBlockH = lines.length * titleSizePx * lineSpacing;
 
     // bloque completo centrado verticalmente: un titulo de una sola linea
@@ -2797,7 +2880,7 @@ AFRAME.registerComponent('space-mission-descent', {
     // de la bacteria. La altura visible queda por encima de la cabeza.
     this.basePosition.set(
       anchorPosition.x + towardVisitor.x * 0.82,
-      spawn.y + 2.72,
+      spawn.y + 2.22,
       anchorPosition.z + towardVisitor.z * 0.82
     );
     this.visibleY = this.basePosition.y;
@@ -3427,6 +3510,21 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     return tex;
   },
 
+  buildElectronLabelTexture() {
+    const c = document.createElement('canvas');
+    c.width = 128; c.height = 72;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#BFFCF7';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '900 48px Arial, Helvetica, sans-serif';
+    ctx.fillText('e⁻', c.width / 2, c.height / 2 + 2);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  },
+
   /* --------------------------------------------------------------------
      TRAYECTORIA. Nace en la superficie de la placa, muere en la bacteria.
      -------------------------------------------------------------------- */
@@ -3481,6 +3579,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     // MUCHO mas pequenos que antes (0.013 -> 0.0038): puntos de energia, no bolas.
     const geo = new THREE.SphereGeometry(0.0045, 10, 8);
     const trailGeo = new THREE.SphereGeometry(0.0026, 8, 6);
+    const tagTex = this.buildElectronLabelTexture();
     this.electronGeo = geo;
     this.trailGeo = trailGeo;
     for (let i = 0; i < this.data.maxElectrons; i++) {
@@ -3501,7 +3600,17 @@ AFRAME.registerComponent('electroactivity-exhibit', {
         sceneObj.add(t);
         return { mesh: t, mat: tm };
       });
-      this.electrons.push({ mesh, mat, trails, active: false, t: 0, speed: 0.55, curve: i % 3 });
+      let tag = null, tagMat = null;
+      if (i % 3 === 0) {
+        tagMat = new THREE.MeshBasicMaterial({
+          map: tagTex, transparent: true, opacity: 0,
+          depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending
+        });
+        tag = new THREE.Mesh(new THREE.PlaneGeometry(0.020, 0.011), tagMat);
+        tag.visible = false;
+        sceneObj.add(tag);
+      }
+      this.electrons.push({ mesh, mat, trails, tag, tagMat, active: false, t: 0, speed: 0.55, curve: i % 3 });
     }
   },
 
@@ -3600,11 +3709,12 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     const g = this.electrode;
     g.group.visible = eased > 0.005;
     // apagado: el electrodo sigue ahi pero casi no se ve (no desaparece de golpe)
+    const press = (this.seq >= 0 && this.seq < 0.45) ? 1 - (this.seq / 0.45) : 0;
     const solid = 0.22 + 0.72 * eased;
     g.graphite.opacity = solid;
     g.stemMat.opacity = solid;
-    g.turquoise.opacity = (0.10 + 0.62 * eased) * (1 + boost * 0.25);
-    g.graphite.emissiveIntensity = (0.02 + 0.10 * eased) * (1 + boost * 0.6);
+    g.turquoise.opacity = (0.10 + 0.62 * eased) * (1 + boost * 0.25 + press * 0.55);
+    g.graphite.emissiveIntensity = (0.02 + 0.10 * eased) * (1 + boost * 0.6 + press * 0.9);
     g.faceMat.opacity = 0.05 + 0.90 * eased;
     if (this.guide) {
       this.guide.group.visible = eased > 0.01;
@@ -3637,6 +3747,11 @@ AFRAME.registerComponent('electroactivity-exhibit', {
       const fadeOut = THREE.MathUtils.clamp((1 - e.t) / 0.14, 0, 1);
       const a = 0.95 * this.displayT * fadeIn * fadeOut;
       e.mat.opacity = a;
+      if (e.tag) {
+        e.tag.visible = true;
+        e.tag.position.copy(e.mesh.position).add(new THREE.Vector3(0, 0.013, 0));
+        e.tagMat.opacity = a * 0.95;
+      }
       e.trails.forEach((tr, i) => {
         const bt = Math.max(0, tt - 0.05 * (i + 1));
         tr.mesh.visible = true;
@@ -3646,6 +3761,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
       if (e.t >= 1) {
         e.active = false;
         e.mesh.visible = false;
+        if (e.tag) { e.tag.visible = false; e.tagMat.opacity = 0; }
         e.trails.forEach((tr) => { tr.mesh.visible = false; });
         this.pulseT = 1;   // llegada -> destello minimo de la bacteria
       }
@@ -3699,6 +3815,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
 
     const cam = this.el.sceneEl.camera ? this.el.sceneEl.camera.getWorldPosition(this.tmp) : null;
     if (this.label && cam) this.label.group.lookAt(cam);
+    if (cam) this.electrons.forEach((e) => { if (e.tag && e.active) e.tag.lookAt(cam); });
     if (this.hotspot) {
       this.hotspot.tick(dt, cam, this.displayT,
         !!(window.hasCapability && window.hasCapability('electro')), running);
@@ -3712,6 +3829,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
       .forEach((g) => { if (g && g.parent) g.parent.remove(g); });
     this.electrons.forEach((e) => {
       if (e.mesh && e.mesh.parent) e.mesh.parent.remove(e.mesh);
+      if (e.tag && e.tag.parent) e.tag.parent.remove(e.tag);
       e.trails.forEach((tr) => { if (tr.mesh.parent) tr.mesh.parent.remove(tr.mesh); });
     });
     if (this.electronGeo) this.electronGeo.dispose();
@@ -5200,6 +5318,21 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     return tex;
   },
 
+  buildH2LabelTexture() {
+    const c = document.createElement('canvas');
+    c.width = 160; c.height = 96;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#eafcff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '900 60px Arial, Helvetica, sans-serif';
+    ctx.fillText('H₂', c.width / 2, c.height / 2 + 3);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  },
+
   /*
     CO: moleculas etiquetadas, calidas, que avanzan en horizontal hacia la
     bacteria y se apagan al entrar. Nunca suben.
@@ -5223,20 +5356,28 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
   },
 
   /*
-    H2: burbujas mas pequeñas, frias, sin etiqueta, que nacen en el extremo
+    H2: burbujas mas pequeñas, frias, con alguna etiqueta, que nacen en el extremo
     opuesto de la bacteria, suben un poco y se desvanecen. Comportamiento
     deliberadamente distinto del CO para que no puedan leerse como lo mismo.
   */
   buildH2() {
     const scene = this.el.sceneEl.object3D;
     const geo = new THREE.SphereGeometry(0.005, 10, 8);
+    const tagTex = this.buildH2LabelTexture();
     this.h2Geo = geo;
     for (let i = 0; i < 8; i++) {
       const mat = new THREE.MeshBasicMaterial({ color: 0xd6f6ff, transparent: true, opacity: 0, depthWrite: false });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.visible = false;
       scene.add(mesh);
-      this.h2.push({ mesh, mat, active: false, t: 0, speed: 0.5, sway: 0, dx: 0, dz: 0 });
+      let tag = null, tagMat = null;
+      if (i % 3 === 0) {
+        tagMat = new THREE.MeshBasicMaterial({ map: tagTex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+        tag = new THREE.Mesh(new THREE.PlaneGeometry(0.027, 0.015), tagMat);
+        tag.visible = false;
+        scene.add(tag);
+      }
+      this.h2.push({ mesh, mat, tag, tagMat, active: false, t: 0, speed: 0.5, sway: 0, dx: 0, dz: 0 });
     }
   },
 
@@ -5284,8 +5425,8 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
 
   now() { return (window.performance && performance.now) ? performance.now() : Date.now(); },
 
-  // "en marcha" = los 3.6 s en que entra CO
-  isRunning() { return this.seq >= 0 && this.seq < 3.6; },
+  // "en marcha" = la fase breve en que entran 2-3 moleculas CO
+  isRunning() { return this.seq >= 0 && this.seq < 2.35; },
 
   /*
     La experiencia la lanza UNICAMENTE el hotspot turquesa. La bacteria y la
@@ -5296,6 +5437,7 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     if (this.seq >= 0) return;
     this.seq = 0;
     this.active = true;
+    this.nextCO = 0.72;
     this.spawnCO(true);
   },
 
@@ -5305,7 +5447,7 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     if (!p) return;
     p.active = true;
     p.t = 0;
-    p.speed = 1 / THREE.MathUtils.randFloat(2.6, 3.6);
+    p.speed = 1 / THREE.MathUtils.randFloat(1.35, 1.85);
     p.mesh.visible = true;
     p.mat.opacity = 0;
   },
@@ -5336,11 +5478,11 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     }
   },
 
-  updateCO(dt, time) {
+  updateCO(dt) {
     const boosting = this.isRunning();
-    if (this.active && time >= this.nextCO) {
+    if (this.active && this.seq >= this.nextCO) {
       this.spawnCO(false);
-      this.nextCO = time + (boosting ? THREE.MathUtils.randFloat(280, 380) : THREE.MathUtils.randFloat(950, 1350));
+      this.nextCO = this.seq + (boosting ? THREE.MathUtils.randFloat(0.72, 0.92) : THREE.MathUtils.randFloat(1.0, 1.3));
     }
     this.co.forEach((p) => {
       if (!p.active) return;
@@ -5356,7 +5498,7 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
         p.active = false;
         p.mesh.visible = false;
         this.pulseT = 1;                                   // pulso minimo de la bacteria
-        this.pendingH2.push(this.now() + 250);             // el H2 sale un instante despues
+        this.pendingH2.push(this.now() + 360);             // pausa breve: CO entra, despues sale H2
       }
     });
   },
@@ -5381,7 +5523,13 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
       p.mesh.scale.setScalar(1 + p.t * 0.45);              // la burbuja crece al subir
       const fadeIn = Math.min(1, p.t / 0.14);
       const fadeOut = Math.min(1, (1 - p.t) / 0.34);
-      p.mat.opacity = 0.9 * this.displayT * Math.min(fadeIn, fadeOut);
+      const a = 0.9 * this.displayT * Math.min(fadeIn, fadeOut);
+      p.mat.opacity = a;
+      if (p.tag) {
+        p.tag.visible = true;
+        p.tag.position.set(p.mesh.position.x + 0.013, p.mesh.position.y + 0.012, p.mesh.position.z);
+        p.tagMat.opacity = a * 0.95;
+      }
     });
   },
 
@@ -5424,7 +5572,7 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
 
     this.displayT += (((this.near || running) ? 1 : 0) - this.displayT) * 0.07;
     this.setVisibleAmount(this.displayT);
-    this.updateCO(dt, time);
+    this.updateCO(dt);
     this.updateH2(dt);
     this.updatePulse(dt);
 
@@ -5433,6 +5581,7 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     if (cw) {
       if (this.label) this.label.group.lookAt(cw);
       this.co.forEach((x) => { if (x.active) x.tag.lookAt(cw); });
+      this.h2.forEach((x) => { if (x.tag && x.active) x.tag.lookAt(cw); });
     }
     if (this.hotspot) {
       this.hotspot.tick(dt, cw, this.displayT,
@@ -5447,7 +5596,10 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     [this.guide && this.guide.group, this.label && this.label.group].forEach((g) => {
       if (g && g.parent) g.parent.remove(g);
     });
-    this.co.concat(this.h2).forEach((x) => { if (x.mesh && x.mesh.parent) x.mesh.parent.remove(x.mesh); });
+    this.co.concat(this.h2).forEach((x) => {
+      if (x.mesh && x.mesh.parent) x.mesh.parent.remove(x.mesh);
+      if (x.tag && x.tag.parent) x.tag.parent.remove(x.tag);
+    });
     if (this.coGeo) this.coGeo.dispose();
     if (this.h2Geo) this.h2Geo.dispose();
   }
@@ -5653,14 +5805,37 @@ AFRAME.registerComponent('pha-exhibit', {
   buildCarbon() {
     const scene = this.el.sceneEl.object3D;
     const geo = new THREE.SphereGeometry(0.0075, 10, 8);
+    const tagTex = this.buildCarbonLabelTexture();
     this.carbonGeo = geo;
     for (let i = 0; i < 14; i++) {
       const mat = new THREE.MeshBasicMaterial({ color: 0xefe0c4, transparent: true, opacity: 0, depthWrite: false });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.visible = false;
+      let tag = null, tagMat = null;
+      if (i % 4 === 0) {
+        tagMat = new THREE.MeshBasicMaterial({ map: tagTex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+        tag = new THREE.Mesh(new THREE.PlaneGeometry(0.022, 0.014), tagMat);
+        tag.visible = false;
+        scene.add(tag);
+      }
       scene.add(mesh);
-      this.carbon.push({ mesh, mat, active: false, t: 0, speed: 0.5, from: new THREE.Vector3(), to: new THREE.Vector3() });
+      this.carbon.push({ mesh, mat, tag, tagMat, active: false, t: 0, speed: 0.5, from: new THREE.Vector3(), to: new THREE.Vector3() });
     }
+  },
+
+  buildCarbonLabelTexture() {
+    const c = document.createElement('canvas');
+    c.width = 120; c.height = 72;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#fff0d4';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '900 50px Arial, Helvetica, sans-serif';
+    ctx.fillText('C', c.width / 2, c.height / 2 + 2);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
   },
 
   buildLabel() {
@@ -5699,6 +5874,35 @@ AFRAME.registerComponent('pha-exhibit', {
     const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
     group.add(new THREE.Mesh(new THREE.PlaneGeometry(0.205, 0.061), mat));
     this.label = { group, mat };
+    this.buildPhaCallout();
+  },
+
+  buildPhaCallout() {
+    if (!this.granules.length) return;
+    const scene = this.el.sceneEl.object3D;
+    const c = document.createElement('canvas');
+    c.width = 160; c.height = 80;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#F1D5FF';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '900 50px Arial, Helvetica, sans-serif';
+    ctx.fillText('PHA', c.width / 2, c.height / 2 + 2);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.048, 0.024), mat);
+    plane.position.copy(this.granules[0].mesh.position).addScaledVector(this.front, 0.075).add(new THREE.Vector3(0, 0.045, 0));
+    scene.add(plane);
+    const lineMat = new THREE.LineBasicMaterial({ color: 0xd9b6f2, transparent: true, opacity: 0, depthWrite: false });
+    const lineGeo = new THREE.BufferGeometry().setFromPoints([
+      plane.position.clone().add(new THREE.Vector3(0, -0.010, 0)),
+      this.granules[0].mesh.position.clone()
+    ]);
+    const line = new THREE.Line(lineGeo, lineMat);
+    scene.add(line);
+    this.phaCallout = { plane, mat, line, lineMat };
   },
 
   /*
@@ -5733,6 +5937,7 @@ AFRAME.registerComponent('pha-exhibit', {
     p.speed = 1 / THREE.MathUtils.randFloat(1.1, 1.7);
     p.mesh.visible = true;
     p.mat.opacity = 0;
+    if (p.tag) { p.tag.visible = true; p.tagMat.opacity = 0; }
   },
 
   updateCarbon(dt) {
@@ -5745,12 +5950,24 @@ AFRAME.registerComponent('pha-exhibit', {
     this.carbon.forEach((p) => {
       if (!p.active) return;
       p.t += p.speed * dt;
-      if (p.t >= 1) { p.active = false; p.mesh.visible = false; p.mat.opacity = 0; return; }
+      if (p.t >= 1) {
+        p.active = false;
+        p.mesh.visible = false;
+        p.mat.opacity = 0;
+        if (p.tag) { p.tag.visible = false; p.tagMat.opacity = 0; }
+        return;
+      }
       const e = p.t * p.t * (3 - 2 * p.t);
       p.mesh.position.lerpVectors(p.from, p.to, e);
       const fadeIn = Math.min(1, p.t / 0.16);
       const fadeOut = Math.min(1, (1 - p.t) / 0.22);
-      p.mat.opacity = 0.92 * Math.min(fadeIn, fadeOut);
+      const a = 0.92 * Math.min(fadeIn, fadeOut);
+      p.mat.opacity = a;
+      if (p.tag) {
+        p.tag.visible = true;
+        p.tag.position.copy(p.mesh.position).add(new THREE.Vector3(0, 0.018, 0));
+        p.tagMat.opacity = a * 0.9;
+      }
     });
   },
 
@@ -5761,7 +5978,7 @@ AFRAME.registerComponent('pha-exhibit', {
     el HUD conserva el descubrimiento.
   */
   updateGranules() {
-    const START = 1.0, STEP = 0.42, GROW = 0.55, HOLD = 7.4, FADE = 1.6;
+    const START = 2.05, STEP = 0.25, GROW = 0.42, HOLD = 8.0, FADE = 1.2;
     let done = 0;
     this.granules.forEach((g, i) => {
       const t0 = START + i * STEP;
@@ -5779,6 +5996,18 @@ AFRAME.registerComponent('pha-exhibit', {
       g.mat.opacity = 0.94 * eased;
     });
     return done;
+  },
+
+  updatePhaCallout(done, cam) {
+    if (!this.phaCallout) return;
+    const running = this.seq >= 0;
+    const show = running && done >= this.granules.length && this.seq < 7.2;
+    const t = show ? THREE.MathUtils.clamp((this.seq - 3.55) / 0.45, 0, 1) : 0;
+    this.phaCallout.plane.visible = t > 0.02;
+    this.phaCallout.line.visible = t > 0.02;
+    this.phaCallout.mat.opacity = t * 0.92;
+    this.phaCallout.lineMat.opacity = t * 0.70;
+    if (cam && t > 0.02) this.phaCallout.plane.lookAt(cam);
   },
 
   tick(time, delta) {
@@ -5820,6 +6049,8 @@ AFRAME.registerComponent('pha-exhibit', {
     const cam = this.el.sceneEl.camera;
     const cw = cam ? cam.getWorldPosition(this.tmp) : null;
     if (cw && this.label) this.label.group.lookAt(cw);
+    this.updatePhaCallout(done, cw);
+    if (cw) this.carbon.forEach((c) => { if (c.tag && c.active) c.tag.lookAt(cw); });
     if (this.hotspot) {
       this.hotspot.tick(dt, cw, this.displayT,
         !!(window.hasCapability && window.hasCapability(this.data.capability)), running);
@@ -5831,7 +6062,14 @@ AFRAME.registerComponent('pha-exhibit', {
     (this.mats || []).forEach(({ mat, base }) => { mat.emissiveIntensity = base; });
     this._wired.forEach((m) => { if (m.userData) delete m.userData.museoAction; });
     if (this.label && this.label.group && this.label.group.parent) this.label.group.parent.remove(this.label.group);
-    this.granules.concat(this.carbon).forEach((x) => { if (x.mesh && x.mesh.parent) x.mesh.parent.remove(x.mesh); });
+    if (this.phaCallout) {
+      if (this.phaCallout.plane.parent) this.phaCallout.plane.parent.remove(this.phaCallout.plane);
+      if (this.phaCallout.line.parent) this.phaCallout.line.parent.remove(this.phaCallout.line);
+    }
+    this.granules.concat(this.carbon).forEach((x) => {
+      if (x.mesh && x.mesh.parent) x.mesh.parent.remove(x.mesh);
+      if (x.tag && x.tag.parent) x.tag.parent.remove(x.tag);
+    });
     if (this.granuleGeo) this.granuleGeo.dispose();
     if (this.carbonGeo) this.carbonGeo.dispose();
   }
@@ -5874,7 +6112,9 @@ AFRAME.registerComponent('hydrogen-exhibit', {
     this.awarded = false;
     this.glow = 0;          // 0..1 del indicador
     this.pulseT = 0;
+    this.lightPulseDone = false;
     this.nextBubble = 0;
+    this.photons = [];
     this.bubbles = [];
     this._wired = [];
     this.tmp = new THREE.Vector3();
@@ -5954,9 +6194,12 @@ AFRAME.registerComponent('hydrogen-exhibit', {
     this.riseTo = Math.min(bellTop - 0.035, this.riseFrom + 0.145);
     this.spreadX = size.x * 0.30;
     this.spreadZ = size.z * 0.30;
+    this.lightFrom = center.clone().addScaledVector(front, -0.20).add(new THREE.Vector3(0, size.y * 0.40, 0));
+    this.lightTarget = center.clone().add(new THREE.Vector3(0, size.y * 0.08, 0));
 
     this.collectMaterials(anchor);
     this.buildIndicator();
+    this.buildPhotons();
     this.buildBubbles();
     this.buildLabel();
     this.hotspot = createMuseoHotspot({
@@ -6055,6 +6298,26 @@ AFRAME.registerComponent('hydrogen-exhibit', {
     this.indicator = { group, bodyMat, tagMat, stemMat, hit };
   },
 
+  buildPhotons() {
+    const scene = this.el.sceneEl.object3D;
+    const geo = new THREE.SphereGeometry(0.0048, 10, 8);
+    this.photonGeo = geo;
+    for (let i = 0; i < 5; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xfff2a8, transparent: true, opacity: 0,
+        depthWrite: false, blending: THREE.AdditiveBlending
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.visible = false;
+      scene.add(mesh);
+      this.photons.push({
+        mesh, mat,
+        delay: i * 0.12,
+        offset: new THREE.Vector3((i - 2) * 0.018, ((i % 2) - 0.5) * 0.018, (2 - i) * 0.006)
+      });
+    }
+  },
+
   buildBubbleTagTexture() {
     const c = document.createElement('canvas');
     c.width = 160; c.height = 96;
@@ -6140,8 +6403,9 @@ AFRAME.registerComponent('hydrogen-exhibit', {
 
   start() {
     this.seq = 0;
-    this.pulseT = 1;
-    this.nextBubble = 0.30;
+    this.pulseT = 0;
+    this.lightPulseDone = false;
+    this.nextBubble = 1.25;
   },
 
   spawnBubble() {
@@ -6194,6 +6458,22 @@ AFRAME.registerComponent('hydrogen-exhibit', {
     });
   },
 
+  updatePhotons() {
+    this.photons.forEach((p) => {
+      if (this.seq < 0) { p.mesh.visible = false; p.mat.opacity = 0; return; }
+      const t = (this.seq - p.delay) / 0.82;
+      if (t < 0 || t > 1.25) { p.mesh.visible = false; p.mat.opacity = 0; return; }
+      const e = THREE.MathUtils.clamp(t, 0, 1);
+      const smooth = e * e * (3 - 2 * e);
+      const from = this.lightFrom.clone().add(p.offset);
+      const to = this.lightTarget.clone().addScaledVector(this.front, p.offset.x * 0.30);
+      p.mesh.position.lerpVectors(from, to, smooth);
+      p.mesh.scale.setScalar(1 + smooth * 0.35);
+      p.mesh.visible = true;
+      p.mat.opacity = 0.88 * Math.min(THREE.MathUtils.clamp(t / 0.18, 0, 1), THREE.MathUtils.clamp((1.25 - t) / 0.25, 0, 1));
+    });
+  },
+
   updatePulse(dt) {
     if (this.pulseT > 0) this.pulseT = Math.max(0, this.pulseT - dt / 0.45);
     const p = Math.sin(this.pulseT * Math.PI);
@@ -6217,6 +6497,10 @@ AFRAME.registerComponent('hydrogen-exhibit', {
       if (this.seq > 7.8) this.seq = -1;      // vuelta al reposo
     }
     const running = this.seq >= 0;
+    if (running && !this.lightPulseDone && this.seq >= 0.86) {
+      this.lightPulseDone = true;
+      this.pulseT = 1;
+    }
 
     // Acercarse solo hace aparecer el indicador APAGADO y la etiqueta tenue.
     this.displayT += (((this.near || running) ? 1 : 0) - this.displayT) * 0.07;
@@ -6243,6 +6527,7 @@ AFRAME.registerComponent('hydrogen-exhibit', {
       this.label.mat.opacity = eased * (running ? 0.95 : 0.52);
     }
 
+    this.updatePhotons();
     this.updateBubbles(dt, (time || 0) / 1000);
     this.updatePulse(dt);
 
@@ -6279,7 +6564,9 @@ AFRAME.registerComponent('hydrogen-exhibit', {
       if (b.mesh && b.mesh.parent) b.mesh.parent.remove(b.mesh);
       if (b.tag && b.tag.parent) b.tag.parent.remove(b.tag);
     });
+    this.photons.forEach((p) => { if (p.mesh && p.mesh.parent) p.mesh.parent.remove(p.mesh); });
     if (this.bubbleGeo) this.bubbleGeo.dispose();
+    if (this.photonGeo) this.photonGeo.dispose();
   }
 });
 

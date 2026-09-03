@@ -203,6 +203,12 @@
         hydrogen: 'H₂ PRODUCED',
         biomass: 'SYSTEM 4 / 4'
       },
+      final: {
+        count: '6 / 6',
+        title: 'CAPABILITIES DISCOVERED',
+        lead: 'YOU HAVE DISCOVERED THEIR FULL POTENTIAL',
+        body: 'Continue exploring the museum to learn about the bacteria and their applications.'
+      },
       // verbo del hotspot de cada vitrina
       verbs: {
         pha: 'SHOW ACCUMULATION',
@@ -235,6 +241,12 @@
         co: 'CO → H₂',
         hydrogen: 'H₂ PRODUCIDO',
         biomass: 'SISTEMA 4 / 4'
+      },
+      final: {
+        count: '6 / 6',
+        title: 'CAPACIDADES DESCUBIERTAS',
+        lead: 'HAS DESCUBIERTO TODO SU POTENCIAL',
+        body: 'Continúa explorando el museo para conocer las bacterias y sus aplicaciones.'
       },
       verbs: {
         pha: 'MOSTRAR ACUMULACIÓN',

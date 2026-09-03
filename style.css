@@ -528,3 +528,65 @@ a-scene canvas { touch-action: none; }
   opacity: 0.55;
   padding-bottom: 2px;
 }
+
+#capability-final {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 435;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  width: min(430px, calc(100vw - 36px));
+  padding: 26px 30px 28px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(247, 244, 238, 0.98), rgba(239, 232, 241, 0.98));
+  border: 1px solid rgba(116, 52, 154, 0.24);
+  box-shadow: 0 18px 54px rgba(24, 12, 30, 0.26);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  color: var(--mus-tinta);
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -46%) scale(0.97);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+#capability-final.visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+#capability-final .cap-final-count {
+  font-size: 15px;
+  letter-spacing: 0.22em;
+  font-weight: 800;
+  color: var(--mus-morado);
+}
+#capability-final .cap-final-title {
+  font-size: 13px;
+  letter-spacing: 0.20em;
+  font-weight: 800;
+  color: #186f70;
+}
+#capability-final .cap-final-lead {
+  font-size: 21px;
+  line-height: 1.18;
+  font-weight: 800;
+  max-width: 340px;
+}
+#capability-final .cap-final-body {
+  font-size: 14px;
+  line-height: 1.45;
+  opacity: 0.76;
+  max-width: 360px;
+}
+#capability-hud.final-pulse {
+  border-color: rgba(79, 228, 220, 0.68);
+  box-shadow: 0 0 24px rgba(79, 228, 220, 0.18);
+}
+.is-mobile #capability-final {
+  top: 48%;
+  padding: 21px 20px 23px;
+}
+.is-mobile #capability-final .cap-final-lead { font-size: 17px; }
+.is-mobile #capability-final .cap-final-body { font-size: 12.5px; }
