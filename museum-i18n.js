@@ -65,7 +65,8 @@
     en: {
       title: 'CREDITS & SOURCES',
       mediaTitle: 'IMAGES & VIDEOS',
-      scienceTitle: 'SCIENTIFIC SOURCES',
+      scienceTitle: 'SCIENTIFIC CONTENT',
+      developmentTitle: 'MUSEUM DEVELOPMENT',
       media: [
         { year: '2017', names: ['Berber Stevens', 'Demi Ligtenberg', 'Marta Cerruti', 'David Weissbrodt', 'Heleen Ouboter'] },
         { year: '2019', names: ['Marta Cerruti', 'Guillaume Crosset-Perrotin', 'David Weissbrodt', 'Maria Paula Giulianetti de Almeida', 'Camille Mondini'] },
@@ -73,12 +74,16 @@
       ],
       science: [
         'Scientific references and DOI are not clearly available in the current museum content yet.'
+      ],
+      development: [
+        'Virtual museum design, integration and interactive implementation.'
       ]
     },
     es: {
       title: 'CRÉDITOS Y FUENTES',
       mediaTitle: 'IMÁGENES Y VÍDEOS',
-      scienceTitle: 'FUENTES CIENTÍFICAS',
+      scienceTitle: 'CONTENIDO CIENTÍFICO',
+      developmentTitle: 'DESARROLLO DEL MUSEO',
       media: [
         { year: '2017', names: ['Berber Stevens', 'Demi Ligtenberg', 'Marta Cerruti', 'David Weissbrodt', 'Heleen Ouboter'] },
         { year: '2019', names: ['Marta Cerruti', 'Guillaume Crosset-Perrotin', 'David Weissbrodt', 'Maria Paula Giulianetti de Almeida', 'Camille Mondini'] },
@@ -86,6 +91,9 @@
       ],
       science: [
         'Las referencias científicas y DOI no están todavía claramente disponibles en el contenido actual del museo.'
+      ],
+      development: [
+        'Diseño, integración digital e implementación interactiva del museo virtual.'
       ]
     }
   };

@@ -360,9 +360,11 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
       const title = panel.querySelector('#credits-title');
       const mediaTitle = panel.querySelector('#credits-media-title');
       const scienceTitle = panel.querySelector('#credits-science-title');
+      const developmentTitle = panel.querySelector('#credits-development-title');
       if (title) title.textContent = copy.title || '';
       if (mediaTitle) mediaTitle.textContent = copy.mediaTitle || '';
       if (scienceTitle) scienceTitle.textContent = copy.scienceTitle || '';
+      if (developmentTitle) developmentTitle.textContent = copy.developmentTitle || '';
 
       const media = panel.querySelector('#credits-media');
       if (media) {
@@ -388,6 +390,17 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
           p.className = 'credits-note';
           p.textContent = note;
           science.appendChild(p);
+        });
+      }
+
+      const development = panel.querySelector('#credits-development');
+      if (development) {
+        development.innerHTML = '';
+        (copy.development || []).forEach((note) => {
+          const p = document.createElement('span');
+          p.className = 'credits-note';
+          p.textContent = note;
+          development.appendChild(p);
         });
       }
     }
