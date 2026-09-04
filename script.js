@@ -51,6 +51,79 @@ const MUSEO_IS_MOBILE = (function () {
 // mientras se lee una ficha -- ambas clases deben vivir en el mismo
 // elemento para que el selector combinado .is-mobile.panel-open funcione.
 if (MUSEO_IS_MOBILE) document.body.classList.add('is-mobile');
+window.MUSEO_IS_MOBILE = MUSEO_IS_MOBILE;
+
+const MUSEO_MOBILE_PIXEL_RATIO = 1.25;
+const MUSEO_MOBILE_VIDEO_PLAY_DISTANCE = 1.6;
+const MUSEO_MOBILE_VIDEO_PAUSE_DISTANCE = 2.3;
+
+function museoRigWorldPosition(target) {
+  const rig = document.getElementById('rig');
+  if (!rig || !rig.object3D) return null;
+  return rig.object3D.getWorldPosition(target);
+}
+
+function museoDistanceXZ(a, b) {
+  if (!a || !b) return Infinity;
+  return Math.hypot(a.x - b.x, a.z - b.z);
+}
+
+function museoMobileSkipIdle(comp, running) {
+  if (!MUSEO_IS_MOBILE || running || comp.near) return false;
+  const display = comp.displayT || 0;
+  const label = comp.labelT || 0;
+  const glow = comp.glow || 0;
+  const pulse = comp.pulseT || 0;
+  return display < 0.015 && label < 0.015 && glow < 0.015 && pulse < 0.015;
+}
+
+function museoMobileCount(desktopCount, ratio, minimum) {
+  if (!MUSEO_IS_MOBILE) return desktopCount;
+  return Math.max(minimum || 1, Math.round(desktopCount * ratio));
+}
+
+(function setupMobileRuntimeProfile() {
+  if (!MUSEO_IS_MOBILE) return;
+  const scene = document.querySelector('a-scene');
+  if (!scene) return;
+  let applied = false;
+
+  const apply = () => {
+    if (!scene.renderer) {
+      window.setTimeout(apply, 120);
+      return;
+    }
+    const ratio = Math.min(window.devicePixelRatio || 1, MUSEO_MOBILE_PIXEL_RATIO);
+    scene.renderer.setPixelRatio(ratio);
+    if (scene.renderer.shadowMap) scene.renderer.shadowMap.enabled = false;
+    if (scene.object3D) {
+      scene.object3D.traverse((obj) => {
+        if (obj.isLight) obj.castShadow = false;
+        if (obj.isMesh) {
+          obj.castShadow = false;
+          obj.receiveShadow = false;
+          obj.frustumCulled = true;
+        }
+      });
+    }
+    window.MUSEO_MOBILE_RUNTIME_PROFILE = {
+      pixelRatio: ratio,
+      shadows: false
+    };
+    applied = true;
+  };
+
+  const reapply = () => {
+    applied = false;
+    apply();
+  };
+
+  scene.addEventListener('loaded', apply);
+  scene.addEventListener('renderstart', apply);
+  scene.addEventListener('museo-ready', apply);
+  window.addEventListener('resize', AFRAME.utils.throttle(reapply, 300, null));
+  window.setTimeout(() => { if (!applied) apply(); }, 600);
+})();
 
 /*
   Joystick tactil de movimiento (solo visible en moviles, ver CSS): un
@@ -1417,7 +1490,8 @@ AFRAME.registerComponent('gltf-animations', {
   tick(time, timeDelta) {
     if (!this.mixer || !timeDelta || document.hidden) return;
     this.accumulated += timeDelta;
-    const interval = 1000 / Math.max(1, this.data.fps);
+    const targetFps = MUSEO_IS_MOBILE ? Math.min(this.data.fps, 15) : this.data.fps;
+    const interval = 1000 / Math.max(1, targetFps);
     if (this.accumulated < interval) return;
     this.mixer.update(this.accumulated / 1000);
     this.accumulated = 0;
@@ -3513,7 +3587,8 @@ AFRAME.registerComponent('application-visuals', {
   drawHydrogen(ctx, phase) {
     this.pill(ctx, 78, 174, 190, 76, (this.cardStep('hydrogen', 0) || 'LIGHT / CULTURE'), 'rgba(255,242,168,0.15)', '#FFF2A8');
     this.arrow(ctx, 292, 212, 404, 212, '#FFF2A8');
-    for (let i = 0; i < 6; i++) {
+    const bubbles = museoMobileCount(6, 0.67, 4);
+    for (let i = 0; i < bubbles; i++) {
       const t = (phase * 0.22 + i * 0.17) % 1;
       const x = 460 + i * 26 + Math.sin(phase + i) * 8;
       const y = 286 - t * 120;
@@ -3553,7 +3628,8 @@ AFRAME.registerComponent('application-visuals', {
     ctx.moveTo(520, 228);
     ctx.bezierCurveTo(410, 290, 310, 290, 224, 228);
     ctx.stroke();
-    for (let i = 0; i < 5; i++) {
+    const electrons = museoMobileCount(5, 0.60, 3);
+    for (let i = 0; i < electrons; i++) {
       const t = (phase * 0.30 + i * 0.20) % 1;
       const x = 224 + (520 - 224) * t;
       const y = 212 + Math.sin(t * Math.PI * 2) * 48;
@@ -3649,10 +3725,24 @@ AFRAME.registerComponent('application-visuals', {
     this.roomSigns.push(plane);
   },
 
+  visitorNearCards(distance) {
+    if (!MUSEO_IS_MOBILE) return true;
+    const rigPos = museoRigWorldPosition(this.tmp);
+    if (!rigPos) return true;
+    return this.cards.some((card) => museoDistanceXZ(rigPos, card.plane.position) < distance);
+  },
+
   tick(time) {
-    if (!this.cards.length || time < this.nextDraw) return;
-    this.nextDraw = time + 90;
-    const seconds = (time || 0) / 1000;
+    if (!this.cards.length) return;
+    const unlockedChanged = this.cards.some((card) => {
+      const unlocked = !!(card.def.cap && window.hasCapability && window.hasCapability(card.def.cap));
+      return unlocked !== card.lastUnlocked;
+    });
+    const near = this.visitorNearCards(4.8);
+    if (MUSEO_IS_MOBILE && !near && !unlockedChanged) return;
+    if (!unlockedChanged && time < this.nextDraw) return;
+    this.nextDraw = time + (MUSEO_IS_MOBILE ? (near ? 160 : 1100) : 90);
+    const seconds = near ? (time || 0) / 1000 : 0;
     this.cards.forEach((card) => this.drawApplicationCard(card, seconds));
   },
 
@@ -4052,7 +4142,8 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     const tagTex = this.buildElectronLabelTexture();
     this.electronGeo = geo;
     this.trailGeo = trailGeo;
-    for (let i = 0; i < this.data.maxElectrons; i++) {
+    const electronCount = museoMobileCount(this.data.maxElectrons, 0.70, 4);
+    for (let i = 0; i < electronCount; i++) {
       const mat = new THREE.MeshBasicMaterial({
         color: 0x6ffcf2, transparent: true, opacity: 0,
         depthWrite: false, blending: THREE.AdditiveBlending
@@ -4266,6 +4357,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     }
     const running = this.seq >= 0;
     this.active = this.isBoosting();          // solo circulan durante la experiencia
+    if (museoMobileSkipIdle(this, running)) return;
 
     this.displayT += (((this.near || running) ? 1 : 0) - this.displayT) * 0.075;
     this.setVisibleAmount(this.displayT);
@@ -4336,6 +4428,7 @@ AFRAME.registerComponent('reactor-control', {
     this.doses = [];          // dosis de nutrientes en curso (ver injectDose)
     this.needsRedraw = false;
     this.nextLangCheck = 0;
+    this.mobileTmp = new THREE.Vector3();
     this.el.addEventListener('museo-modules-loaded', () => this.onLoaded());
   },
 
@@ -4536,8 +4629,9 @@ AFRAME.registerComponent('reactor-control', {
     // los trazos se lean de verdad a distancia de visita.
     const color = new THREE.Color(0x8df7ef);
     const RINGS = 4, PER = 5;
+    const perRing = museoMobileCount(PER, 0.75, 3);
     for (let r = 0; r < RINGS; r++) {
-      for (let i = 0; i < PER; i++) {
+      for (let i = 0; i < perRing; i++) {
         const mat = new THREE.MeshBasicMaterial({
           color, transparent: true, opacity: 0, depthWrite: false
         });
@@ -4545,7 +4639,7 @@ AFRAME.registerComponent('reactor-control', {
         group.add(dot);
         this.flowDots.push({
           mesh: dot, mat,
-          angle: (i / PER) * Math.PI * 2 + r * 0.5,
+          angle: (i / perRing) * Math.PI * 2 + r * 0.5,
           // radio y altura fijos por anillo: la lectura es "gira", no "flota"
           radiusX: sx * (0.20 + r * 0.055),
           radiusZ: sz * (0.20 + r * 0.055),
@@ -4605,7 +4699,7 @@ AFRAME.registerComponent('reactor-control', {
     const color = new THREE.Color(0xf6e9d2);
     const group = new THREE.Group();
     group.name = 'reactor-nutrient-dose';
-    const N = 20;
+    const N = museoMobileCount(20, 0.70, 12);
     for (let i = 0; i < N; i++) {
       const mat = new THREE.MeshBasicMaterial({
         color, transparent: true, opacity: 0, depthWrite: false
@@ -4721,7 +4815,7 @@ AFRAME.registerComponent('reactor-control', {
     const group = new THREE.Group();
     group.name = 'reactor-activity-bubbles';
     const color = this.bubbleMat && this.bubbleMat.color ? this.bubbleMat.color.clone() : new THREE.Color(0xd8fbf7);
-    const N = 20;
+    const N = museoMobileCount(20, 0.70, 12);
     for (let i = 0; i < N; i++) {
       const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false });
       const size = 0.008 + ((i * 37) % 5) * 0.0035;    // tamanos variados
@@ -5279,6 +5373,7 @@ AFRAME.registerComponent('reactor-control', {
     // error al colgarlo bajo #modelo (que si tiene escala).
     this.el.sceneEl.appendChild(wrapper);
     this.wrapper = wrapper;
+    this.reactorCenter = pos.clone();
   },
 
   /*
@@ -5362,18 +5457,27 @@ AFRAME.registerComponent('reactor-control', {
     if (!this.wrapper) return;
     const dt = Math.min((delta || 16) / 1000, 0.1);
     const speed = 1 - Math.pow(0.004, dt);   // ~0.5 s, la transicion que pide el guion
+    const now = this.now();
 
     const info = this.el.components['exhibit-info'];
     const hoverId = info && info.hoverId;
     this.hoverGlow += ((hoverId === 'reactor01' ? 1 : 0) - this.hoverGlow) * 0.12;
 
     // pulso de la recompensa (solo mientras dura el banner)
-    const rewarding = this.now() < this.rewardUntil;
-    if (this.biomassAt && this.now() >= this.biomassAt) {
+    const rewarding = now < this.rewardUntil;
+    if (this.biomassAt && now >= this.biomassAt) {
       this.biomassAt = 0;
       if (window.unlockCapability) window.unlockCapability('biomass');
     }
-    const rewardTarget = rewarding ? (0.55 + 0.45 * Math.sin(this.now() / 150)) : 0;
+
+    if (MUSEO_IS_MOBILE && this.reactorCenter) {
+      const rigPos = museoRigWorldPosition(this.mobileTmp);
+      const far = rigPos && museoDistanceXZ(rigPos, this.reactorCenter) > 5.2;
+      const messageExpired = this.msgUntil && now > this.msgUntil;
+      if (far && !rewarding && !this.biomassAt && !messageExpired && this.hoverGlow < 0.015) return;
+    }
+
+    const rewardTarget = rewarding ? (0.55 + 0.45 * Math.sin(now / 150)) : 0;
     this.rewardPulse += (rewardTarget - this.rewardPulse) * 0.25;
 
     this.curSpot += (this.targetSpot - this.curSpot) * speed;
@@ -5530,14 +5634,11 @@ AFRAME.scenes[0]?.addEventListener('loaded', () => {
 });
 
 /*
-  Bucle robusto de los videos circulares. `loop` en el propio <video>
-  ya deberia bastar, pero se reafirma por si el navegador ignora el
-  autoplay inicial (tipico si la pestaña no tenia foco) o si la textura de
-  video de three.js se queda parada en el ultimo frame: se relanza al
-  terminar y, si el primer intento de reproduccion es bloqueado, se
-  reintenta en cuanto haya cualquier primer gesto del visitante (click,
-  toque o tecla) -- el video sigue muted, asi que esos reintentos no
-  chocan con las politicas de autoplay de ningun navegador.
+  Bucle robusto de los videos circulares. En desktop se mantiene el
+  comportamiento historico: todos los videos muted intentan reproducirse en
+  bucle. En movil se abarata la decodificacion: solo se reproduce el video
+  cuya pantalla circular esta cerca del visitante; lejos queda pausado sin
+  reiniciar currentTime, de modo que al volver continua desde el mismo punto.
 */
 (function () {
   const videos = Array.from(document.querySelectorAll('video[id^="ppb-video-"]'));
@@ -5547,6 +5648,87 @@ AFRAME.scenes[0]?.addEventListener('loaded', () => {
     video.muted = true;
     video.playsInline = true;
   });
+
+  if (MUSEO_IS_MOBILE) {
+    videos.forEach((video) => {
+      video.autoplay = false;
+      video.removeAttribute('autoplay');
+      video.preload = 'metadata';
+      video.pause();
+    });
+
+    const tmp = new THREE.Vector3();
+    const tmp2 = new THREE.Vector3();
+    let screens = [];
+    let nextScan = 0;
+    const playing = new Set();
+
+    const pauseVideo = (video) => {
+      if (!video || video.paused) return;
+      video.pause();
+      playing.delete(video);
+    };
+    const playVideo = (video) => {
+      if (!video || playing.has(video)) return;
+      const p = video.play();
+      if (p && p.then) {
+        p.then(() => playing.add(video)).catch(() => playing.delete(video));
+      } else {
+        playing.add(video);
+      }
+    };
+    const videoFromCircle = (circle) => {
+      const mat = circle.getAttribute('material');
+      const src = typeof mat === 'string'
+        ? ((mat.match(/src:\s*#([\w-]+)/) || [])[1])
+        : (mat && mat.src && (mat.src.id || String(mat.src).replace(/^#/, '')));
+      return src ? document.getElementById(src) : null;
+    };
+    const scanScreens = () => {
+      const now = performance.now();
+      if (now < nextScan && screens.length) return;
+      nextScan = now + 1200;
+      screens = Array.from(document.querySelectorAll('a-circle[id^="PPB_VIDEO_"]'))
+        .map((circle) => ({ circle, video: videoFromCircle(circle) }))
+        .filter((item) => item.video && item.circle.object3D);
+    };
+    const update = () => {
+      scanScreens();
+      const rigPos = museoRigWorldPosition(tmp);
+      if (!rigPos || !screens.length) {
+        videos.forEach(pauseVideo);
+        return;
+      }
+      const assigned = new Set(screens.map((item) => item.video));
+      videos.forEach((video) => { if (!assigned.has(video)) pauseVideo(video); });
+      screens.forEach(({ circle, video }) => {
+        if (!circle.object3D.visible) { pauseVideo(video); return; }
+        const pos = circle.object3D.getWorldPosition(tmp2);
+        const dist = museoDistanceXZ(rigPos, pos);
+        if (dist < MUSEO_MOBILE_VIDEO_PLAY_DISTANCE) playVideo(video);
+        else if (dist > MUSEO_MOBILE_VIDEO_PAUSE_DISTANCE) pauseVideo(video);
+      });
+    };
+
+    const interval = window.setInterval(update, 450);
+    const onReady = () => update();
+    const onFirstInteraction = () => update();
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) videos.forEach(pauseVideo);
+      else update();
+    });
+    window.addEventListener('pagehide', () => videos.forEach(pauseVideo));
+    window.addEventListener('click', onFirstInteraction);
+    window.addEventListener('touchstart', onFirstInteraction, { passive: true });
+    window.addEventListener('keydown', onFirstInteraction);
+    const scene = document.querySelector('a-scene');
+    if (scene) {
+      scene.addEventListener('museo-ready', onReady);
+      scene.addEventListener('loaded', onReady);
+    }
+    window.MUSEO_MOBILE_VIDEO_PROFILE = { interval, playDistance: MUSEO_MOBILE_VIDEO_PLAY_DISTANCE, pauseDistance: MUSEO_MOBILE_VIDEO_PAUSE_DISTANCE };
+    return;
+  }
 
   const tryPlay = () => {
     videos.forEach((video) => {
@@ -5848,7 +6030,8 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     const geo = new THREE.SphereGeometry(0.005, 10, 8);
     const tagTex = this.buildH2LabelTexture();
     this.h2Geo = geo;
-    for (let i = 0; i < 8; i++) {
+    const h2Count = museoMobileCount(8, 0.75, 5);
+    for (let i = 0; i < h2Count; i++) {
       const mat = new THREE.MeshBasicMaterial({ color: 0xd6f6ff, transparent: true, opacity: 0, depthWrite: false });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.visible = false;
@@ -6048,6 +6231,7 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     }
     const running = this.seq >= 0;
     this.active = this.isRunning();
+    if (museoMobileSkipIdle(this, running)) return;
 
     /*
       Orden deliberado: el CO deja de entrar a los 3.6 s, el H2 que ya sube
@@ -6298,7 +6482,8 @@ AFRAME.registerComponent('pha-exhibit', {
     const geo = new THREE.SphereGeometry(0.0075, 10, 8);
     const tagTex = this.buildCarbonLabelTexture();
     this.carbonGeo = geo;
-    for (let i = 0; i < 14; i++) {
+    const carbonCount = museoMobileCount(14, 0.70, 8);
+    for (let i = 0; i < carbonCount; i++) {
       const mat = new THREE.MeshBasicMaterial({ color: 0xefe0c4, transparent: true, opacity: 0, depthWrite: false });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.visible = false;
@@ -6518,6 +6703,7 @@ AFRAME.registerComponent('pha-exhibit', {
       if (this.seq > 9.4) this.seq = -1;     // vuelta al reposo
     }
     const running = this.seq >= 0;
+    if (museoMobileSkipIdle(this, running)) return;
 
     // Acercarse solo enciende la microetiqueta, muy tenue. Nunca desbloquea.
     this.displayT += (((this.near || running) ? 1 : 0) - this.displayT) * 0.07;
@@ -6796,7 +6982,8 @@ AFRAME.registerComponent('hydrogen-exhibit', {
     const scene = this.el.sceneEl.object3D;
     const geo = new THREE.SphereGeometry(0.0048, 10, 8);
     this.photonGeo = geo;
-    for (let i = 0; i < 5; i++) {
+    const photonCount = museoMobileCount(5, 0.80, 4);
+    for (let i = 0; i < photonCount; i++) {
       const mat = new THREE.MeshBasicMaterial({
         color: 0xfff2a8, transparent: true, opacity: 0,
         depthWrite: false, blending: THREE.AdditiveBlending
@@ -6807,7 +6994,7 @@ AFRAME.registerComponent('hydrogen-exhibit', {
       this.photons.push({
         mesh, mat,
         delay: i * 0.12,
-        offset: new THREE.Vector3((i - 2) * 0.018, ((i % 2) - 0.5) * 0.018, (2 - i) * 0.006)
+        offset: new THREE.Vector3((i - (photonCount - 1) / 2) * 0.018, ((i % 2) - 0.5) * 0.018, (((photonCount - 1) / 2) - i) * 0.006)
       });
     }
   },
@@ -6832,7 +7019,8 @@ AFRAME.registerComponent('hydrogen-exhibit', {
     const geo = new THREE.SphereGeometry(1, 12, 10);
     const tagTex = this.buildBubbleTagTexture();
     this.bubbleGeo = geo;
-    for (let i = 0; i < 10; i++) {
+    const bubbleCount = museoMobileCount(10, 0.70, 7);
+    for (let i = 0; i < bubbleCount; i++) {
       const mat = new THREE.MeshBasicMaterial({ color: 0xd8f7ff, transparent: true, opacity: 0, depthWrite: false });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.visible = false;
@@ -6992,6 +7180,7 @@ AFRAME.registerComponent('hydrogen-exhibit', {
       if (this.seq > 7.8) this.seq = -1;      // vuelta al reposo
     }
     const running = this.seq >= 0;
+    if (museoMobileSkipIdle(this, running)) return;
     if (running && !this.lightPulseDone && this.seq >= 0.86) {
       this.lightPulseDone = true;
       this.pulseT = 1;
@@ -7407,6 +7596,7 @@ AFRAME.registerComponent('nitrogen-exhibit', {
       if (this.seq > 8.0) { this.seq = -1; this.resetMolecules(); }   // vuelve a estar listo
     }
     const running = this.seq >= 0;
+    if (museoMobileSkipIdle(this, running)) return;
 
     this.displayT += (((this.near || running) ? 1 : 0) - this.displayT) * 0.07;
     const arrived = this.updateMolecules(dt, (time || 0) / 1000);
