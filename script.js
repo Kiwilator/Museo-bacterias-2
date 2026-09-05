@@ -1,43 +1,16 @@
-/*
-  Look: click-and-drag to look around, release to stop — not pointer lock.
-  Pointer lock (look-controls' pointerLockEnabled) captures the cursor on
-  click and needs ESC to let go, which read as "stuck"/uncomfortable.
-  This never captures the cursor at all: hold the left mouse button (or one
-  finger on touch) and drag, release and looking stops, cursor free the
-  whole time. No ESC, nothing to "get out of".
-*/
-// Un desplazamiento del puntero por debajo de este umbral (en pixeles) se
-// trata como CLICK/TAP sobre la escena; por encima, como arrastre de camara.
-// Ver trySelect() mas abajo: es lo unico que distingue seleccionar una pieza
-// de simplemente mirar alrededor.
+
+
+
 const CLICK_MAX_MOVE_PX = 6;
-/*
-  El dedo nunca se queda tan quieto como el raton: un tap normal en pantalla
-  tactil se desplaza facilmente 10-15 px entre touchstart y touchend, asi que
-  con el umbral del raton (6 px) casi todos los toques se interpretaban como
-  arrastre de camara y la seleccion no llegaba a dispararse.
-*/
+
 const TAP_MAX_MOVE_PX = 16;
-// radio de tolerancia del dedo al apuntar: los controles del reactor son
-// piezas de ~3 cm y en un movil caen en muy pocos pixeles, demasiado poco
-// para un dedo. Ver trySelect().
+
+
 const TAP_TOLERANCE_PX = 18;
 const MUSEUM_LANGUAGE = window.MUSEUM_LANGUAGE || 'en';
 const museumText = (key) => window.getMuseumUiText ? window.getMuseumUiText(key) : key;
 
-/* ==========================================================================
-   Soporte movil: en un telefono/tablet no hay teclado, asi que WASD (unica
-   forma de moverse hasta ahora) simplemente no existe -- mirar alrededor y
-   tocar piezas YA funcionaban en tactil (drag-look-controls, mas abajo,
-   escucha touchstart/move/end desde el principio), pero avanzar/retroceder/
-   strafe no tenian ningun equivalente tactil. Se detecta el dispositivo una
-   sola vez al cargar (AFRAME.utils.device.isMobile ya cubre los casos
-   habituales por user-agent; se combina con una comprobacion de puntero
-   "coarse" + soporte tactil como red de seguridad en dispositivos raros que
-   ese user-agent-sniffing no reconozca) y se marca con una clase en <body>
-   -- todo lo demas (mostrar el joystick, cambiar el texto de ayuda de WASD
-   a instrucciones tactiles) es CSS puro sobre esa clase, ver style.css.
-   ========================================================================== */
+
 const MUSEO_IS_MOBILE = (function () {
   try {
     const byUA = !!(AFRAME.utils && AFRAME.utils.device && AFRAME.utils.device.isMobile());
@@ -46,10 +19,8 @@ const MUSEO_IS_MOBILE = (function () {
     return byUA || (touch && coarse);
   } catch (e) { return false; }
 })();
-// En <body>, no en <html>: exhibit-info.open()/close() tambien marca
-// "panel-open" sobre document.body (ver mas abajo) para ocultar el joystick
-// mientras se lee una ficha -- ambas clases deben vivir en el mismo
-// elemento para que el selector combinado .is-mobile.panel-open funcione.
+
+
 if (MUSEO_IS_MOBILE) document.body.classList.add('is-mobile');
 window.MUSEO_IS_MOBILE = MUSEO_IS_MOBILE;
 
@@ -125,18 +96,7 @@ function museoMobileCount(desktopCount, ratio, minimum) {
   window.setTimeout(() => { if (!applied) apply(); }, 600);
 })();
 
-/*
-  Joystick tactil de movimiento (solo visible en moviles, ver CSS): un
-  circulo base fijo abajo a la izquierda de la pantalla con un nucleo que
-  sigue al dedo, desplazamiento limitado a un radio maximo. Mientras se
-  mantiene pulsado, window.MUSEO_MOVE_VECTOR guarda la direccion normalizada
-  (-1..1 en x/z, mismos ejes de pantalla que WASD) que museum-movement suma
-  a las teclas -- es literalmente "otra fuente de entrada" para el mismo
-  sistema de movimiento, no uno nuevo. Es un elemento HTML aparte por encima
-  del canvas (mobile-controls en index.html): sus toques nunca llegan al
-  canvas, asi que nunca compiten con el arrastre de camara de drag-look-
-  controls, y viceversa (ver el seguimiento por touch.identifier alli).
-*/
+
 window.MUSEO_MOVE_VECTOR = { x: 0, z: 0 };
 (function setupMobileJoystick() {
   const base = document.getElementById('joystick-base');
@@ -146,7 +106,7 @@ window.MUSEO_MOVE_VECTOR = { x: 0, z: 0 };
   let active = false;
   let touchId = null;
   let cx = 0, cy = 0;
-  const MAX_R = 38; // px, radio maximo de desplazamiento del nucleo
+  const MAX_R = 38;
 
   const setNub = (dx, dy) => { nub.style.transform = `translate(${dx}px, ${dy}px)`; };
   const reset = () => {
@@ -161,8 +121,8 @@ window.MUSEO_MOVE_VECTOR = { x: 0, z: 0 };
     const dist = Math.hypot(dx, dy);
     if (dist > MAX_R) { dx = (dx / dist) * MAX_R; dy = (dy / dist) * MAX_R; }
     setNub(dx, dy);
-    // pantalla: x+ = derecha, y+ = abajo -- mismos signos que W/A/S/D en
-    // museum-movement.tick (right-left en x, backward-forward en z).
+
+
     window.MUSEO_MOVE_VECTOR.x = dx / MAX_R;
     window.MUSEO_MOVE_VECTOR.z = dy / MAX_R;
   };
@@ -197,32 +157,13 @@ window.MUSEO_MOVE_VECTOR = { x: 0, z: 0 };
   window.addEventListener('touchcancel', end);
 })();
 
-/* ==========================================================================
-   CAPACIDADES DESCUBIERTAS -- capa de juego transversal del museo.
 
-   Es una capa independiente: no toca el GLB, ni las fichas cientificas, ni
-   ninguna exposicion. Solo mantiene una lista de capacidades que el visitante
-   ha llegado a descubrir interactuando, la guarda en el navegador y la muestra
-   en un HUD discreto arriba a la izquierda (la esquina libre: el selector de
-   idioma vive arriba a la derecha, la ayuda de controles abajo al centro y el
-   joystick tactil abajo a la izquierda).
-
-   Cada exposicion solo tiene que llamar a unlockCapability('<id>') cuando su
-   interaccion se complete. La funcion es idempotente: devuelve true la primera
-   vez y false siempre despues, asi que una capacidad no puede descubrirse dos
-   veces ni el aviso repetirse.
-
-   Para añadir una capacidad nueva (por ejemplo H2 en Rhodopseudomonas
-   palustris) basta con poner su id en MUSEO_CAP_ORDER y sus textos en
-   museum-i18n.js: ni el HUD ni el contador necesitan tocarse.
-   ========================================================================== */
 const MUSEUM_GAME_VERSION = '2';
 const MUSEO_CAP_KEY = 'museum-capabilities';
 const MUSEO_CAP_VERSION_KEY = 'museum-game-version';
 const MUSEO_CAP_FINAL_KEY = 'museum-capabilities-final-version';
-// Orden del recorrido real: fichas 01, 04, 06, 07, 08 y, ya en la Sala 2,
-// el reactor. Añadir una capacidad es añadir su id aqui y sus textos en
-// museum-i18n.js.
+
+
 const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomass'];
 
 (function museumCapabilities() {
@@ -278,11 +219,7 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
     });
     hud.appendChild(row);
 
-    /*
-      Al entrar, unos segundos de explicacion: solo con los simbolos no se
-      entiende que el HUD es un marcador de descubrimientos. Despues se
-      encoge y queda el HUD normal.
-    */
+
     const intro = document.createElement('div');
     intro.className = 'cap-intro';
     const introTitle = document.createElement('span');
@@ -302,8 +239,8 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
     toast = document.createElement('div');
     toast.id = 'capability-toast';
     toast.setAttribute('role', 'status');
-    // La primera linea recuerda lo que el visitante ACABA de ver, para que
-    // pueda unir "he visto esto" con "por eso he descubierto esto".
+
+
     const result = document.createElement('span');
     result.className = 'cap-toast-result';
     const kicker = document.createElement('span');
@@ -386,11 +323,7 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
     return unlocked.indexOf(id) !== -1;
   };
 
-  /*
-    Devuelve true SOLO la primera vez. Cualquier exposicion puede llamarla
-    tantas veces como quiera sin comprobar nada por su cuenta: aqui esta el
-    unico sitio donde se decide si algo es un descubrimiento nuevo.
-  */
+
   window.unlockCapability = function unlockCapability(id) {
     if (!known(id)) { console.warn('[capacidades] id no registrado:', id); return false; }
     if (window.hasCapability(id)) return false;
@@ -405,7 +338,7 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
     return true;
   };
 
-  // utilidad de prueba: vacia lo descubierto para poder repetir el recorrido
+
   window.resetCapabilities = function resetCapabilities() {
     unlocked = [];
     try {
@@ -497,25 +430,7 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
   else ready();
 })();
 
-/* ==========================================================================
-   HOTSPOT MUSEOGRAFICO COMPARTIDO.
 
-   Un unico elemento reconocible para TODAS las microexperiencias del museo:
-   un punto turquesa emisivo y, a su lado, un verbo muy corto. Mismo tamaño,
-   mismo color, mismo comportamiento y mismo feedback en todas las vitrinas,
-   para que el visitante aprenda una sola regla: "donde veo este punto, puedo
-   interactuar".
-
-   Reparto de papeles, igual en todo el museo:
-     - la placa de la peana y la propia pieza  -> abren la FICHA CIENTIFICA
-     - este punto turquesa                     -> lanza la MICROEXPERIENCIA
-   Nunca el mismo click para las dos cosas.
-
-   Al acercarse el punto aparece; si su capacidad sigue bloqueada late muy
-   despacio, y si ya se descubrio deja de latir y le acompaña un ✓ pequeño.
-   Mientras la experiencia esta en marcha se atenua y no acepta un segundo
-   click, para que no se dispare dos veces.
-   ========================================================================== */
 const MUSEO_HOTSPOT_COLOR = 0x4fe4dc;
 
 function faceMuseoFront(object3D, front) {
@@ -549,8 +464,7 @@ function createMuseoHotspot(cfg) {
   const ring = new THREE.Mesh(new THREE.RingGeometry(0.0148, 0.0172, 28), ringMat);
   group.add(ring);
 
-  // Verbo: mismo cuerpo de letra en todas las vitrinas; solo cambia el ancho
-  // del plano, calculado a partir del texto real.
+
   const text = String(cfg.verb || '').toUpperCase();
   const probe = document.createElement('canvas').getContext('2d');
   const FONT = '800 52px Arial, Helvetica, sans-serif';
@@ -560,12 +474,8 @@ function createMuseoHotspot(cfg) {
   c.width = Math.max(64, Math.ceil(probe.measureText(text).width) + 30);
   const ctx = c.getContext('2d');
   ctx.clearRect(0, 0, c.width, c.height);
-  /*
-    Placa oscura muy tenue detras del verbo: probado sobre Rhodovulum, el
-    texto cruzaba la tapa negra de la vitrina y seguia sobre la piedra clara
-    de la peana, y en ese tramo se perdia. Con el fondo se lee igual encima de
-    cualquier superficie del museo.
-  */
+
+
   const R = c.height * 0.34;
   ctx.beginPath();
   ctx.moveTo(R, 6);
@@ -594,7 +504,7 @@ function createMuseoHotspot(cfg) {
   label.position.set(0.020 + LABEL_W / 2, 0, 0.0008);
   group.add(label);
 
-  // ✓ discreto para las experiencias ya completadas
+
   const cc = document.createElement('canvas');
   cc.width = 64; cc.height = 64;
   const cctx = cc.getContext('2d');
@@ -625,7 +535,7 @@ function createMuseoHotspot(cfg) {
     busy: false,
     pressT: 0,
     activate() {
-      if (api.busy || api.amount < 0.25) return;    // ni oculto ni ya en marcha
+      if (api.busy || api.amount < 0.25) return;
       api.pressT = 1;
       if (cfg.onActivate) cfg.onActivate();
     },
@@ -637,8 +547,8 @@ function createMuseoHotspot(cfg) {
       if (!group.visible) return;
       if (!fixedFront && camera) group.lookAt(camera);
 
-      api.pressT = Math.max(0, api.pressT - dt * 5.0);      // microrespuesta ~200 ms
-      // late solo mientras la capacidad siga sin descubrirse
+      api.pressT = Math.max(0, api.pressT - dt * 5.0);
+
       const beat = unlocked ? 0 : (0.5 + 0.5 * Math.sin(performance.now() / 620));
       const dim = busy ? 0.35 : 1;
 
@@ -665,11 +575,7 @@ function createMuseoHotspot(cfg) {
   return api;
 }
 
-/*
-  Punto donde se coloca el hotspot de una vitrina: delante de la campana y un
-  poco por debajo de la pieza, de modo que nunca la tape ni tape la imagen
-  circular, y siempre en el mismo sitio relativo en todas las vitrinas.
-*/
+
 function museoHotspotSpot(bellBox, center, front) {
   const bellCenter = bellBox ? bellBox.getCenter(new THREE.Vector3()) : center.clone();
   const bellRadius = bellBox
@@ -682,7 +588,7 @@ function museoHotspotSpot(bellBox, center, front) {
 
 AFRAME.registerComponent('drag-look-controls', {
   schema: {
-    sensitivity: { type: 'number', default: 0.2 } // degrees per pixel of drag
+    sensitivity: { type: 'number', default: 0.2 }
   },
   init() {
     this.dragging = false;
@@ -690,18 +596,12 @@ AFRAME.registerComponent('drag-look-controls', {
     this.lastY = 0;
     this.downX = 0;
     this.downY = 0;
-    /*
-      Orden de rotacion YXZ (yaw y luego pitch). Con el orden por defecto XYZ
-      el pitch se aplica ANTES que el yaw, y al combinar ambos aparece un
-      alabeo parasito: el horizonte se inclinaba en diagonal en cuanto mirabas
-      hacia arriba o abajo y girabas a la vez. Con YXZ el horizonte se
-      mantiene horizontal siempre. El roll se fija a 0 explicitamente mas
-      abajo, asi que la camara nunca acumula giro sobre el eje de vision.
-    */
+
+
     this.el.object3D.rotation.order = 'YXZ';
     this.pitch = this.el.object3D.rotation.x;
     this.yaw = this.el.object3D.rotation.y;
-    const maxPitch = THREE.MathUtils.degToRad(80);   // ni techo ni suelo del reves
+    const maxPitch = THREE.MathUtils.degToRad(80);
 
     const start = (x, y) => {
       this.dragging = true;
@@ -725,23 +625,14 @@ AFRAME.registerComponent('drag-look-controls', {
     const end = (isTouch) => {
       this.dragging = false;
       canvas.style.cursor = 'grab';
-      // Mismo gesto (mousedown/touchstart -> mouseup/touchend) que el drag-look,
-      // pero si el puntero apenas se movio se interpreta como click/tap sobre
-      // una pieza en vez de arrastre de camara -- ver CLICK_MAX_MOVE_PX arriba.
+
+
       const moved = Math.hypot(this.lastX - this.downX, this.lastY - this.downY);
       const slop = isTouch ? TAP_MAX_MOVE_PX : CLICK_MAX_MOVE_PX;
       if (moved < slop) this.trySelect(this.lastX, this.lastY, !!isTouch);
     };
 
-    /*
-      MOVIL -- causa real de que los controles del reactor "no funcionaran":
-      despues de cada touchend el navegador emite ademas mousedown/mouseup de
-      compatibilidad sobre el mismo punto. El gesto llegaba entonces por las
-      DOS vias y trySelect() se ejecutaba dos veces por cada toque: el boton
-      se encendia y se apagaba dentro del mismo tap, asi que en pantalla no
-      cambiaba nada. Aqui se marca el instante del ultimo toque y se ignora
-      cualquier evento de raton que llegue justo detras.
-    */
+
     this._lastTouchAt = 0;
     const echoOfTouch = () => (Date.now() - this._lastTouchAt) < 900;
 
@@ -749,36 +640,18 @@ AFRAME.registerComponent('drag-look-controls', {
     this.onMouseMove = (e) => { if (!echoOfTouch()) move(e.clientX, e.clientY); };
     this.onMouseUp = () => { if (!echoOfTouch()) end(false); };
 
-    /*
-      Toque en movil: se identifica el "dedo de mirar" por su touch.identifier
-      (this._touchId), no por "cuantos dedos hay en total en la pantalla"
-      como antes. Con el criterio antiguo (e.touches.length === 1) un segundo
-      dedo en cualquier otro sitio -- el joystick de movimiento en moviles
-      (ver mobile-controls mas abajo), o simplemente otro toque accidental --
-      hacia que el gesto de mirar dejara de funcionar mientras ese segundo
-      dedo estuviera apoyado. Ademas, al ser un listener en window, el
-      propio preventDefault() se llamaba para CUALQUIER touchmove de un solo
-      dedo en toda la pagina, aunque no fuera el que empezo a arrastrar
-      sobre el canvas -- eso es lo que bloqueaba el scroll tactil dentro del
-      panel de informacion (panel-scroll): un dedo deslizando el texto
-      tambien disparaba este preventDefault() y el navegador nunca llegaba a
-      hacer scroll. Ahora solo se sigue el toque que EMPEZO sobre el propio
-      canvas (this._touchId) y solo ESE toque llama a preventDefault();
-      cualquier otro toque (panel, joystick) pasa de largo sin tocarse.
-    */
+
     this._touchId = null;
     this.onTouchStart = (e) => {
       this._lastTouchAt = Date.now();
-      // Red de seguridad: si un gesto anterior se quedo "colgado" (por ejemplo
-      // un touchcancel del sistema que no llego a cerrarse) y ya no queda
-      // ningun dedo del gesto anterior en pantalla, se descarta ese id en vez
-      // de bloquear para siempre tanto el mirar como el tap.
+
+
       if (this._touchId !== null) {
         let alive = false;
         for (let i = 0; i < e.touches.length; i++) {
           if (e.touches[i].identifier === this._touchId) { alive = true; break; }
         }
-        if (alive) return;                  // ya hay un toque de "mirar" en curso
+        if (alive) return;
         this._touchId = null;
         this.dragging = false;
       }
@@ -800,12 +673,8 @@ AFRAME.registerComponent('drag-look-controls', {
         if (e.changedTouches[i].identifier === this._touchId) { this._touchId = null; end(true); break; }
       }
     };
-    /*
-      touchcancel lo dispara el propio sistema (gesto del navegador, llamada
-      entrante, cambio de app...). Sin escucharlo, this._touchId se quedaba
-      apuntando a un dedo que ya no existe y a partir de ahi ni el tap ni el
-      giro de camara volvian a responder en toda la sesion.
-    */
+
+
     this.onTouchCancel = (e) => {
       this._lastTouchAt = Date.now();
       if (this._touchId === null) return;
@@ -834,14 +703,8 @@ AFRAME.registerComponent('drag-look-controls', {
     if (canvas) attach();
     else this.el.sceneEl.addEventListener('render-target-loaded', attach, { once: true });
   },
-  /*
-    Seleccion directa por click/tap: lanza un rayo desde la camara hacia el
-    punto de pantalla donde se solto el puntero y, si toca una de las mallas
-    que exhibit-info marco como pieza informativa (userData.museoExhibitId),
-    abre la misma ficha que abriria la proximidad. Solo se comprueba contra
-    esa lista corta de mallas (bacterias, reactor...), nunca contra paredes,
-    suelo o neones, y solo se llama cuando el gesto no fue un arrastre.
-  */
+
+
   trySelect(x, y, isTouch) {
     const sceneEl = this.el.sceneEl;
     const canvas = sceneEl && sceneEl.canvas;
@@ -855,15 +718,7 @@ AFRAME.registerComponent('drag-look-controls', {
     if (!this._ndc) this._ndc = new THREE.Vector2();
     if (!this._raycaster) this._raycaster = new THREE.Raycaster();
 
-    /*
-      Con raton basta un rayo por el punto exacto. Con el dedo no: los cuatro
-      controles del reactor son cilindros de unos 3 cm y en un movil ocupan muy
-      pocos pixeles, mucho menos que la huella real de un dedo. Se prueba
-      primero el punto exacto -- asi un toque preciso se comporta igual que
-      siempre -- y solo si falla se prueban dos coronas de puntos alrededor,
-      dentro del radio de tolerancia. Nunca amplia lo que es seleccionable,
-      solo la punteria necesaria para acertarle.
-    */
+
     const probes = [[0, 0]];
     if (isTouch) {
       for (let i = 0; i < 8; i++) {
@@ -884,8 +739,8 @@ AFRAME.registerComponent('drag-look-controls', {
       this._raycaster.setFromCamera(this._ndc, camera);
       const hits = this._raycaster.intersectObjects(info.selectableMeshes, false);
       if (!hits.length) continue;
-      // Los controles del reactor (Sala 2) no abren ficha: llevan su propia
-      // accion (museoAction) en vez de museoExhibitId, y se comprueban primero.
+
+
       const action = hits[0].object.userData.museoAction;
       if (action) { action(); return; }
       const id = hits[0].object.userData.museoExhibitId;
@@ -906,21 +761,7 @@ AFRAME.registerComponent('drag-look-controls', {
   }
 });
 
-/*
-  Movement: WASD + arrow keys, smooth acceleration (no abrupt start/stop),
-  moderate walking pace, relative to where the camera is looking, no fly
-  (Y is never touched here). Custom instead of aframe-extras'
-  movement-controls because that component throws
-  "THREE.Math.degToRad is not a function" on this A-Frame/three.js build
-  (aframe-extras 6.1.0 still calls the THREE.Math namespace three.js
-  removed around r125+ in favor of THREE.MathUtils) — confirmed via a
-  compat shim that only fixed it intermittently, meaning something in that
-  dependency chain is genuinely unreliable here, not just a load-order
-  issue. Its nav-mesh component has the same problem (calls the removed
-  THREE.Geometry class), so aframe-extras isn't used at all in the end —
-  this component and `clamp-to-bounds` below replace what it would have
-  provided, without an unreliable third-party dependency in the input loop.
-*/
+
 AFRAME.registerComponent('museum-movement', {
   schema: {
     speed: { type: 'number', default: 1.0 },
@@ -953,20 +794,13 @@ AFRAME.registerComponent('museum-movement', {
     const right = (this.keys.KeyD || this.keys.ArrowRight) ? 1 : 0;
 
     this.moveVector.set(right - left, 0, backward - forward);
-    // Joystick tactil (moviles, ver MUSEO_MOVE_VECTOR mas arriba): misma
-    // convencion de ejes que las teclas, asi que basta con sumarlo antes de
-    // normalizar -- otra fuente de entrada para el mismo vector, no un
-    // sistema de movimiento aparte.
+
+
     const joy = window.MUSEO_MOVE_VECTOR;
     if (joy && (joy.x || joy.z)) { this.moveVector.x += joy.x; this.moveVector.z += joy.z; }
     if (this.moveVector.lengthSq() > 0) this.moveVector.normalize();
 
-    // BUG FIX: this only read the camera's own local yaw (from mouse look),
-    // ignoring the rig's own yaw (set once at spawn, to face the exhibition
-    // — see setup-museum-model). Since those two rotations combine to make
-    // up what the player actually sees, using only one made "forward" point
-    // ~84° off from the real view direction — reported as arrow-up walking
-    // left instead of forward.
+
     const rigYaw = this.el.object3D.rotation.y;
     const cameraYaw = this.cameraEl ? this.cameraEl.object3D.rotation.y : 0;
     this.moveVector.applyAxisAngle(this.up, rigYaw + cameraYaw);
@@ -979,7 +813,7 @@ AFRAME.registerComponent('museum-movement', {
   }
 });
 
-/* Basic helpers for debug */
+
 AFRAME.registerComponent('log-when-loaded', {
   init() {
     this.el.addEventListener('model-loaded', (e) => {
@@ -991,53 +825,20 @@ AFRAME.registerComponent('log-when-loaded', {
   }
 });
 
-/*
-  Full setup for the museum model, run once when the GLB finishes loading:
 
-  1. Strips baked Blender lights (LUZ_*, REBOTE_*) — Blender's light power (W)
-     isn't the same unit as glTF's photometric intensity (candela/lux), so
-     these were exported with intensities in the thousands and blew the
-     whole render out to white.
-  2. Rescales the model so its real-world footprint matches `length`
-     (largest horizontal dimension) and `height`, regardless of export units.
-  3. Re-measures the world-space bounding box AFTER scaling, and:
-     - places the player rig (#rig) at the model's real floor (ground level,
-       y = box.min.y) and the camera child at local y = eyeHeight — a proper
-       rig/camera split, not "move the whole museum to fix the height".
-     - orients the rig to face the exhibition (toward the centroid of the
-       detected peanas) instead of a fixed, possibly-wrong direction.
-     - stores window.MUSEO_SPAWN for the respawn safety net.
-     - stores the horizontal bounds (shrunk by `wallMargin`) on
-       window.MUSEO_BOUNDS and per-peana boxes on window.MUSEO_OBSTACLES —
-       this rectangle-with-holes *is* our navmesh data (see note on
-       `clamp-to-bounds` for why it's applied this way instead of via
-       aframe-extras' nav-mesh component).
-  4. Tags each detected peana with a stable id/class-like userData so future
-     interactivity (panels, video, audio...) has something to hook onto
-     without re-deriving "which mesh is a peana" again.
-*/
 AFRAME.registerComponent('setup-museum-model', {
   schema: {
     length: { type: 'number', default: 11 },
     height: { type: 'number', default: 3 },
     wallMargin: { type: 'number', default: 0.4 },
-    // Radio del jugador para las peanas. Antes se reutilizaba wallMargin, que
-    // esta pensado para no pegarse a los muros: al inflar cada peana 0.4 m por
-    // lado, cualquier hueco perdia 0.8 m y varios pasos reales quedaban
-    // cerrados. Separado en su propio valor, mucho menor, para que se pueda
-    // pasar entre piezas sin dejar de chocar con ellas.
+
+
     playerRadius: { type: 'number', default: 0.15 },
     eyeHeight: { type: 'number', default: 0.5 }
   },
   init() {
-    /*
-      El museo ya no es un GLB unico sino doce modulos, cada uno cargado en su
-      propia entidad hija y todos con las coordenadas de mundo de Blender. Este
-      componente espera a que TODOS terminen y solo entonces mide el conjunto y
-      aplica una unica escala al contenedor: si cada modulo se midiera y
-      escalara por separado, cada uno saldria con un factor distinto y las
-      piezas no encajarian.
-    */
+
+
     const modulos = Array.from(this.el.querySelectorAll('[gltf-model]'));
     this.pendientes = modulos.length;
     if (!this.pendientes) { this.el.addEventListener('model-loaded', () => this.onLoaded()); return; }
@@ -1052,7 +853,7 @@ AFRAME.registerComponent('setup-museum-model', {
     const mesh = this.el.object3D;
     if (!mesh) return;
 
-    // 1) strip baked lights
+
     const lights = [];
     mesh.traverse((o) => { if (o.isLight) lights.push(o); });
     lights.forEach((light) => {
@@ -1061,22 +862,7 @@ AFRAME.registerComponent('setup-museum-model', {
       if (light.parent) light.parent.remove(light);
     });
 
-    // 1b) NOTE: an earlier version of this step force-set `toneMapped =
-    // false` on every emissive material, to stop ACES from "washing" the
-    // neon/bacteria colors. Reverted: with toneMapped=false, any lit value
-    // that goes over 1.0 in a channel (very plausible here — bright
-    // hemisphere + directional light hitting a glossy low-roughness
-    // material, on top of its own emissive) hard-clips straight to white
-    // instead of being rolled off gracefully by the tone-mapping curve —
-    // that clip is almost certainly why the purple bacteria/exhibit
-    // materials were reading as white on screen. Leaving every material's
-    // default toneMapped: true in place, plus the light-intensity trim in
-    // index.html, restores the graceful roll-off so the actual Blender
-    // colors (confirmed correct in the source file and in the exported
-    // glTF: base color + emissive are both purple) show through instead of
-    // clipping out.
 
-    // 2) scale to real-world size
     this.el.object3D.scale.set(1, 1, 1);
     this.el.object3D.updateMatrixWorld(true);
     let box = new THREE.Box3().setFromObject(mesh);
@@ -1089,20 +875,13 @@ AFRAME.registerComponent('setup-museum-model', {
       this.el.object3D.scale.set(scaleXZ, scaleY, scaleXZ);
     }
 
-    // 3) re-measure in world space after scaling
+
     this.el.object3D.updateMatrixWorld(true);
     box = new THREE.Box3().setFromObject(mesh);
     const center = new THREE.Vector3();
     box.getCenter(center);
 
-    // Real floor meshes (children of the 'suelo' node): the walking
-    // surface is their TOP face, not the lowest point of the whole model
-    // (box.min.y). The floor mesh has real thickness (~0.5m slab), so
-    // box.min.y lands at its underside -- using that as the rig's Y put
-    // the camera embedded inside the floor slab instead of standing on
-    // top of it (near-plane clipping through solid geometry, screen full
-    // of fog/background). floorMeshes is also reused below for the
-    // ground-collision raycast.
+
     const floorRoot = mesh.getObjectByName('suelo');
     const floorMeshes = [];
     if (floorRoot) {
@@ -1118,7 +897,7 @@ AFRAME.registerComponent('setup-museum-model', {
       floorY = box.min.y;
     }
 
-    // 4) detect free-standing "blocks" (peanas) to collide with + tag them
+
     const obstacles = [];
     const objBox = new THREE.Box3();
     const objSize = new THREE.Vector3();
@@ -1128,11 +907,8 @@ AFRAME.registerComponent('setup-museum-model', {
       if (!o.isMesh) return;
       objBox.setFromObject(o);
       objBox.getSize(objSize);
-      // Solo las peanas reales cuentan como obstaculo. La heuristica por
-      // tamaño detectaba 29 objetos (bacterias, bases de vitrina, piezas del
-      // reactor...) y sus margenes de 0.4 m se solapaban hasta tapar casi
-      // toda la sala, que es lo que impedia moverse. Los objetos del GLB ya
-      // vienen con nombres claros desde Blender, asi que basta con el prefijo.
+
+
       if (o.name.startsWith('PEANA_')) {
         objBox.getCenter(objCenter);
         const id = `peana-${peanaIndex++}`;
@@ -1156,32 +932,20 @@ AFRAME.registerComponent('setup-museum-model', {
       minZ: box.min.z + m, maxZ: box.max.z - m
     };
 
-    // 4b) MUSEO_FLOOR_MESHES for the ground-collision check (isGrounded
-    // below). This room's outer wall is a curved/organic shape, not a
-    // rectangle, so MUSEO_BOUNDS above is only a coarse outer limit —
-    // plenty of points inside that rectangle are past the real wall, over
-    // nothing. clamp-to-bounds raycasts against these meshes to catch
-    // that instead of letting the player walk off the edge of the model
-    // into empty space. (floorMeshes/floorRoot computed above, in step 3,
-    // where floorY also needs them.)
+
     window.MUSEO_FLOOR_MESHES = floorMeshes;
 
-    // 4c) MUSEO_WALL_MESHES: the real curved perimeter wall (node
-    // 'PAREDES_Sala' in museum_walls.glb), used by clamp-to-bounds as a
-    // lightweight horizontal-raycast collision proxy so the visitor can't
-    // step through the curved wall — no separate invisible collision box,
-    // just the wall geometry that already ships in the modular GLB.
+
     const wallRoot = mesh.getObjectByName('PAREDES_Sala');
     const wallMeshes = [];
     if (wallRoot) wallRoot.traverse((o) => { if (o.isMesh) wallMeshes.push(o); });
     window.MUSEO_WALL_MESHES = wallMeshes;
 
-    // registry for future interactivity hooks (peanas, nichos, screens...)
+
     window.MUSEO_INTERACTIVE = window.MUSEO_INTERACTIVE || {};
     window.MUSEO_INTERACTIVE.peanas = obstacles.map((o) => ({ id: o.id, meshName: o.meshName, position: o.center }));
 
-    // 5) player rig: ground level, facing the exhibition (toward the
-    // average position of the peanas), camera child holds the eye height
+
     const rig = document.querySelector('#rig');
     const camera = document.querySelector('#camera');
     let yaw = 0;
@@ -1191,11 +955,8 @@ AFRAME.registerComponent('setup-museum-model', {
       avg.z /= obstacles.length;
       yaw = Math.atan2(center.x - avg.x, avg.z - center.z) * (180 / Math.PI);
     }
-    // the geometric center of the room can itself land inside a peana's
-    // footprint, or in the gap between two overlapping peana margins where
-    // a single push-out isn't enough to land somewhere fully free — so
-    // find a genuinely free spot with a ring search outward from center,
-    // instead of trusting the center point at all.
+
+
     const spawnXZ = findSafeSpawn(center.x, center.z, window.MUSEO_BOUNDS, obstacles, floorMeshes, floorY);
 
     if (rig) {
@@ -1216,30 +977,12 @@ AFRAME.registerComponent('setup-museum-model', {
   }
 });
 
-/*
-  Constrains the player rig to the walkable floor: outer rectangle
-  (window.MUSEO_BOUNDS) minus a hole per peana (window.MUSEO_OBSTACLES) —
-  push back to the nearest edge if it ends up inside a hole or past the
-  outer bounds.
 
-  This *is* our navmesh: a rectangle-with-holes matching the walkable area,
-  built once from the model's own measured geometry. We tried the "proper"
-  route first — aframe-extras' `nav-mesh` component + `movement-controls`'
-  `constrainToNavMesh` — but that component throws
-  "THREE.Geometry is not a constructor" on this A-Frame/three.js build
-  (aframe-extras 6.1.0 still calls the THREE.Geometry class that three.js
-  removed around r125+), so it's non-functional here. Since our obstacles
-  are already axis-aligned boxes, this rectangle-minus-boxes clamp produces
-  the same walkable region a "real" navmesh would for this room shape,
-  without depending on the broken component.
-*/
 function clampToWalkable(x, z, bounds, obstacles) {
   x = THREE.MathUtils.clamp(x, bounds.minX, bounds.maxX);
   z = THREE.MathUtils.clamp(z, bounds.minZ, bounds.maxZ);
 
-  // a few relaxation passes: pushing out of one peana's (margin-expanded)
-  // box can land you inside a neighbouring one where they're close together,
-  // so a single pass isn't always enough.
+
   if (obstacles) {
     for (let pass = 0; pass < 4; pass++) {
       let movedAny = false;
@@ -1269,18 +1012,11 @@ function isFreeOfObstacles(x, z, obstacles, extraMargin) {
     x >= o.minX - m && x <= o.maxX + m && z >= o.minZ - m && z <= o.maxZ + m);
 }
 
-/*
-  Ground check: casts a ray straight down at (x, z) against the real floor
-  meshes (window.MUSEO_FLOOR_MESHES, set in setup-museum-model) and reports
-  whether it actually hits floor. Cheap (one ray against ~450 triangles) —
-  fine to run every tick. If no floor meshes were found at all, doesn't
-  block movement (falls back to the rectangle-only bounds instead of
-  trapping the player at spawn).
-*/
+
 const groundRaycaster = new THREE.Raycaster();
 const groundRayOrigin = new THREE.Vector3();
 const groundRayDir = new THREE.Vector3(0, -1, 0);
-// null = sin comprobar, true = el raycast sirve, false = inservible (usar solo bounds)
+
 let groundProbe = null;
 
 function rayHitsFloor(x, z, floorMeshes, refY) {
@@ -1290,26 +1026,7 @@ function rayHitsFloor(x, z, floorMeshes, refY) {
   return groundRaycaster.intersectObjects(floorMeshes, false).length > 0;
 }
 
-/*
-  El suelo de este museo es una malla aplastada a grosor cero. Ademas de no
-  poder sombrearse, tampoco se puede intersecar: el raycast devuelve 0
-  impactos en CUALQUIER punto, incluido el propio spawn. Como clamp-to-bounds
-  usa esto como "¿hay suelo debajo?", el jugador quedaba congelado en su
-  ultima posicion valida y no habia forma de andar con WASD.
 
-  Se comprueba una sola vez en el spawn. Si ahi tampoco hay impacto, la malla
-  no sirve como referencia y se cae a los limites rectangulares, que ya
-  existen y son suficientes para no salirse de la sala.
-*/
-/*
-  Horizontal raycast against the real wall mesh (window.MUSEO_WALL_MESHES,
-  set in setup-museum-model): fired from the last known-good position toward
-  the candidate position, chest-height. If it hits the wall before reaching
-  the candidate, the move would cross the curved perimeter -- used by
-  clamp-to-bounds to hold the player back instead of letting the rectangle-
-  shaped MUSEO_BOUNDS (a coarse outer limit only) allow walking through the
-  curve between two rectangle corners.
-*/
 const wallRaycaster = new THREE.Raycaster();
 const wallRayOrigin = new THREE.Vector3();
 const wallRayDir = new THREE.Vector3();
@@ -1338,15 +1055,7 @@ function isGrounded(x, z, floorMeshes, refY) {
   return rayHitsFloor(x, z, floorMeshes, refY);
 }
 
-/*
-  Finds a spawn point guaranteed to be inside bounds and outside every
-  peana, with some breathing room (not just technically-not-inside) so the
-  first thing you see isn't a pedestal filling the screen: tries the room
-  center first (the common case), then searches outward in rings — handles
-  rooms where peana margins overlap near the center and a single push-out
-  isn't enough. Falls back to a smaller margin, then none, if a spot with
-  full breathing room can't be found (dense layouts).
-*/
+
 function findSafeSpawn(centerX, centerZ, bounds, obstacles, floorMeshes, floorY) {
   const ok = (x, z, margin) =>
     isFreeOfObstacles(x, z, obstacles, margin) && isGrounded(x, z, floorMeshes, floorY);
@@ -1370,7 +1079,7 @@ function findSafeSpawn(centerX, centerZ, bounds, obstacles, floorMeshes, floorY)
 
 AFRAME.registerComponent('clamp-to-bounds', {
   init() {
-    this.lastGood = null; // lazily set from MUSEO_SPAWN on first tick (see below)
+    this.lastGood = null;
   },
   tick() {
     const b = window.MUSEO_BOUNDS;
@@ -1388,19 +1097,16 @@ AFRAME.registerComponent('clamp-to-bounds', {
     const refY = spawn ? spawn.y : obj.position.y;
     const wallHit = crossesWall(this.lastGood.x, this.lastGood.z, clamped.x, clamped.z, window.MUSEO_WALL_MESHES, refY);
     if (wallHit) {
-      // the move would cross the real curved wall mesh before reaching the
-      // candidate point -- hold at the last position instead of stepping
-      // through it (this is the actual perimeter, not the coarse rectangle).
+
+
       clamped.x = this.lastGood.x;
       clamped.z = this.lastGood.z;
     } else if (isGrounded(clamped.x, clamped.z, window.MUSEO_FLOOR_MESHES, refY)) {
       this.lastGood.x = clamped.x;
       this.lastGood.z = clamped.z;
     } else {
-      // the rectangle-minus-obstacles pass let this point through, but
-      // there's no floor mesh under it — this room's real wall curves in
-      // here, past the rectangle's edge. Hold at the last position that
-      // was actually over the floor instead of stepping into empty space.
+
+
       clamped.x = this.lastGood.x;
       clamped.z = this.lastGood.z;
     }
@@ -1410,12 +1116,7 @@ AFRAME.registerComponent('clamp-to-bounds', {
   }
 });
 
-/*
-  Safety net for Priority 1: if the player ever ends up somewhere clamp-to-
-  bounds shouldn't allow (a future bug, a teleport, falling through geometry,
-  a big Y drift since there's no gravity component here) snap back to the
-  measured spawn point. Checked a few times a second, not every frame.
-*/
+
 AFRAME.registerComponent('respawn-guard', {
   init() {
     this.nextCheck = 0;
@@ -1443,25 +1144,10 @@ AFRAME.registerComponent('respawn-guard', {
   }
 });
 
-/* neon-support-lights removed: the GLB's own emissive neon materials
-   (Neon_Purple / Neon_Turquoise / Neon_White, baked in Blender) are what
-   should read as light sources. A-Frame just displays the model as
-   exported -- no extra JS-created point lights simulating the neon. */
 
-/*
-  Reproduce las animaciones que vienen dentro del GLB (cuerpos de las
-  bacterias, puntas de los pelitos como morph targets, y las pompas del
-  reactor). A-Frame no las arranca solo: hay que crear un
-  THREE.AnimationMixer sobre el modelo cargado y avanzarlo en cada tick.
-  Se reproducen TODAS las clips a la vez y en bucle infinito, que es como
-  estan authored en Blender (cada objeto lleva su propio desfase, asi que
-  no van sincronizadas entre si).
-*/
 AFRAME.registerComponent('gltf-animations', {
-  // fps: el mixer no necesita actualizarse a la frecuencia de refresco de la
-  // pantalla para verse suave -- son respiraciones/balanceos lentos. 30 Hz
-  // es indistinguible a la vista y evita recalcular 12 modulos por frame.
-  // document.hidden ademas pausa el trabajo cuando la pestaña no es visible.
+
+
   schema: {
     fps: { type: 'number', default: 30 }
   },
@@ -1498,22 +1184,7 @@ AFRAME.registerComponent('gltf-animations', {
   }
 });
 
-/*
-  Correcciones de render sobre el GLB ya cargado. No tocan geometria,
-  animaciones ni el diseño: solo como se dibujan tres cosas concretas.
 
-  1. Suelo: la malla es un plano de grosor cero y su material venia con
-     FrontSide, asi que desde la altura de los ojos se veia por la cara
-     de atras y desaparecia. DoubleSide lo devuelve.
-  2. Bacterias: el cuerpo venia con DoubleSide y depthWrite, asi que las
-     caras traseras competian con las delanteras y producian el ruido de
-     pixeles sueltos. FrontSide lo limpia. Los pelitos SI necesitan
-     DoubleSide (son tiras finas), asi que esos no se tocan.
-  3. Neones bajo las cristaleras pequeñas: en blanco, como la linea de la
-     ventana grande. El resto del lado se queda morado. Se localizan por
-     posicion (el aro que hay justo debajo de cada VITRINA_Base_*), no por
-     nombre, para que siga funcionando si cambia la numeracion.
-*/
 AFRAME.registerComponent('web-fixes', {
   init() {
     this.el.addEventListener('museo-modules-loaded', () => this.onLoaded());
@@ -1531,20 +1202,14 @@ AFRAME.registerComponent('web-fixes', {
       if (o.name === 'SUELO_Superficie') suelo = o;
       if (o.name.startsWith('VITRINA_Base_')) bases.push(o);
       if (o.material && o.material.name === 'Neon_Purple') neones.push(o);
-      // cuerpos de bacteria: quitar el doble cara que generaba los artefactos
+
       if (o.material && o.material.name === 'Bacteria_Mat') {
         o.material.side = THREE.FrontSide;
         o.material.needsUpdate = true;
       }
     });
 
-    // El suelo ya no necesita apaño: la malla siempre tuvo sus 0,52 m de
-    // grosor, lo que estaba a cero era la escala Z del objeto en Blender.
-    // Restaurada y reexportada, vuelve a tener volumen real, se sombrea con
-    // las luces de la escena y se puede intersecar, asi que ni el material
-    // plano ni el DoubleSide hacen falta.
 
-    // un unico material blanco compartido por todos los aros de vitrina
     let blanco = null;
     let pintados = 0;
     bases.forEach((base) => {
@@ -1569,33 +1234,22 @@ AFRAME.registerComponent('web-fixes', {
         pintados++;
       });
     });
-    /*
-      Tubos y probetas sueltos. Los de Lab_Batch2 y Lab_Extra ya no salen del
-      GLB, pero quedaban los del instrumental de laboratorio (Lab_Peana*,
-      Lab_Nicho6_*, TuboGenerico*, Tube*). Se ocultan por prefijo. El
-      reactor NO se toca: sus piezas se llaman Bioreactor_*, que no encaja
-      con ninguno de estos prefijos.
-    */
+
+
     let tubos = 0;
     mesh.traverse((o) => {
       if (o.isMesh && /^(Lab_|Tubo|Tube)/.test(o.name)) { o.visible = false; tubos++; }
     });
 
-    /*
-      Ventanas del lado de las bacterias en blanco. Se distinguen por forma,
-      no por nombre: son los marcos verticales pegados a la pared, altos
-      (mas de 1 m) y que arrancan cerca del suelo. Quedan fuera los aros de
-      peana (planos, a ras de suelo) y los arcos de techo (arrancan por
-      encima de 2,5 m), que siguen morados.
-    */
+
     let blancoVentana = null;
     let ventanas = 0;
     mesh.traverse((o) => {
       if (!o.isMesh || !o.material || o.material.name !== 'Neon_Purple') return;
       const b = new THREE.Box3().setFromObject(o);
-      if ((b.min.x + b.max.x) / 2 >= 0) return;          // solo el lado bacterias
+      if ((b.min.x + b.max.x) / 2 >= 0) return;
       const alto = b.max.y - b.min.y;
-      if (alto < 1.0 || b.min.y > 1.0) return;           // ni aros de suelo ni arcos de techo
+      if (alto < 1.0 || b.min.y > 1.0) return;
       if (!blancoVentana) {
         blancoVentana = o.material.clone();
         blancoVentana.name = 'Neon_Blanco_Ventana';
@@ -1612,23 +1266,8 @@ AFRAME.registerComponent('web-fixes', {
 });
 
 
-/* ==========================================================================
-   CAPA CURATORIAL — contenido + interaccion por proximidad
-   Un unico objeto de contenido y un unico componente reutilizado por todas
-   las piezas. No toca geometria, materiales, luces ni animaciones: es una
-   capa de HTML por encima del museo.
-   ========================================================================== */
-
-/*
-  Sala 2 (Reactores y Aplicaciones) tiene su propio lenguaje de color: verde/
-  turquesa, no el morado de la Sala 1. El tono no es inventado -- se deriva
-  del propio material Neon_Turquoise ya presente en el modelo (mismo peso y
-  saturacion que el morado #74349A/#805096 que sustituye en toda la
-  señaletica y los acentos de interaccion del reactor), para que ambos
-  sistemas de color convivan como parte del mismo museo.
-*/
-const ROOM2_ACCENT = '#2C8C82';         // equivalente a #74349A en Sala 2
-const ROOM2_ACCENT_LIGHT = '#5A9994';   // equivalente a #805096 en Sala 2
+const ROOM2_ACCENT = '#2C8C82';
+const ROOM2_ACCENT_LIGHT = '#5A9994';
 const REACTOR_CONTROL_I18N = {
   en: {
     title: 'PHOTOBIOREACTOR',
@@ -1723,63 +1362,53 @@ const REACTOR_CONTROL_I18N = {
 };
 
 const museumContent = {
-  /* Sala 1 (Purple Phototrophic Bacteria). Introduccion general + las 8 cepas
-     avanzan de lo general a lo especifico. Solo hay 8 anclas fisicas en esta
-     sala (2 piezas "large" + 6 "small"), asi que la introduccion general y la
-     cepa 01 (Rhodospirillum rubrum) comparten la primera ficha -- el propio
-     texto de la introduccion termina anunciando las ocho cepas, asi que el
-     salto a la cepa 01 en la misma ficha es la continuacion natural. El resto
-     de cepas (02-08) sigue el mismo orden de recorrido que ya tenian las
-     piezas de la sala. */
+
+
   bacteriaLarge01: {
     lead: 'Much more than photosynthesis', tags: ['PHOTOSYNTHESIS', 'METABOLIC DIVERSITY', 'PHA'], icon: 'cell',
     tier: 'primary', anchor: 'BACTERIA_MASTER',
     section: '01', title: 'PURPLE PHOTOTROPHIC BACTERIA', label: 'EXPLORE +',
-    // Microscopia real de bacterias purpuras (fluorescencia + SEM), tomada de
-    // los documentos fuente del proyecto -- ver brief punto 5.
-    images: ['./assets/images/ppb-microscopy-overview.jpg'],
-    body: 'Purple phototrophic bacteria (PPB) are a diverse group of microorganisms capable of using light as a source of energy. What makes them particularly interesting, however, is not only their photosynthetic ability, but also the extraordinary variety of metabolic strategies they can develop.\n\nDepending on the species and environmental conditions, these bacteria can modify their metabolism, fix nitrogen, transform organic compounds, use certain gases, exchange electrons with minerals or electrodes, and store carbon in the form of PHA (biopolymers with potential applications in the production of bio-based plastics). Some strains are also particularly efficient at producing hydrogen, while the biomass obtained from their cultivation is being investigated for food and feed applications.\n\nThis diversity makes purple phototrophic bacteria important both for understanding fundamental biological processes (such as the conversion of light into energy and cellular adaptation to environmental conditions) and for investigating more sustainable biotechnological processes. Their cultivation opens possibilities related to hydrogen production, bioplastics, biomass and bioelectrochemical systems.\n\nBut they do not all behave in the same way.\n\nFrom this point onwards, the exhibition focuses on eight specific strains, revealing the characteristics and capabilities that distinguish each one.\n\n01. RHODOSPIRILLUM RUBRUM\nA key bacterium for understanding photosynthesis\n\nRhodospirillum rubrum has played an important role in the history of bacterial photosynthesis research. Its relatively simple photosynthetic apparatus made it one of the first model organisms used to investigate how energy from light is transformed, through electron transfer, into energy that the cell can use.\n\nIts study has also helped researchers understand the relationship between energy production, nitrogen fixation and carbon metabolism, showing how a bacterium can coordinate different processes depending on its needs and environmental conditions.\n\nIts relevance is not limited to fundamental research. R. rubrum can accumulate PHA in the form of intracellular granules. These compounds act as carbon reserves for the bacterium and can be used in the production of bio-based and biodegradable materials. The species is also currently being investigated as a potential nutritious ingredient for food and feed applications.'
+
+
+    body: 'Purple phototrophic bacteria (PPB) are a diverse group of microorganisms capable of using light as a source of energy. What makes them particularly interesting, however, is not only their photosynthetic ability, but also the extraordinary variety of metabolic strategies they can develop.\n\nDepending on the species and environmental conditions, these bacteria can modify their metabolism, fix nitrogen, transform organic compounds, use certain gases, exchange electrons with minerals or electrodes, and store carbon in the form of PHA (biopolymers with potential applications in the production of bio-based plastics). Some strains are also particularly efficient at producing hydrogen, while the biomass obtained from their cultivation is being investigated for food and feed applications.\n\nThis diversity makes purple phototrophic bacteria important both for understanding fundamental biological processes (such as the conversion of light into energy and cellular adaptation to environmental conditions) and for investigating more sustainable biotechnological processes. Their cultivation opens possibilities related to hydrogen production, bioplastics, biomass and bioelectrochemical systems.\n\nBut they do not all behave in the same way.\n\nFrom this point onwards, the exhibition focuses on eight specific strains, revealing the characteristics and capabilities that distinguish each one.\n\n01. RHODOSPIRILLUM RUBRUM\nA key bacterium for understanding photosynthesis\n\nRhodospirillum rubrum has played an important role in the history of bacterial photosynthesis research. Its relatively simple photosynthetic apparatus made it one of the first model organisms used to investigate how energy from light is transformed, through electron transfer, into energy that the cell can use.\n\nIts study has also helped researchers understand the relationship between energy production, nitrogen fixation and carbon metabolism, showing how a bacterium can coordinate different processes depending on its needs and environmental conditions.\n\nIts relevance is not limited to fundamental research. R. rubrum can accumulate PHA in the form of intracellular granules. These compounds act as carbon reserves for the bacterium and can be used in the production of bio-based and biodegradable materials. The species is also currently being investigated as a potential nutritious ingredient for food and feed applications.\n\nSOURCE\nPHA in R. rubrum · DOI 10.1016/0141-8130(89)90040-8'
   },
-  /* Pieza suspendida independiente. El componente space-mission-descent la
-     registra cuando su GLB ya esta cargado y situado; por eso no busca un
-     ancla dentro de los doce modulos como las bacterias convencionales. */
+
+
   spaceMission: {
     dynamic: true, tier: 'primary',
     section: 'ISS', title: 'RHODOSPIRILLUM RUBRUM IN SPACE',
     lead: 'Seven days aboard the International Space Station',
     tags: ['SPACEFLIGHT', 'MICROGRAVITY', 'CLOSED-LOOP LIFE SUPPORT'],
     images: ['./assets/images/rhodospirillum-space-mission.jpg'],
-    body: 'Future space missions will need ways to produce food, recycle waste and regenerate air and water without depending on constant supplies from Earth. One possible solution is to use beneficial microorganisms inside engineered closed-loop ecosystems.\n\nIn 2015, scientists sent Rhodospirillum rubrum and several other useful bacterial species to the International Space Station for seven days. The original culture was divided into two groups: one remained on Earth while the other travelled into low Earth orbit, where it experienced microgravity and increased radiation.\n\nAfter the flight, the researchers reactivated both cultures and compared them. R. rubrum survived the journey, grew normally and continued to perform its expected biological functions. The spaceflight appeared to have little effect on its overall performance.\n\nThese results support the possibility of using this edible purple bacterium in experimental life-support systems. In the future, microorganisms such as R. rubrum could help recycle resources, reduce dependence on terrestrial resupply and perhaps contribute to feeding astronauts during long-duration missions.'
+    body: 'Future space missions will need ways to produce food, recycle waste and regenerate air and water without depending on constant supplies from Earth. One possible solution is to use beneficial microorganisms inside engineered closed-loop ecosystems.\n\nIn 2015, scientists sent Rhodospirillum rubrum and several other useful bacterial species to the International Space Station for seven days. The original culture was divided into two groups: one remained on Earth while the other travelled into low Earth orbit, where it experienced microgravity and increased radiation.\n\nAfter the flight, the researchers reactivated both cultures and compared them. R. rubrum survived the journey, grew normally and continued to perform its expected biological functions. The spaceflight appeared to have little effect on its overall performance.\n\nThese results support the possibility of using this purple bacterium, which is being investigated as a potential food/feed ingredient, in experimental life-support systems. In the future, microorganisms such as R. rubrum could help recycle resources, reduce dependence on terrestrial resupply and perhaps contribute to feeding astronauts during long-duration missions.\n\nSOURCE\nIlgrande et al., 2019 · DOI 10.1089/ast.2018.1973'
   },
   bacteriaSmall01: {
     lead: 'The machinery that converts light into energy', tags: ['REACTION CENTER', 'NOBEL PRIZE'], icon: 'form',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_base',
     section: '02', title: 'BLASTOCHLORIS VIRIDIS', label: 'VIEW +',
     images: ['./assets/images/blastochloris-viridis.png'],
-    body: 'Inside photosynthetic bacteria, specialized structures capture light energy and begin its conversion into chemical energy. The photosynthetic reaction center of Blastochloris viridis occupies a particularly important place in the history of science.\n\nIt was the first membrane protein complex whose structure was resolved at atomic resolution. Observing its organization at this level of detail made it possible to better understand one of the essential processes of photosynthesis (the initial conversion of light energy into chemical energy).\n\nThis discovery went far beyond the study of a single bacterium. It opened new possibilities for investigating the structure of membrane proteins and contributed to the research recognized by the 1988 Nobel Prize in Chemistry.'
+    body: 'Inside photosynthetic bacteria, specialized structures capture light energy and begin its conversion into chemical energy. The photosynthetic reaction center of Blastochloris viridis occupies a particularly important place in the history of science.\n\nIt was the first membrane protein complex whose structure was resolved at atomic resolution. Observing its organization at this level of detail made it possible to better understand one of the essential processes of photosynthesis (the initial conversion of light energy into chemical energy).\n\nThis discovery went far beyond the study of a single bacterium. It opened new possibilities for investigating the structure of membrane proteins and contributed to the research recognized by the 1988 Nobel Prize in Chemistry.\n\nThe structure shown here is a later structure of the same reaction center, not the original one behind that prize.\n\nSOURCE\nStructure of the photosynthetic reaction center of Blastochloris viridis. PDB 5M7J · DOI 10.2210/pdb5M7J/pdb'
   },
   bacteriaSmall02: {
     lead: 'Changing from within to adapt', tags: ['CHROMATOPHORES', 'ADAPTATION'], icon: 'surface',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_10',
     section: '03', title: 'CEREIBACTER SPHAEROIDES', label: 'VIEW +',
-    // Microscopia optica real, celulas esfericas -- coherente con "sphaeroides".
-    images: ['./assets/images/cereibacter-sphaeroides-microscopy.jpg'],
+
     body: 'Bacteria are not static organisms. Some can modify their own cellular architecture in response to the conditions around them.\n\nCereibacter sphaeroides (formerly known as Rhodobacter sphaeroides) is one of the most extensively studied photosynthetic microorganisms and provides a particularly clear example of this ability to adapt.\n\nWhen oxygen availability decreases, the bacterium develops extensive intracellular membranes known as chromatophores. These membranes contain the machinery required for photosynthesis. As environmental conditions change, the internal organization of the cell changes as well.\n\nResearch on C. sphaeroides has helped scientists understand both the molecular mechanisms of electron transfer during photosynthesis and the way microorganisms regulate and reorganize their metabolism in response to changing environments.'
   },
   bacteriaSmall03: {
     lead: 'Coordinating light, nitrogen and energy', tags: ['NITROGEN FIXATION', 'REDOX BALANCE'], icon: 'wave',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_12',
     section: '04', title: 'RHODOBACTER CAPSULATUS', label: 'VIEW +',
-    // Microscopia de fluorescencia real de bacterias purpuras.
-    images: ['./assets/images/rhodobacter-capsulatus-microscopy.jpg'],
+
     body: 'A cell must coordinate many processes at the same time. Rhodobacter capsulatus has become an important model organism for studying how a photosynthetic bacterium maintains this balance.\n\nResearch on this species has revealed important connections between photosynthesis, nitrogen fixation and cellular redox balance. These processes are interconnected and form part of the regulatory networks controlling how the cell obtains and uses energy.\n\nMore recently, structural studies have revealed an unusually compact architecture in its light-harvesting and reaction-center complex.\n\nIts study demonstrates that even within purple phototrophic bacteria, different biological solutions exist for capturing light, managing energy and responding to changing environmental conditions.'
   },
   bacteriaLarge02: {
     lead: 'A different way to reproduce', tags: ['HYPHAE', 'BUDDING', 'LIFE CYCLE'], icon: 'transform',
     tier: 'primary', anchor: 'Exhibit_Mesh0_Capsule',
     section: '05', title: 'RHODOMICROBIUM VANNIELII', label: 'EXPLORE +',
-    // Microscopia de contraste de fase real, celulas con apendices polares
-    // -- coherente con la budding/hifas descritas en el cuerpo del texto.
+
+
     images: ['./assets/videos/rhodomicrobium-vannielii-animation.mp4', './assets/images/rhodomicrobium-budding.jpg'],
     body: 'We often imagine bacteria reproducing through a simple division in which one cell produces two almost identical cells. Rhodomicrobium vannielii shows that bacterial reproduction can be considerably more complex.\n\nThis bacterium develops filamentous extensions known as hyphae. New cells are formed by budding from the tips of these structures. A small bud appears, gradually grows and eventually separates to form a new cell.\n\nThis life cycle includes processes of cellular differentiation and unusual multicellular stages, making R. vannielii an important organism for studying the evolution of complex bacterial life cycles.\n\nIts distinctive morphology also provides a striking example of the extraordinary diversity found among photosynthetic bacteria.'
   },
@@ -1787,51 +1416,41 @@ const museumContent = {
     lead: 'Bacteria connected to electricity', tags: ['ELECTROACTIVITY', 'BIOELECTROCHEMISTRY'], icon: 'grid',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_14',
     section: '06', title: 'RHODOVULUM', label: 'VIEW +',
-    // Trabajo de laboratorio real con sondas de electrodo -- coherente con
-    // la electroactividad descrita en el cuerpo del texto.
+
+
     images: ['./assets/images/rhodovulum-electroactivity.jpg'],
-    body: 'Some purple phototrophic bacteria have a particularly remarkable ability (they are electroactive). This means that they can exchange electrons with elements outside the cell.\n\nSpecies of Rhodovulum (including Rhodovulum sulfidophilum and Rhodovulum visakhapatnamense) can obtain electrons from hydrogen, iron or even directly from an electrode.\n\nThese processes allow us to understand the bacterium not as an isolated organism, but as part of a system in which biological matter and conductive materials can exchange electrical charges.\n\nThe mechanisms responsible for this electroactivity are still not completely understood. For this reason, these bacteria remain an active field of research and provide new opportunities to investigate interactions between microorganisms, minerals and bioelectrochemical systems.'
+    body: 'Some purple phototrophic bacteria have a particularly remarkable ability (they are electroactive). This means that they can exchange electrons with elements outside the cell.\n\nSpecies of Rhodovulum (including Rhodovulum sulfidophilum and Rhodovulum visakhapatnamense) can obtain electrons from hydrogen, iron or even directly from an electrode.\n\nThese processes allow us to understand the bacterium not as an isolated organism, but as part of a system in which biological matter and conductive materials can exchange electrical charges.\n\nThe mechanisms responsible for this electroactivity are still not completely understood. For this reason, these bacteria remain an active field of research and provide new opportunities to investigate interactions between microorganisms, minerals and bioelectrochemical systems.\n\nSOURCE\nRhodovulum sulfidophilum AB26 · DOI 10.1038/s41396-021-01015-8'
   },
   bacteriaSmall05: {
     lead: 'Living from a toxic gas', tags: ['CARBON MONOXIDE', 'BIOHYDROGEN'], icon: 'scale',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_16',
     section: '07', title: 'RUBRIVIVAX GELATINOSUS', label: 'VIEW +',
-    // Micrografia TEM real de bacterias purpuras.
-    images: ['./assets/images/rubrivivax-gelatinosus-tem.jpg'],
+
     body: 'Carbon monoxide (CO) is toxic to many organisms. Rubrivivax gelatinosus, however, is able to use it as an energy source.\n\nUnder anaerobic conditions (in the absence of oxygen), some purple phototrophic bacteria can oxidize CO using specialized enzyme systems. In R. gelatinosus, this metabolism can also be linked to hydrogen production.\n\nThis ability has made the species an important model for studying both the biological conversion of carbon monoxide and potential processes for biohydrogen production.\n\nIts case illustrates one of the key ideas running throughout this room (the remarkable metabolic flexibility of purple phototrophic bacteria and their ability to exploit substances and environmental conditions that would be unfavorable for many other organisms).'
   },
   bacteriaSmall06: {
     lead: 'When a biological capability becomes an opportunity', tags: ['PHOTOFERMENTATION', 'ELECTROACTIVITY'], icon: 'transform',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_18',
     section: '08', title: 'RHODOPSEUDOMONAS PALUSTRIS', label: 'VIEW +',
-    // b1/b3 reales (no el circulo/nicho): ver brief -- dos imagenes propias
-    // para esta ficha, distintas del contenido del display circular.
+
+
     images: ['./assets/images/b1.png', './assets/images/b3.png'],
-    body: 'Rhodopseudomonas palustris brings together several of the capabilities explored throughout the exhibition.\n\nIt can use light to support the anaerobic degradation of aromatic compounds derived from plants, contributing to the recycling of complex organic matter and to processes associated with the carbon cycle.\n\nIt is also particularly effective at producing hydrogen through photofermentation. Among the purple phototrophic bacteria studied for this process, certain strains of R. palustris (such as strain 42OL) have achieved especially high hydrogen productivity.\n\nIt has another important characteristic as well (electroactivity). Some strains can exchange electrons with electrodes and, by combining electricity and light, use these processes to generate valuable products such as PHA and certain biofuels.\n\nAt this point, we have finished looking closely at the bacteria themselves. The next step is to understand how they can be cultivated and how these capabilities can be used at a larger scale.'
+    body: 'Rhodopseudomonas palustris brings together several of the capabilities explored throughout the exhibition.\n\nIt can use light to support the anaerobic degradation of aromatic compounds derived from plants, contributing to the recycling of complex organic matter and to processes associated with the carbon cycle.\n\nIt is also particularly effective at producing hydrogen through photofermentation. Among the purple phototrophic bacteria studied for this process, certain strains of R. palustris (such as strain 42OL) have achieved especially high hydrogen productivity.\n\nIt has another important characteristic as well (electroactivity). Some strains can exchange electrons with electrodes and, by combining electricity and light, use these processes to generate valuable products such as PHA and certain biofuels.\n\nAt this point, we have finished looking closely at the bacteria themselves. The next step is to understand how they can be cultivated and how these capabilities can be used at a larger scale.\n\nR. palustris is also a model for microbial electroactivity. The strain TIE-1 can take up electrons from an electrode under illuminated conditions and use carbon dioxide as a carbon source. This metabolism has been investigated for the production of compounds including PHA and n-butanol.\n\nSOURCE\nR. palustris 42OL, photofermentation · DOI 10.1155/2012/590693\nTIE-1 on an electrode: Bose et al., 2014, Nature Communications'
   },
-  /* Sala 2 (Reactors and Applications). Continua la historia de la Sala 1:
-     BACTERIA -> CULTIVATION -> REACTOR -> PROCESS -> PRODUCT -> APPLICATION.
-     El reactor es la pieza principal (misma ficha ya funcionaba por click,
-     solo cambia el contenido); las 6 ventanas pasan de "vitrina pasiva sin
-     ficha" a piezas informativas reales (ver openable, mas abajo) que abren
-     el mismo panel que el resto del museo. Ninguna imagen todavia -- display
-     se queda en false a proposito en las 6, ver nota en image-windows. */
+
+
   reactor01: {
     lead: 'Creating the right conditions for microbial growth',
     tags: ['CULTIVATION', 'CONTROLLED CONDITIONS', 'PROCESS'], icon: 'reactor',
     tier: 'primary', anchor: 'PEANA_Bioreactor',
     title: 'PHOTOBIOREACTOR', label: 'VIEW PROCESS +',
-    // Fotobiorreactores reales de laboratorio, tomados de los documentos
-    // fuente del proyecto -- ver brief punto 5 (nunca inventadas).
+
+
     images: ['./assets/images/reactor-cultivation-01.jpg', './assets/images/reactor-cultivation-02.jpg'],
     body: 'FROM BACTERIA TO BIOPROCESS\n\nIn the previous room, we discovered the remarkable metabolic diversity of purple phototrophic bacteria.\n\nBut understanding what these microorganisms can do is only the beginning. To use their capabilities, researchers need to create controlled environments where bacteria receive the appropriate light, nutrients and operating conditions. Photobioreactors make this possible.\n\nInside these systems, microorganisms can be cultivated under controlled conditions, allowing researchers to study and develop processes related to hydrogen production, bioplastics, biomass and bioelectrochemical applications.\n\nIn this room, the focus moves from the microorganism itself to the process.\n\nPHOTOBIOREACTOR\n\nA photobioreactor provides a controlled environment for cultivating photosynthetic microorganisms.\n\nThe system allows key conditions such as light, nutrient supply and circulation to be managed while the culture grows. By controlling these variables, researchers can investigate how purple phototrophic bacteria transform resources and produce compounds of potential interest.\n\nThe reactor therefore represents the transition between understanding the biology of these microorganisms and using their capabilities in technological processes.'
   },
 
-  /* Ventanas de la pared del laboratorio. openable:true (nuevo) -- antes eran
-     contenido pasivo sin ficha; ahora abren el panel de informacion como
-     cualquier otra pieza (ver exhibit-info.open). display se queda en false:
-     sin imagenes ni graficos todavia, los nichos quedan limpios a proposito
-     -- el contenido grafico final se disenara aparte (ver image-windows). */
+
   window01: { display: false, tier: 'tertiary', windowIndex: 0, openable: true, icon: 'wave',
     section: '01', title: 'FROM LIGHT TO HYDROGEN', lead: 'Photofermentation',
     tags: ['HYDROGEN', 'PHOTOFERMENTATION'],
@@ -1840,7 +1459,7 @@ const museumContent = {
   window02: { display: false, tier: 'tertiary', windowIndex: 1, openable: true, icon: 'form',
     section: '02', title: 'FROM CARBON TO BIOPLASTIC', lead: 'PHA production',
     tags: ['PHA', 'BIOPLASTIC'],
-    // Micrografia TEM real de una bacteria con granulos de PHA visibles.
+
     images: ['./assets/images/pha-granules-tem.jpg'],
     body: 'Some purple phototrophic bacteria can accumulate carbon inside their cells in the form of PHA.\n\nFor the microorganism, these compounds function as carbon and energy reserves. For biotechnology, however, PHA is especially interesting because it can be used as a basis for producing bio-based and biodegradable materials.\n\nThe process creates a direct connection between microbial metabolism and the development of alternative materials.' },
   window03: { display: false, tier: 'tertiary', windowIndex: 2, openable: true, icon: 'scale',
@@ -1851,32 +1470,29 @@ const museumContent = {
   window04: { display: false, tier: 'tertiary', windowIndex: 3, openable: true, icon: 'grid',
     section: '04', title: 'BIOELECTRICITY', lead: 'Microorganisms and electrodes',
     tags: ['ELECTROACTIVITY', 'BIOELECTROCHEMISTRY'],
-    // SEM+EDS de un electrodo/mineral y trabajo de laboratorio con sondas de
-    // electrodo -- ambas reales, de los documentos fuente del proyecto.
-    images: ['./assets/images/electroactivity-electrode-sem.jpg', './assets/images/electroactivity-electrode-lab.jpg'],
+
+
+    images: ['./assets/images/electroactivity-electrode-sem.jpg'],
     body: 'Some purple phototrophic bacteria are electroactive.\n\nThis means that they can exchange electrons with external materials, including electrodes.\n\nThese interactions allow researchers to investigate bioelectrochemical systems in which living microorganisms and conductive materials become part of the same process.\n\nElectroactivity opens new possibilities for connecting microbial metabolism with technological systems.' },
   window05: { display: false, tier: 'tertiary', windowIndex: 4, openable: true, icon: 'surface',
     section: '05', title: 'SCALE UP', lead: 'From laboratory to larger production',
     tags: ['SCALE-UP', 'PRODUCTION'],
-    // Reactores de bolsa de plastico reales, en estanteria -- exactamente el
-    // "low-cost plastic bag reactor" que describe el cuerpo del texto.
+
+
     images: ['./assets/images/scaleup-bag-reactors-01.jpg', './assets/images/scaleup-bag-reactors-02.jpg'],
-    body: 'A successful biological process must eventually move beyond the laboratory.\n\nOne strategy for reducing production and installation costs is to cultivate purple phototrophic bacteria in low-cost plastic bag reactors using food-grade equipment.\n\nInstead of building one increasingly large reactor, production capacity can be expanded by operating several reactors in parallel.\n\nThis approach offers a flexible way of increasing cultivation capacity while keeping the system relatively simple.' },
-  /* Ultima ventana del recorrido: cierra con la sintesis de la sala
-     (BACTERIA -> PROCESS -> RESULT), igual que bacteriaLarge01/bacteriaSmall06
-     cierran la Sala 1 dentro de su propio body -- ningun panel nuevo. */
+    body: 'A successful biological process must eventually move beyond the laboratory.\n\nOne strategy for reducing production and installation costs is to cultivate purple phototrophic bacteria in low-cost plastic bag reactors using food-grade equipment.\n\nInstead of building one increasingly large reactor, production capacity can be expanded by operating several reactors in parallel.\n\nThis approach offers a flexible way of increasing cultivation capacity while keeping the system relatively simple, and it can be run under sterile conditions.\n\nThe biomass obtained is studied as an ingredient for food and feed applications. Productivity can still be improved, but the system is viable and scalable.\n\nThese systems are currently being optimised at UMONS (Belgium), while PurpleTech develops capacity expansion through the parallel operation of multiple bag reactors.' },
+
+
   window06: { display: false, tier: 'tertiary', windowIndex: 5, openable: true, icon: 'transform',
     section: '06', title: 'ONE MICROORGANISM, MANY OUTPUTS', lead: 'Different processes, different possibilities',
     tags: ['HYDROGEN', 'PHA', 'BIOMASS', 'ELECTRON EXCHANGE'],
-    // Infografia real del proceso completo (fermentacion -> filtracion ->
-    // cultivo PPB -> separacion de biomasa), sintesis visual del recorrido.
+
+
     images: ['./assets/images/process-overview.jpg'],
     body: 'Purple phototrophic bacteria do not lead to a single product or application.\n\nDepending on the strain, cultivation conditions and process, their metabolism can be connected to different outcomes.\n\nHYDROGEN\nPHA\nBIOMASS\nELECTRON EXCHANGE\n\nThe value of these microorganisms lies precisely in this diversity.\n\nDifferent bacteria, different processes and different possibilities.\n\nBACTERIA → PROCESS → RESULT\n\nUnderstanding the microorganism is the first step. Controlling the process is what allows its capabilities to be explored at a larger scale.' }
 };
 
-// English is the canonical/default content. The Spanish file only contains
-// translated text fields, so anchors, images, icons and interaction metadata
-// always stay identical in both languages.
+
 const translatedContent = window.MUSEUM_I18N
   && window.MUSEUM_I18N.content
   && window.MUSEUM_I18N.content[MUSEUM_LANGUAGE];
@@ -1886,21 +1502,7 @@ if (translatedContent) {
   });
 }
 
-/*
-  Texto del cuerpo de la ficha: de textContent plano a HTML controlado, para
-  poder (a) resaltar en negrita solo los conceptos cientificos importantes
-  y (b) separar parrafos reales (cada \n\n de museumContent) en su propio
-  <p>, con \n simples como salto de linea dentro del mismo parrafo (para
-  listas cortas como la de window06). El texto en si NO cambia -- se
-  escapa primero para que nada de esto pueda romper el HTML del panel.
 
-  La lista de terminos es la misma para todo el museo (Sala 1 y Sala 2
-  comparten la ficha): son los conceptos que el propio brief señala como
-  ejemplo, mas los sinonimos directos que ya aparecen en los textos
-  existentes. Ordenados de mas largo a mas corto antes de construir el
-  regex, para que "hydrogen production" se resalte entero en vez de dejar
-  "hydrogen" suelto y "production" sin marcar.
-*/
 const PANEL_KEYWORDS = [
   'International Space Station', 'closed-loop ecosystems', 'life-support systems',
   'microgravity', 'spaceflight', 'radiation',
@@ -1949,8 +1551,7 @@ function highlightKeywords(escapedText) {
   return escapedText.replace(PANEL_KEYWORDS_RE, '<strong>$1</strong>');
 }
 
-/* museumContent[id].body en <p> reales (parrafo = linea en blanco), con
-   negrita selectiva sobre terminos clave -- nunca frases/parrafos enteros. */
+
 function renderPanelBody(rawText) {
   const highlighted = highlightKeywords(escapeHtml(rawText || ''));
   return highlighted
@@ -1959,16 +1560,7 @@ function renderPanelBody(rawText) {
     .join('');
 }
 
-/*
-  Reasigna `child` a `newParent` conservando su transformacion de MUNDO
-  exacta (misma posicion/rotacion/escala vistas desde fuera, aunque cambien
-  sus valores locales). Se usa para envolver cada pieza informativa en un
-  "pivote" centrado en su propio volumen, de forma que el hover pueda
-  escalarla ligeramente alrededor de su propio centro en vez de alrededor
-  del origen (0,0,0) que comparten todos los modulos del museo -- escalar
-  sobre el origen desplazaria visiblemente la pieza en vez de agrandarla en
-  su sitio.
-*/
+
 function reparentPreservingWorld(child, newParent) {
   child.updateWorldMatrix(true, false);
   const worldMatrix = child.matrixWorld.clone();
@@ -1979,13 +1571,7 @@ function reparentPreservingWorld(child, newParent) {
   localMatrix.decompose(child.position, child.quaternion, child.scale);
 }
 
-/*
-  Orienta la entidad hacia la camara cada frame. No se usa el componente
-  `look-at` de aframe-extras (esta version no lo trae cargado, ver nota en
-  drag-look-controls sobre por que aframe-extras no se usa en este
-  proyecto): esta version minima solo la necesita la etiqueta flotante
-  "VIEW +" de exhibit-info.
-*/
+
 AFRAME.registerComponent('face-camera', {
   init() { this._target = new THREE.Vector3(); },
   tick() {
@@ -1996,22 +1582,7 @@ AFRAME.registerComponent('face-camera', {
   }
 });
 
-/*
-  Datos crudos (sin escalar) de los 6 circulos de video de la sala violeta,
-  medidos directamente sobre la malla visible de cada circulo de Blender
-  (centroide y normal reales de sus vertices en espacio de mundo de
-  Blender/glTF, NUNCA el origen del objeto -- los 6 objetos tienen su
-  origen en 0,0,0 y toda su geometria horneada en los vertices, asi que el
-  origen no sirve como referencia de posicion). Exportados directamente
-  desde Blender a glTF (misma tuberia/conversion de ejes que el resto de
-  modulos) y verificados con SVD sobre la nube de puntos: centroid = centro
-  geometrico real; normal = normal del plano ajustado por PCA, con el signo
-  corregido para que apunte hacia el interior de la sala; u_axis = un eje
-  tangente del propio plano del circulo, ortogonal a la normal. radius = la
-  distancia real maxima de un vertice al centroide, en las mismas unidades
-  crudas. place-ppb-circle (mas abajo) aplica la escala real del museo a
-  estos valores en tiempo de ejecucion.
-*/
+
 const PPB_CIRCLES = {
   PPB_VIDEO_01: { centroid: [-1.94093, 1.40719, 2.99479], normal: [0.92215, -0.38567, 0.02998], u: [0.37767, 0.88082, -0.28553], radius: 0.1904 },
   PPB_VIDEO_02: { centroid: [-1.84054, 1.39784, 2.26459], normal: [0.89861, -0.39303, 0.19501], u: [0.43474, 0.73765, -0.5166], radius: 0.1975 },
@@ -2021,29 +1592,7 @@ const PPB_CIRCLES = {
   PPB_VIDEO_06: { centroid: [-2.30118, 1.40707, -3.61543], normal: [0.90425, -0.4241, -0.04974], u: [-0.4165, -0.85032, -0.32169], radius: 0.1944 }
 };
 
-/*
-  Coloca un <a-circle> de la sala violeta usando la transformacion de mundo
-  REAL del museo ya cargado (no valores fijos calculados a mano). El
-  circulo NO va anidado dentro de #modelo a proposito: setup-museum-model
-  aplica una escala NO uniforme (scaleXZ para ancho/fondo, scaleY aparte
-  para la altura), y una rotacion combinada con una escala no uniforme del
-  padre deja el circulo torcido/mal orientado aunque la rotacion en si sea
-  correcta -- por eso este componente calcula el resultado final ya
-  corregido y lo aplica directamente en espacio de escena (sin padre que
-  vuelva a escalar nada por encima):
-    - posicion: el centroide crudo se escala eje a eje (igual que cualquier
-      vertice del museo).
-    - normal: bajo escala no uniforme una normal se transforma con la
-      inversa-traspuesta de la escala (1/sx, 1/sy, 1/sz), no con la escala
-      directa, o la orientacion queda sesgada.
-    - eje tangente (u): un vector CONTENIDO en la superficie si se
-      transforma con la escala directa; se reortogonaliza contra la normal
-      ya corregida.
-    - radio: se promedia el factor de escala real a lo largo de las dos
-      direcciones propias del plano del circulo (u y v), que es la longitud
-      que de verdad cubre el hueco -- un a-circle no puede representar una
-      elipse, así que un unico radio es la mejor aproximacion posible.
-*/
+
 AFRAME.registerComponent('place-ppb-circle', {
   schema: { id: { type: 'string' } },
   init() {
@@ -2081,7 +1630,7 @@ AFRAME.registerComponent('place-ppb-circle', {
     const quat = new THREE.Quaternion().setFromRotationMatrix(rotMatrix);
 
     const worldRadius = data.radius * (uScaleFactor + vScaleFactor) / 2;
-    const forwardOffset = 0.015; // metros, ya en espacio de mundo escalado
+    const forwardOffset = 0.015;
 
     this.el.object3D.position.copy(worldPos).addScaledVector(worldNormal, forwardOffset);
     this.el.object3D.quaternion.copy(quat);
@@ -2091,22 +1640,19 @@ AFRAME.registerComponent('place-ppb-circle', {
 
 AFRAME.registerComponent('exhibit-info', {
   schema: {
-    show:  { type: 'number', default: 2.0 },   // distancia a la que aparece el aviso
-    close: { type: 'number', default: 3.5 }    // distancia a la que se cierra el panel
+    show:  { type: 'number', default: 2.0 },
+    close: { type: 'number', default: 3.5 }
   },
   init() {
     this.items = [];
-    this.active = null;      // pieza mas cercana en rango (solo para el atajo "E")
-    this.openId = null;      // panel abierto
+    this.active = null;
+    this.openId = null;
     this.nextCheck = 0;
     this.tmp = new THREE.Vector3();
 
     this.ui = false;
 
-    // Estado del hover (raton): que pieza esta bajo el cursor ahora mismo.
-    // Solo se usa para el lenguaje visual de las 8 cepas (ver setupHover
-    // AffordanceFor / tick) -- no toca seleccion por click, que ya
-    // funciona de forma independiente en drag-look-controls.trySelect.
+
     this.hoverId = null;
     this._hoverNdc = new THREE.Vector2();
     this._hoverRaycaster = new THREE.Raycaster();
@@ -2116,9 +1662,8 @@ AFRAME.registerComponent('exhibit-info', {
 
     this.onKey = (e) => {
       if (e.key === 'Escape') this.close();
-      // E abre la pieza mas cercana; no interfiere con WASD. Ya no hay
-      // ningun boton flotante -- this.active se sigue calculando en tick()
-      // solo para que este atajo de teclado siga funcionando.
+
+
       if ((e.key === 'e' || e.key === 'E') && this.active && !this.openId) this.open(this.active.id);
     };
     window.addEventListener('keydown', this.onKey);
@@ -2126,13 +1671,7 @@ AFRAME.registerComponent('exhibit-info', {
     this.el.addEventListener('museo-modules-loaded', () => this.onLoaded());
   },
 
-  /*
-    El HTML del panel va despues de <a-scene>, asi que cuando A-Frame llama a
-    init() el navegador todavia no lo ha parseado y getElementById devuelve
-    null. Por eso las referencias se resuelven aqui, de forma perezosa, en vez
-    de en init(). Ya no depende de #exhibit-prompt (retirado): la ficha
-    funciona con solo el panel de informacion.
-  */
+
   wireUI() {
     if (this.ui) return true;
     this.panel = document.getElementById('exhibit-panel');
@@ -2158,20 +1697,13 @@ AFRAME.registerComponent('exhibit-info', {
       const b = new THREE.Box3().setFromObject(o);
       const s = b.getSize(new THREE.Vector3());
       const c = b.getCenter(new THREE.Vector3());
-      // Mismo filtro que ya usa image-windows (afinado alli tras comprobar
-      // que un filtro mas simple -- solo "alto", b.min.y > 1.2 -- tambien
-      // enganchaba los arcos de neon del techo, mucho mas altos que un
-      // nicho real: quedaban 13 "ventanas" candidatas en vez de las 4 que
-      // hay de verdad, con huecos[] apuntando sobre todo al techo. Un unico
-      // filtro consistente (lado laboratorio, altura y tamaño de nicho) para
-      // las dos cosas que dependen de estos nichos: la posicion 3D de la
-      // ficha interactiva (aqui) y la lamina de imagen (image-windows).
+
+
       if (c.x < 1.2 || s.y < 0.9 || s.y > 2.6 || Math.max(s.x, s.z) > 1.6) return;
       turquesaAlto.push({ o, p: c, minY: b.min.y, maxY: b.max.y });
     });
 
-    // Las ventanas de imagen se anclan a los nichos turquesa altos de la pared
-    // opuesta, agrupados por posicion. Asi no dependen de nombres concretos.
+
     turquesaAlto.sort((a, b) => a.p.z - b.p.z);
     const huecos = [];
     turquesaAlto.forEach((n) => {
@@ -2204,21 +1736,11 @@ AFRAME.registerComponent('exhibit-info', {
           pos = box.getCenter(new THREE.Vector3());
           topY = box.max.y;
           bottomY = box.min.y;
-          // Marca cada malla de esta pieza para la seleccion directa por
-          // click/tap (ver drag-look-controls.trySelect): asi el raycaster
-          // solo puede tocar piezas con ficha real, nunca paredes/suelo/neon.
+
+
           o.traverse((n) => { if (n.isMesh) n.userData.museoExhibitId = id; });
-          // Caso especial del reactor: su ancla (PEANA_Bioreactor) es solo la
-          // peana/base, un anillo pequeño y en gran parte tapado por el
-          // propio reactor que se apoya encima -- el cuerpo visible del
-          // reactor (cristal, liquido, burbujas, tapa...) vive en nodos
-          // hermanos con prefijo "Bioreactor_" del mismo modulo GLB, sin
-          // marcar hasta ahora. Sin esto, el visitante podia pasar el raton
-          // o hacer click sobre el propio reactor -- lo obvio para
-          // seleccionarlo -- y no pasaba nada, solo funcionaba sobre el
-          // aro estrecho de la base: es lo que hacia que "no se notara
-          // seleccionable". Se marcan aqui con el mismo id para que el
-          // hover/click funcionen sobre el cuerpo real del reactor.
+
+
           if (id === 'reactor01') {
             mesh.traverse((n) => {
               if (n.isMesh && n.name && n.name.startsWith('Bioreactor_')) n.userData.museoExhibitId = id;
@@ -2233,22 +1755,15 @@ AFRAME.registerComponent('exhibit-info', {
     this.selectableMeshes = [];
     mesh.traverse((o) => { if (o.isMesh && o.userData.museoExhibitId) this.selectableMeshes.push(o); });
 
-    // Peanas reales (mismo prefijo que usa setup-museum-model para los
-    // obstaculos de colision), medidas aqui de forma independiente: cada
-    // placa fisica (createPedestalPlacard) necesita el radio y el centro
-    // REAL de la peana de su propia pieza, no un valor supuesto, para
-    // apoyarse justo en su superficie sin flotar ni hundirse.
+
     this.peanaBoxes = [];
     mesh.traverse((o) => {
       if (o.isMesh && o.name.startsWith('PEANA_')) {
         const b = new THREE.Box3().setFromObject(o);
         const c = b.getCenter(new THREE.Vector3());
         const s = b.getSize(new THREE.Vector3());
-        // radiusX/radiusZ (medio ancho real en cada eje de mundo), ademas del
-        // "radius" unico ya existente: la peana central (PEANA_Bacteria) no
-        // es circular -- es una elipse suave, mas larga en Z que en X (medido
-        // por geometria real) -- y createPedestalPlacard necesita ambos
-        // valores por separado para esa pieza (ver isLowWidePlinth).
+
+
         this.peanaBoxes.push({
           center: c, radius: Math.max(s.x, s.z) / 2,
           radiusX: s.x / 2, radiusZ: s.z / 2,
@@ -2257,14 +1772,7 @@ AFRAME.registerComponent('exhibit-info', {
       }
     });
 
-    // Orientacion compartida para la fila de las 6 piezas secundarias: UNA
-    // sola direccion (no una calculada por pieza), desde el centro de esa
-    // fila hacia la bacteria grande central. Las 6 peanas estan sobre una
-    // pared curva -- calcular "hacia el centro de la sala" por separado para
-    // cada una (como se hacia antes) da un angulo distinto por pieza y las
-    // placas terminan mirando "de lado" unas respecto a otras. Con una unica
-    // direccion compartida, las placas de la sala quedan paralelas entre si,
-    // como un sistema coherente visto desde el paso del visitante.
+
     this._placardRowDir = null;
     {
       const secondary = this.items.filter((i) => i.data.tier === 'secondary' && i.id.startsWith('bacteria'));
@@ -2287,21 +1795,13 @@ AFRAME.registerComponent('exhibit-info', {
       }
     }
 
-    // Lenguaje visual de interaccion (hover + placa fisica en la peana) en
-    // las 8 cepas de la Sala 1 (ids que empiezan por "bacteria"). No toca el
-    // reactor (Sala 2, su propia malla PEANA_Bioreactor ya quedo marcada
-    // arriba con museoExhibitId y abre panel igual que siempre).
+
     this.items.forEach((it) => {
       if (it.data.tier === 'tertiary' || !it.id.startsWith('bacteria')) return;
       this.setupHoverAffordance(it);
     });
 
-    // Ventanas de la Sala 2 (openable:true): antes eran contenido pasivo sin
-    // ficha ni malla seleccionable. Cada una recibe ahora una pequeña placa
-    // fisica de pared (setupWindowTag), pegada justo debajo de su nicho real,
-    // que reutiliza exactamente el mismo lenguaje visual que las placas de
-    // peana (papel, sin cristal, sin resplandor) y el mismo mecanismo de
-    // hover por pivote que ya usa tick() para las 8 cepas.
+
     this.items.forEach((it) => {
       if (it.data.tier !== 'tertiary' || !it.data.openable) return;
       this.setupWindowTag(it);
@@ -2311,29 +1811,12 @@ AFRAME.registerComponent('exhibit-info', {
       `${this.items.filter((i) => i.pivot).length} con lenguaje visual de hover`);
   },
 
-  /*
-    Prepara UNA pieza informativa para el lenguaje visual de interaccion: un
-    "pivote" (THREE.Group) centrado en su propio volumen, del que cuelga la
-    entidad gltf-model que la contiene (nunca el nodo animado en si -- ver
-    nota mas abajo), y una ficha compacta (numero + nombre + "VIEW +") junto
-    a la peana que se atenua/enciende segun la distancia del visitante.
 
-    Por que un pivote y no escalar la pieza directamente: cada bacteria trae
-    su propia animacion de posicion/rotacion horneada en el propio nodo
-    ancla (BACTERIA_MASTER, Bacteria_GRUPO_*...) -- es la respiracion/
-    balanceo sutil que ya tenian. Si esta funcion tocara ese nodo, el
-    AnimationMixer lo pisaria en el siguiente frame. En su lugar se reasigna
-    la ENTIDAD gltf-model completa (el contenedor que A-Frame crea para el
-    modulo, que la animacion nunca toca) a un pivote situado en el centro
-    real de la pieza, así el hover puede escalar el pivote sin interferir
-    con la animacion existente ni desplazar la pieza de su sitio.
-  */
   setupHoverAffordance(it) {
     const anchorObj = it.anchorObj;
     if (!anchorObj) return;
-    // sube por la jerarquia hasta la entidad A-Frame dueña de este modulo
-    // (el object3D de una <a-entity> siempre lleva `.el`; los nodos internos
-    // del glTF cargado no lo llevan)
+
+
     let p = anchorObj;
     while (p && !p.el) p = p.parent;
     const wrapperEl = p && p.el;
@@ -2350,10 +1833,9 @@ AFRAME.registerComponent('exhibit-info', {
     reparentPreservingWorld(wrapperObj, pivot);
 
     it.pivot = pivot;
-    it.hoverT = 0;       // 0..1, suavizado (ease) de entrada/salida del hover
+    it.hoverT = 0;
 
-    // materiales emisivos de esta pieza (brillo violeta de la bacteria/
-    // capsula), para el realce muy sutil al pasar el raton por encima
+
     const mats = new Set();
     const black = new THREE.Color(0, 0, 0);
     anchorObj.traverse((n) => {
@@ -2363,17 +1845,11 @@ AFRAME.registerComponent('exhibit-info', {
     });
     it.emissiveMats = Array.from(mats).map((mat) => ({ mat, base: mat.emissiveIntensity }));
 
-    // Una unica placa fisica para las 8 cepas (ver createPedestalPlacard).
+
     it.placard = this.createPedestalPlacard(it);
   },
 
-  /*
-    Normal real de la pared mas cercana a "pos", apuntando hacia DENTRO de
-    la sala (perpendicular a esa pared, no hacia un punto de mira que
-    cambia con la posicion de cada pieza -- ver nota en setupWindowTag).
-    Usa el rectangulo real de la sala (MUSEO_BOUNDS): la pared mas cercana
-    es la que tiene menor distancia a cualquiera de sus 4 lados.
-  */
+
   wallFacingDir(pos) {
     const bounds = window.MUSEO_BOUNDS;
     if (!bounds) return { x: 0, z: -1 };
@@ -2388,49 +1864,25 @@ AFRAME.registerComponent('exhibit-info', {
     return { x: 0, z: 1 };
   },
 
-  /*
-    Placa fisica de pared para las ventanas de la Sala 2 (openable:true):
-    misma familia visual que las placas de peana (papel, sin cristal, sin
-    resplandor permanente), pero plana -- aqui no hay ninguna peana
-    cilindrica que envolver, solo el nicho de neon turquesa real (this.items
-    ya trae su centro/alto/bajo, medidos en onLoaded). Se cuelga justo debajo
-    del nicho, ligeramente separada del muro para no pisar el marco.
 
-    Como no hay malla de bacteria que "respire" al pasar el raton por
-    encima, aqui el propio pivote de hover ES la placa: se le da un tinte
-    emisivo sutil para que el mismo bucle de tick() (pensado para las 8
-    cepas, solo mira it.pivot/it.emissiveMats) la haga brillar un poco al
-    pasar el cursor, sin codigo nuevo en tick().
-  */
   setupWindowTag(it) {
-    // Direccion real del muro (normal hacia dentro de la sala), no un punto
-    // de mira que cambia con la posicion de cada pieza -- ver wallFacingDir.
+
+
     const dir = this.wallFacingDir(it.pos);
     const dirX = dir.x, dirZ = dir.z;
     const yaw = Math.atan2(dirX, dirZ);
 
-    // Mismo tamaño/proporcion que las cartelas moradas de peana secundaria
-    // (Sala 1: PLACARD_HEIGHT=0.26, cuerda de arco ~0.28) -- antes esta
-    // placa era mas ancha y mucho mas baja (0.30x0.165), lo que la hacia
-    // sentir mas grande/torpe y desproporcionada frente al sistema morado.
+
     const HEIGHT = 0.26;
     const WIDTH = it.id === 'window04' ? 0.392 : 0.28;
 
-    // Soporte de pared -> soporte de poste independiente del muro. Alinear
-    // una placa exactamente al ras de un muro curvo, sin poder verificarlo
-    // en un render en vivo, es fragil: la mas minima imprecision en la
-    // normal real deja la placa flotando, de lado o a medio pegar (el
-    // problema reportado). Un poste fino desde el suelo hasta la altura de
-    // lectura, con la placa rectangular en su extremo, es el propio
-    // "soporte museistico" que pide el brief y no depende de esa precision:
-    // se apoya en el suelo real (MUSEO_SPAWN.y) y se separa del muro hacia
-    // el interior de la sala, nunca sobre el.
+
     const spawn = window.MUSEO_SPAWN;
     const floorY = (spawn && typeof spawn.y === 'number')
       ? spawn.y
       : (it.bottomY !== null ? it.bottomY - 1.0 : it.pos.y - 1.2);
-    const STAND_OUT = 0.40;                 // hacia el interior de la sala, lejos del muro
-    const SIGN_CENTER_Y = floorY + 1.15;    // altura de lectura comoda
+    const STAND_OUT = 0.40;
+    const SIGN_CENTER_Y = floorY + 1.15;
     const POLE_RADIUS = 0.012;
     const poleH = Math.max(0.3, SIGN_CENTER_Y - floorY - HEIGHT * 0.5);
 
@@ -2448,11 +1900,7 @@ AFRAME.registerComponent('exhibit-info', {
     pole.position.set(0, poleH / 2, 0);
     wrapper.object3D.add(pole);
 
-    // Mismo metodo de texto horneado que las 8 cartelas de bacteria (un
-    // unico canvas con numero + nombre + cita, aplicado como textura),
-    // solo que en Sala 2 con los colores verde/turquesa (ROOM2_ACCENT*) en
-    // vez del morado por defecto -- misma jerarquia, misma tipografia,
-    // mismo "lenguaje museo", solo cambia el acento de color.
+
     const texture = this.buildPlacardTextTexture(
       it.data.section || '', (it.data.title || '').toUpperCase(), museumText('clickToExplore'),
       HEIGHT, WIDTH, ROOM2_ACCENT, ROOM2_ACCENT_LIGHT
@@ -2472,22 +1920,14 @@ AFRAME.registerComponent('exhibit-info', {
 
     this.el.sceneEl.appendChild(wrapper);
 
-    // el pivote/emisivo son los mismos campos que usa el bucle de hover de
-    // tick() para las 8 cepas -- aqui el "pivote" es el soporte entero
-    // (poste + placa), asi que el hover lo realza como conjunto.
+
     it.pivot = wrapper.object3D;
     it.hoverT = 0;
     it.emissiveMats = [{ mat: plane.material, base: plane.material.emissiveIntensity }];
     it.tag = { wrapper, plane, pole };
   },
 
-  /*
-    Textura de papel muy barata (un solo canvas en escala de grises,
-    reutilizado por las 8 placas): ruido suave a baja opacidad sobre blanco,
-    solo para romper la superficie perfectamente lisa de un
-    MeshStandardMaterial de color plano. No es un efecto de luz -- es grano
-    de papel, se ve igual con cualquier iluminacion de la sala.
-  */
+
   getPlacardPaperTexture() {
     if (this._placardPaperTexture) return this._placardPaperTexture;
     const c = document.createElement('canvas');
@@ -2507,12 +1947,7 @@ AFRAME.registerComponent('exhibit-info', {
     return this._placardPaperTexture;
   },
 
-  /*
-    Reparte "text" en lineas que quepan en maxWidthPx (medido con el font ya
-    puesto en ctx), partiendo siempre por palabra completa -- nunca a mitad
-    de palabra. Mismo criterio que ya usaba image-windows.lamina() para el
-    pie de foto, reutilizado aqui para el nombre de la especie.
-  */
+
   wrapCanvasText(ctx, text, maxWidthPx) {
     const words = (text || '').split(' ').filter(Boolean);
     const lines = [];
@@ -2526,31 +1961,10 @@ AFRAME.registerComponent('exhibit-info', {
     return lines;
   },
 
-  /*
-    El texto de la cartela YA NO son a-text sueltos flotando delante de la
-    curva (eso es lo que se veia "plano"/"proyectado", como una pegatina
-    cruzando el cilindro). Aqui se pinta numero + especie + "click to
-    explore" en un unico canvas -- fondo crema y grano de papel incluidos --
-    y ese canvas se aplica como textura de la MISMA malla curva que ya forma
-    la cartela (ver createPedestalPlacard). Al llevar el mapeado UV estandar
-    de un CylinderGeometry (u recorre justo el arco generado, v la altura),
-    el texto queda repartido sobre la propia superficie curva -- lee como
-    impreso en la etiqueta, no como una tarjeta plana delante de ella.
 
-    Los tamaños de fuente se calculan como fraccion de heightM (la altura
-    real de la cartela en metros), no en pixeles fijos: asi la jerarquia
-    numero/titulo/cita es identica, en proporcion, en una cartela pequeña o
-    en la grande del pedestal principal (mucho mas baja) -- se ven a
-    familia aunque su tamaño fisico absoluto sea distinto.
-  */
   buildPlacardTextTexture(section, title, cueText, heightM, widthM, accentColor, cueColor) {
-    // accentColor/cueColor opcionales: por defecto el morado de la Sala 1
-    // (unicos valores usados hasta ahora, por las 8 cartelas de bacteria),
-    // asi ese llamador no cambia. La Sala 2 (setupWindowTag) pasa
-    // ROOM2_ACCENT/ROOM2_ACCENT_LIGHT para compartir EXACTAMENTE el mismo
-    // metodo de texto horneado -- misma proporcion, jerarquia y tipografia
-    // que las cartelas moradas -- en vez de una construccion aparte con
-    // <a-text> sueltos, que es lo que las hacia sentir desproporcionadas.
+
+
     const numberColor = accentColor || '#74349A';
     const cueTextColor = cueColor || '#805096';
     const HPX = 640;
@@ -2560,9 +1974,7 @@ AFRAME.registerComponent('exhibit-info', {
     const ctx = c.getContext('2d');
     const pxPerM = HPX / heightM;
 
-    // fondo crema + grano de papel muy suave (mismo lenguaje que el resto
-    // del museo), pintado aqui en vez de como mapa aparte para que quede en
-    // el mismo canvas que el texto y no se dupliquen texturas.
+
     ctx.fillStyle = '#F7F4EE';
     ctx.fillRect(0, 0, WPX, HPX);
     const grano = Math.round((WPX * HPX) / 700);
@@ -2572,14 +1984,12 @@ AFRAME.registerComponent('exhibit-info', {
       ctx.fillRect(Math.random() * WPX, Math.random() * HPX, 1, 1);
     }
 
-    // Jerarquia (fraccion de heightM): numero visible pero no gigante,
-    // especie como texto principal, cita mas pequeña y discreta. Margenes
-    // generosos arriba/abajo y a los lados -- nada pegado al borde.
+
     const numberSizePx = heightM * 0.105 * pxPerM;
     let titleSizePx = heightM * 0.125 * pxPerM;
     const cueSizePx = heightM * 0.070 * pxPerM;
-    const gap1Px = heightM * 0.050 * pxPerM;     // numero -> titulo
-    const gap2Px = heightM * 0.055 * pxPerM;     // titulo -> cita
+    const gap1Px = heightM * 0.050 * pxPerM;
+    const gap2Px = heightM * 0.055 * pxPerM;
     const padSidePx = WPX * 0.09;
     const lineSpacing = 1.18;
     const maxTextWidth = WPX - padSidePx * 2;
@@ -2597,8 +2007,7 @@ AFRAME.registerComponent('exhibit-info', {
     }
     const titleBlockH = lines.length * titleSizePx * lineSpacing;
 
-    // bloque completo centrado verticalmente: un titulo de una sola linea
-    // (p. ej. "RHODOVULUM") no deja la cartela descompensada hacia arriba.
+
     const contentH = (section ? numberSizePx + gap1Px : 0) + titleBlockH +
                       (cueText ? gap2Px + cueSizePx : 0);
     let cy = Math.max((HPX - contentH) / 2, HPX * 0.06);
@@ -2632,36 +2041,7 @@ AFRAME.registerComponent('exhibit-info', {
     return tex;
   },
 
-  /*
-    Cartela fisica de museo, unica para las 8 cepas. Un segmento de cilindro
-    parcial -- una etiqueta de papel envuelta solo en el frente de la peana,
-    no un plano plano ni un tubo completo -- centrado en el propio eje de la
-    peana real mas cercana (this.peanaBoxes, medido en onLoaded), con radio
-    = radio real de esa peana + 8 mm. Al compartir eje con la peana, la
-    cartela queda pegada a su superficie curva en vez de flotar delante.
 
-    Orientacion: NO face-camera, no se vuelve a tocar tras crearla. Las 6
-    piezas secundarias comparten una unica direccion (this._placardRowDir,
-    calculada una vez en onLoaded) para quedar todas paralelas, como una
-    fila coherente -- la pared donde estan es curva, asi que calcular el
-    frente pieza a pieza (como se hacia antes) producia angulos distintos y
-    parecian torcidas. Las 2 piezas grandes no son fila: cada una mira hacia
-    MUSEO_SPAWN (el punto real por el que entra el visitante).
-
-    Altura: fraccion de la altura REAL de esa peana concreta (peanaMinY/
-    peanaMaxY), no un valor absoluto sobre el suelo -- así queda a la altura
-    del cuerpo del pedestal (tercio medio/medio-alto), con peana visible por
-    encima y por debajo, en vez de cerca de la cupula de cristal.
-
-    Caso especial -- peana principal (BACTERIA_MASTER / PEANA_Bacteria): es
-    una base baja y ancha (~0.27 m de alto, ~1.4 m de diametro), no una
-    columna como las demas. Usando el mismo arco/alto que el resto, la
-    cartela salia enorme (mas de 1 m de cuerda) y casi tan alta como la
-    propia peana. Se detecta por altura real (<0.35 m) y se usa un arco mas
-    cerrado y una cartela mas baja, a medida de ESA peana -- radio y
-    posicion siguen midiendose igual, solo cambian arco/alto/encaje
-    vertical, y solo para esta pieza.
-  */
   createPedestalPlacard(it) {
     let peanaRadius = 0.22, peanaRadiusX = 0.22, peanaRadiusZ = 0.22, peanaMinY = null, peanaMaxY = null;
     let px = it.pos.x, pz = it.pos.z;
@@ -2676,15 +2056,11 @@ AFRAME.registerComponent('exhibit-info', {
       peanaRadiusZ = nearest.radiusZ;
       peanaMinY = nearest.minY;
       peanaMaxY = nearest.maxY;
-      px = nearest.center.x;   // centrada en el eje REAL de la peana, no en
-      pz = nearest.center.z;   // el centroide de la bacteria que lleva encima
+      px = nearest.center.x;
+      pz = nearest.center.z;
     }
 
-    // Direccion frontal: fila compartida para la sala cuando se ha podido
-    // calcular. Asi las placas principales leen como un sistema unico, no
-    // cada una apuntando hacia un punto distinto. Si por algun motivo no
-    // existe esa fila compartida, se conserva la red de seguridad hacia el
-    // punto de entrada del visitante.
+
     let dirX = 0, dirZ = 1;
     if (this._placardRowDir) {
       dirX = this._placardRowDir.x;
@@ -2705,29 +2081,16 @@ AFRAME.registerComponent('exhibit-info', {
 
     const peanaHeightM = (peanaMinY !== null && peanaMaxY !== null) ? (peanaMaxY - peanaMinY) : null;
     const isLowWidePlinth = peanaHeightM !== null && peanaHeightM < 0.35;
-    // La peana principal (PEANA_Bacteria) no es circular: medida por
-    // geometria real (vertices reales del mesh, no solo su caja), es una
-    // elipse suave -- mas larga en Z que en X (radiusZ/radiusX ~= 1.25).
-    // isLowWidePlinth ya identificaba solo esta pieza (unica peana baja y
-    // ancha del museo); cuando ademas sus dos radios difieren de verdad, se
-    // usa geometria elíptica real en vez de asumir un circulo.
+
+
     const isEllipticalPlinth = isLowWidePlinth &&
       Math.abs(peanaRadiusX - peanaRadiusZ) > 0.03 * Math.max(peanaRadiusX, peanaRadiusZ);
 
-    // Geometria: medio cilindro (o media elipse) abierto, arco centrado en
-    // el frente. Caso circular (7 de las 8 peanas): misma convencion de
-    // siempre (yaw = atan2(dirX,dirZ) orienta el wrapper). Caso eliptico
-    // (solo PEANA_Bacteria): la elipse real esta alineada con los ejes de
-    // mundo X/Z (confirmado por analisis de la geometria -- eje principal a
-    // ~90 grados del eje local, es decir sin giro), asi que el wrapper NO
-    // se rota: el arco se construye ya en coordenadas de mundo, con
-    // radiusX/radiusZ propios, y el centro del arco (thetaCenter) se calcula
-    // con la formula de la normal real de una elipse (no la del circulo),
-    // para que seguir apuntando hacia MUSEO_SPAWN sea correcto igual.
-    const ARC_DEG = isLowWidePlinth ? 50 : 82;  // peana ancha -> arco mas cerrado, cuerda razonable
+
+    const ARC_DEG = isLowWidePlinth ? 50 : 82;
     const ARC = ARC_DEG * Math.PI / 180;
     const PLACARD_HEIGHT = isLowWidePlinth ? 0.15 : 0.26;
-    const heightFrac = isLowWidePlinth ? 0.50 : 0.58;   // centrada si apenas hay peana, si no tercio medio-alto
+    const heightFrac = isLowWidePlinth ? 0.50 : 0.58;
     const segs = Math.max(10, Math.round(ARC_DEG / 6));
 
     const spawn = window.MUSEO_SPAWN;
@@ -2743,28 +2106,25 @@ AFRAME.registerComponent('exhibit-info', {
 
     let curveGeo, arcLengthM;
     if (isEllipticalPlinth) {
-      // radios reales de la superficie (peana + 8 mm en cada eje).
+
       const rx = peanaRadiusX + 0.008, rz = peanaRadiusZ + 0.008;
-      // normal real de una elipse (x/rx)^2+(z/rz)^2=1 en el punto theta,
-      // con la misma convencion seno-en-X/coseno-en-Z que usa el resto del
-      // museo para "yaw": normal ∝ (rx*sin(theta), rz*cos(theta)). Se
-      // resuelve theta para que esa normal apunte hacia (dirX,dirZ) --
-      // cuando rx=rz esto se reduce exactamente a yaw=atan2(dirX,dirZ).
+
+
       const thetaCenter = Math.atan2(dirX * rx, dirZ * rz);
       const thetaStart = thetaCenter - ARC / 2;
-      // wrapper SIN rotacion: la elipse ya esta en ejes de mundo reales.
+
       wrapper.object3D.rotation.set(0, 0, 0);
       curveGeo = new THREE.CylinderGeometry(1, 1, PLACARD_HEIGHT, segs, 1, true, thetaStart, ARC);
       curveGeo.scale(rx, 1, rz);
-      // radio efectivo en el punto central del arco, para dimensionar el
-      // texto sin estirarlo (mismo criterio que el caso circular).
+
+
       const rEff = Math.hypot(rx * Math.sin(thetaCenter), rz * Math.cos(thetaCenter));
       arcLengthM = rEff * ARC;
     } else {
-      const CURVE_RADIUS = peanaRadius + 0.008;   // superficie real de la peana + 8 mm
+      const CURVE_RADIUS = peanaRadius + 0.008;
       wrapper.object3D.rotation.set(0, yaw, 0);
       curveGeo = new THREE.CylinderGeometry(CURVE_RADIUS, CURVE_RADIUS, PLACARD_HEIGHT, segs, 1, true, -ARC / 2, ARC);
-      arcLengthM = CURVE_RADIUS * ARC;   // cuerda real del arco, para no estirar el texto
+      arcLengthM = CURVE_RADIUS * ARC;
     }
 
     const texture = this.buildPlacardTextTexture(
@@ -2786,16 +2146,10 @@ AFRAME.registerComponent('exhibit-info', {
     return { wrapper, curve };
   },
 
-  /*
-    Hover por raton: raycast contra las mismas mallas seleccionables que ya
-    usa el click (drag-look-controls.trySelect), pero en cada movimiento del
-    raton en vez de al soltar. Solo cambia this.hoverId + el cursor; el
-    realce visual en si (escala/brillo/etiqueta) se aplica en tick(), donde
-    se anima con suavidad en vez de saltar de golpe.
-  */
+
   updateHover(x, y) {
     const now = (window.performance && performance.now) ? performance.now() : Date.now();
-    if (now - this._lastHoverCheck < 50) return;   // ~20 comprobaciones/seg, de sobra
+    if (now - this._lastHoverCheck < 50) return;
     this._lastHoverCheck = now;
 
     if (!this.selectableMeshes || !this.selectableMeshes.length) return;
@@ -2804,8 +2158,7 @@ AFRAME.registerComponent('exhibit-info', {
     const camera = sceneEl && sceneEl.camera;
     if (!canvas || !camera) return;
 
-    // mientras se arrastra la camara no hay "hover": evita que la pieza que
-    // queda bajo el cursor al terminar un arrastre largo se ilumine sola
+
     const cameraEl = document.getElementById('camera');
     const drag = cameraEl && cameraEl.components && cameraEl.components['drag-look-controls'];
     if (drag && drag.dragging) { this.setHover(null); return; }
@@ -2834,26 +2187,17 @@ AFRAME.registerComponent('exhibit-info', {
     if (!rig) return;
     const p = rig.object3D.getWorldPosition(this.tmp);
 
-    // Hover de las 8 cepas: sin throttle (se anima cada frame para que la
-    // respiracion se vea suave). Muy barato -- 8 items como mucho, sin
-    // raycasts aqui. La cartela fisica (it.placard) es estatica y ya no se
-    // toca en cada frame -- solo la propia bacteria (pivote/emisivo).
+
     this.items.forEach((it) => {
       if (!it.pivot) return;
       const isHovered = this.hoverId === it.id;
       it.hoverT += ((isHovered ? 1 : 0) - it.hoverT) * 0.08;
 
       const breathe = 0.5 + 0.5 * Math.sin(time * 0.0016);
-      const scale = 1 + it.hoverT * (0.015 + 0.015 * breathe);   // ~1.00 -> ~1.03
+      const scale = 1 + it.hoverT * (0.015 + 0.015 * breathe);
       it.pivot.scale.setScalar(scale);
 
-      // Piezas "large" (Sala 1): su cartela fisica (it.placard) vivia fuera
-      // del pivote y nunca se tocaba en hover ("la cartela es estatica" --
-      // ver nota historica arriba), asi que al agrandarse la bacteria la
-      // cartela se quedaba atras y la interaccion se sentia rota/desconectada.
-      // Se le aplica el MISMO factor de escala, centrado en su propio
-      // wrapper (ya posicionado junto a la peana real), para que bacteria y
-      // cartela crezcan juntas y la cartela nunca desaparezca.
+
       if (it.data.tier === 'primary' && it.placard && it.placard.wrapper) {
         it.placard.wrapper.object3D.scale.setScalar(scale);
       }
@@ -2868,9 +2212,7 @@ AFRAME.registerComponent('exhibit-info', {
     this.nextCheck = time + 180;
     if (!this.wireUI()) return;
 
-    // Ya no hay ningun boton flotante que actualizar: esto solo alimenta
-    // this.active para el atajo de teclado "E" (abrir la pieza mas cercana).
-    // Las ventanas openable cuentan igual que cualquier otra pieza real.
+
     let mejor = null, mejorD = Infinity;
     this.items.forEach((it) => {
       if (it.data.tier === 'tertiary' && !it.data.openable) return;
@@ -2879,7 +2221,7 @@ AFRAME.registerComponent('exhibit-info', {
     });
     this.active = (mejor && mejorD <= this.data.show) ? mejor : null;
 
-    // cerrar el panel si el visitante se aleja
+
     if (this.openId) {
       const abierto = this.items.find((i) => i.id === this.openId);
       if (abierto && Math.hypot(abierto.pos.x - p.x, abierto.pos.z - p.z) > this.data.close) this.close();
@@ -2897,12 +2239,11 @@ AFRAME.registerComponent('exhibit-info', {
     const lead = this.panel.querySelector('.panel-lead');
     lead.textContent = d.lead || '';
     lead.style.display = d.lead ? 'block' : 'none';
-    // cuerpo: parrafos reales + negrita solo en los conceptos clave (ver
-    // renderPanelBody/highlightKeywords) -- el texto en si no cambia.
+
+
     this.panel.querySelector('.panel-body').innerHTML = renderPanelBody(d.body);
-    // medios de apoyo opcionales (imagenes o videos cortos). Vacio por
-    // defecto, no se muestra nada si la pieza no los trae -- nunca la imagen
-    // del circulo/nicho, que es un contenido aparte.
+
+
     const imagesEl = this.panel.querySelector('.panel-images');
     if (imagesEl) {
       imagesEl.innerHTML = '';
@@ -2933,19 +2274,16 @@ AFRAME.registerComponent('exhibit-info', {
     tags.textContent = (d.tags || []).join(' · ');
     tags.style.display = (d.tags && d.tags.length) ? 'block' : 'none';
     this.panel.classList.toggle('secondary', d.tier === 'secondary' || d.tier === 'tertiary');
-    // Sala 2 (reactor/ventanas) usa el acento verde/turquesa del propio
-    // sistema de color de esa sala, no el morado de la Sala 1 -- misma
-    // ficha compartida, solo cambia --mus-morado (ver style.css).
+
+
     this.panel.classList.toggle('room2', id.startsWith('reactor') || id.startsWith('window') || id === 'spaceMission');
     this.panel.classList.add('visible');
     const scroll = this.panel.querySelector('.panel-scroll');
-    if (scroll) scroll.scrollTop = 0;   // cada ficha nueva empieza arriba, no donde quedo la anterior
+    if (scroll) scroll.scrollTop = 0;
     this.openId = id;
     this.hideIntro();
-    // En movil, el panel puede solapar la esquina donde vive el joystick de
-    // movimiento (ver mobile-controls) en pantallas pequeñas: se oculta
-    // mientras se lee una ficha (con la ficha abierta no hace falta seguir
-    // moviendose) y vuelve a aparecer al cerrarla, ver style.css.
+
+
     document.body.classList.add('panel-open');
   },
 
@@ -2966,16 +2304,7 @@ AFRAME.registerComponent('exhibit-info', {
   }
 });
 
-/*
-  Estacion espacial suspendida de R. rubrum.
 
-  La pieza se coloca a partir de la geometria real de la segunda bacteria
-  grande, no mediante coordenadas fijas. Al entrar en su radio de proximidad
-  baja desde el techo; al salir vuelve a subir. Dos lineas de bronce unen los
-  anclajes incluidos en el GLB con el techo y crecen durante el descenso.
-  La propia estacion se registra tambien en exhibit-info, asi que funciona
-  con el mismo click/tap, hover y panel accesible del resto del museo.
-*/
 AFRAME.registerComponent('space-mission-descent', {
   schema: {
     anchor: { type: 'string', default: 'Exhibit_Mesh0_Capsule' },
@@ -3005,8 +2334,8 @@ AFRAME.registerComponent('space-mission-descent', {
     };
     this.onMuseumLoaded = () => {
       this.museumReady = true;
-      // exhibit-info escucha el mismo evento. Un turno de event-loop asegura
-      // que termine su registro convencional antes de añadir la pieza dinamica.
+
+
       setTimeout(() => this.trySetup(), 0);
     };
 
@@ -3037,8 +2366,7 @@ AFRAME.registerComponent('space-mission-descent', {
     if (towardVisitor.lengthSq() < 0.0001) towardVisitor.set(0, 0, 1);
     towardVisitor.normalize();
 
-    // Un poco hacia el pasillo para que la estacion no atraviese la vitrina
-    // de la bacteria. La altura visible queda por encima de la cabeza.
+
     this.basePosition.set(
       anchorPosition.x + towardVisitor.x * 0.82,
       spawn.y + 2.22,
@@ -3208,46 +2536,7 @@ AFRAME.registerComponent('space-mission-descent', {
   }
 });
 
-/*
-  Focos de exposicion. Es solo luz: no toca geometria, materiales, neones,
-  animaciones ni el GLB.
 
-  Jerarquia en tres niveles, que es lo que le da profundidad a la sala:
-    - hemisferico = relleno ambiental calido, bajo, para que nada quede negro
-    - directional = luz principal, marca el volumen de las paredes curvas
-    - estos focos  = acentos sobre las piezas, para separarlas del fondo
-
-  Los focos NO proyectan sombra a proposito: en una sala con esta cantidad
-  de geometria cada sombra adicional cuesta un mapa de sombras entero, y el
-  efecto buscado es un charco de luz suave, no una sombra marcada. La sombra
-  de contacto ya la da la directional.
-
-  Las posiciones se leen de las propias piezas del modelo ya cargado, asi que
-  siguen siendo correctas aunque el modelo se reescale en tiempo real.
-*/
-/*
-  NOTA: hubo dos intentos de "vitral" en este hueco de ventana (primero sobre
-  la campana de vidrio de la bacteria grande -- se leia como una burbuja
-  morada envolviendo la bacteria --, despues como una lamina de degradado
-  flotando junto a la ventana -- se seguia leyendo como un panel de color
-  pegado delante de la arquitectura, no como parte de ella). Los dos se han
-  retirado por completo, sin sustituirlos por ninguna otra geometria: el
-  hueco de la ventana queda limpio, con su neon y su arquitectura tal cual
-  vienen del modulo. Si en el futuro se quiere un tratamiento de cristal de
-  color ahi, se hara a mano sobre el propio material del modulo, no generado
-  aqui.
-*/
-
-/*
-  Ventanas-imagen. Tres de los cinco nichos altos se convierten en lightbox de
-  museo: un plano finisimo dentro del hueco con una textura generada que ya
-  incluye el numero, el titulo y el pie. Asi el contenido queda embebido en la
-  arquitectura en lugar de ser una tarjeta blanca flotando delante.
-
-  El marco iluminado lo pone la propia arquitectura (el neon del nicho), asi que
-  aqui no se dibuja ningun borde. Si algun dia se rellena `image` en
-  museumContent con una ruta, la foto se usa de fondo en lugar del patron.
-*/
 AFRAME.registerComponent('image-windows', {
   init() { this.el.addEventListener('museo-modules-loaded', () => this.onLoaded()); },
 
@@ -3257,12 +2546,12 @@ AFRAME.registerComponent('image-windows', {
     c.width = W; c.height = H;
     const ctx = c.getContext('2d');
 
-    // fondo oscuro tintado: lectura de vitrina retroiluminada, no de monitor
+
     const g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, '#161320'); g.addColorStop(1, '#241d2c');
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 
-    // patron celular: circulos concentricos tenues, lenguaje de microscopia
+
     ctx.lineWidth = 1.1;
     for (let i = 0; i < 26; i++) {
       const x = 40 + Math.random()*(W-80), y = 30 + Math.random()*(H-120);
@@ -3271,7 +2560,7 @@ AFRAME.registerComponent('image-windows', {
       ctx.beginPath(); ctx.arc(x, y, r, 0, 6.28); ctx.stroke();
       if (r > 20) { ctx.beginPath(); ctx.arc(x, y, r*0.42, 0, 6.28); ctx.stroke(); }
     }
-    // velo inferior para que el texto siempre se lea
+
     const v = ctx.createLinearGradient(0, H*0.45, 0, H);
     v.addColorStop(0, 'rgba(12,10,18,0)'); v.addColorStop(1, 'rgba(12,10,18,0.92)');
     ctx.fillStyle = v; ctx.fillRect(0, H*0.45, W, H*0.55);
@@ -3284,7 +2573,7 @@ AFRAME.registerComponent('image-windows', {
     ctx.fillText(d.title, 34, H - 56);
     ctx.fillStyle = 'rgba(246,241,234,0.62)';
     ctx.font = '17px Helvetica, Arial, sans-serif';
-    // el pie se parte en dos lineas si hace falta
+
     const palabras = d.caption.split(' ');
     let linea = '', y = H - 28;
     palabras.forEach((w) => {
@@ -3304,26 +2593,19 @@ AFRAME.registerComponent('image-windows', {
     const mesh = this.el.object3D;
     const raiz = this.el.object3D;
 
-    /*
-      Los nichos de verdad son los marcos verticales de neon turquesa pegados a
-      la pared del lado laboratorio. El primer intento se anclaba a grupos de
-      neon altos, que resultaron ser los arcos del techo: las laminas salian
-      diminutas y casi de perfil. Aqui se buscan marcos altos y pegados a la
-      pared, y cada lamina se dimensiona y orienta segun su propio hueco.
-    */
+
     const marcos = [];
     mesh.traverse((o) => {
       if (!o.isMesh || !o.material || o.material.name !== 'Neon_Turquoise') return;
       const b = new THREE.Box3().setFromObject(o);
       const s = b.getSize(new THREE.Vector3());
       const c = b.getCenter(new THREE.Vector3());
-      // pegado a la pared, de altura de ventana y de tamaño de nicho: los arcos
-      // grandes del techo cumplian las dos primeras condiciones y hacian que el
-      // hueco resultante creciera hasta varios metros
+
+
       if (c.x < 1.2 || s.y < 0.9 || s.y > 2.6 || Math.max(s.x, s.z) > 1.6) return;
       marcos.push({ c, s });
     });
-    // agrupar los marcos que comparten hueco y quedarse con los tres mayores
+
     const huecos = [];
     marcos.forEach((m) => {
       const h = huecos.find((h) => Math.abs(h.c.z - m.c.z) < 0.6);
@@ -3339,17 +2621,17 @@ AFRAME.registerComponent('image-windows', {
       const tex = it.data.image ? new THREE.TextureLoader().load(it.data.image) : this.lamina(it.data);
       const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.94,
                                                 side: THREE.FrontSide, toneMapped: true });
-      // acotado: una lamina de museo, nunca un panel de varios metros
+
       const ancho = Math.min(Math.max(h.s.z, 0.5) * 0.8, 1.1);
       const alto = Math.min(h.s.y * 0.66, 0.85);
       const plano = new THREE.Mesh(new THREE.PlaneGeometry(ancho, alto), mat);
       const p = h.c.clone();
-      p.x -= 0.04;                                   // ligeramente por detras del plano del marco
+      p.x -= 0.04;
       raiz.worldToLocal(p);
       plano.position.copy(p);
       plano.renderOrder = 1;
       raiz.add(plano);
-      const mirar = p.clone(); mirar.x -= 3;         // de cara al centro de la sala
+      const mirar = p.clone(); mirar.x -= 3;
       plano.lookAt(mirar);
       puestas++;
     });
@@ -3755,32 +3037,7 @@ AFRAME.registerComponent('application-visuals', {
   }
 });
 
-/*
-  Microinstalacion de electroactividad de RHODOVULUM.
 
-  Es una capa museografica: no toca el GLB, ni posiciones, ni materiales
-  base. Todo se deriva por MEDICION en tiempo de ejecucion de piezas reales
-  del modelo -- la bacteria (anclaje curatorial bacteriaSmall04), su campana
-  de cristal (VITRINA_Campana_*), la base de esa campana (VITRINA_Base_*) y
-  la peana que las sostiene -- de modo que no hay ni una sola coordenada
-  escrita a mano.
-
-  Lectura buscada, desde la posicion normal del visitante:
-
-      [ELECTRODO]  ---> e-  e-  e-  --->  [BACTERIA]
-
-  El electrodo es una placa fina, discreta, a la DERECHA del visitante y
-  ligeramente retrasada, apoyada en la tapa de la peana (fuera de la campana,
-  porque la bacteria ocupa practicamente todo el diametro interior: medido,
-  quedan 1.7 cm libres a cada lado, imposible meter nada sin que la propia
-  bacteria lo tape). Los electrones nacen en la superficie de la placa y
-  mueren dentro de la bacteria siguiendo una curva muy suave, con una guia
-  casi transparente y una punta de flecha minuscula junto a la bacteria para
-  que la direccion se entienda incluso en una captura fija.
-
-  No hay ningun cartel grande: solo una microetiqueta de dos lineas que
-  aparece al acercarse, siempre por debajo de la imagen circular superior.
-*/
 AFRAME.registerComponent('electroactivity-exhibit', {
   schema: {
     target: { type: 'string', default: 'bacteriaSmall04' },
@@ -3791,9 +3048,9 @@ AFRAME.registerComponent('electroactivity-exhibit', {
 
   init() {
     this.ready = false;
-    this.active = false;      // solo mientras corre la experiencia
-    this.near = false;        // solo enciende el hotspot y el electrodo
-    this.seq = -1;            // < 0 en reposo; si no, segundos desde el click
+    this.active = false;
+    this.near = false;
+    this.seq = -1;
     this.awarded = false;
     this.displayT = 0;
     this.nextSpawn = 0;
@@ -3813,14 +3070,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     return window.getMuseumElectroactivityText ? window.getMuseumElectroactivityText(key) : key;
   },
 
-  /* --------------------------------------------------------------------
-     MEDICION. Todo lo que sigue sale del modelo, nunca de constantes.
-     -------------------------------------------------------------------- */
 
-  // Campana de cristal que cubre a esta bacteria. Se localiza por contencion
-  // real (la caja del cristal envuelve el centro de la bacteria), no por
-  // indice ni por nombre exacto, para que siga funcionando si cambia la
-  // numeracion de las vitrinas en Blender.
   findVitrine(center) {
     let bell = null, base = null;
     this.el.object3D.traverse((o) => {
@@ -3847,8 +3097,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     return nearest;
   },
 
-  // Direccion "hacia el visitante": la misma fila de cartelas que ya usa
-  // exhibit-info para orientar todas las fichas de la sala.
+
   getFrontDirection(info, center) {
     if (info && info._placardRowDir) {
       return new THREE.Vector3(info._placardRowDir.x, 0, info._placardRowDir.z).normalize();
@@ -3893,12 +3142,10 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     const standRadius = peana ? peana.radius : bellRadius + 0.18;
 
     const front = this.getFrontDirection(info, center);
-    // Derecha del VISITANTE (mira hacia -front): right = (-front) x up.
+
     const right = new THREE.Vector3(front.z, 0, -front.x).normalize();
 
-    // Se prueba primero la derecha; si ahi el electrodo no cabria dentro de
-    // la tapa de la peana, se usa la izquierda. Nunca se fuerza una posicion
-    // que se salga de la piedra.
+
     const margin = 0.055;
     const wanted = bellRadius + 0.072;
     const place = (dir, lateral) => bellCenter.clone()
@@ -3913,7 +3160,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
       const alt = place(right.clone().negate(), wanted);
       if (fits(alt)) { sideDir = right.clone().negate(); pos = alt; }
       else {
-        // se acerca el electrodo hasta que quepa, sin bajar de la campana
+
         while (lateral > bellRadius + 0.030 && !fits(pos)) {
           lateral -= 0.008;
           pos = place(sideDir, lateral);
@@ -3922,12 +3169,11 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     }
     pos.y = standTopY + 0.002;
 
-    // Proporciones DERIVADAS de la bacteria: la placa mide poco mas de la
-    // mitad de su altura visual, tal y como pide el guion museografico.
+
     const plateH = THREE.MathUtils.clamp(bacHeight * 0.58, 0.046, 0.095);
     const plateW = plateH * 0.64;
     const plateT = 0.0038;
-    const plateCY = center.y - bacHeight * 0.12;   // ligeramente por debajo del centro
+    const plateCY = center.y - bacHeight * 0.12;
 
     this.info = info;
     this.anchorObj = anchor;
@@ -3976,10 +3222,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     }));
   },
 
-  /* --------------------------------------------------------------------
-     ELECTRODO. Placa fina de grafito con un filo turquesa, sobre un pie
-     minimo. Nada de torre, nada de pantalla.
-     -------------------------------------------------------------------- */
+
   createElectrode() {
     const sceneObj = this.el.sceneEl.object3D;
     const { w, h, t, cy } = this.plateGeom;
@@ -3988,7 +3231,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     const group = new THREE.Group();
     group.name = 'rhodovulum-electrodo';
     group.position.copy(base);
-    // la cara util mira a la bacteria
+
     const toBac = this.targetCenter.clone().sub(base); toBac.y = 0;
     if (toBac.lengthSq() < 1e-6) toBac.copy(this.front);
     toBac.normalize();
@@ -4009,11 +3252,10 @@ AFRAME.registerComponent('electroactivity-exhibit', {
       transparent: true, opacity: 0
     });
 
-    const plateY = cy - base.y;                 // altura local del centro de placa
+    const plateY = cy - base.y;
     const plateBottom = plateY - h / 2;
 
-    // filo turquesa: un plano un pelin mayor detras de la placa, de modo que
-    // solo asome como una linea de menos de 1 mm en todo el contorno.
+
     const rim = new THREE.Mesh(new THREE.PlaneGeometry(w + 0.0016, h + 0.0016), turquoise);
     rim.position.set(0, plateY, t / 2 - 0.0004);
     group.add(rim);
@@ -4039,7 +3281,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     foot.position.set(0, 0.0025, 0);
     group.add(foot);
 
-    // zona de click comoda, invisible
+
     const hit = new THREE.Mesh(
       new THREE.PlaneGeometry(w * 2.6, h * 1.9),
       new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false, side: THREE.DoubleSide })
@@ -4085,9 +3327,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     return tex;
   },
 
-  /* --------------------------------------------------------------------
-     TRAYECTORIA. Nace en la superficie de la placa, muere en la bacteria.
-     -------------------------------------------------------------------- */
+
   createPath() {
     const base = this.electrodeBase;
     const { cy, t } = this.plateGeom;
@@ -4106,8 +3346,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     });
   },
 
-  // Guia direccional: linea finisima semitransparente + punta de flecha
-  // minuscula junto a la bacteria (opcion A del guion).
+
   createGuide() {
     const sceneObj = this.el.sceneEl.object3D;
     const group = new THREE.Group();
@@ -4122,8 +3361,8 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     group.add(tube);
 
     const head = new THREE.Mesh(new THREE.ConeGeometry(0.0068, 0.017, 12), mat);
-    // la punta se coloca en el hueco visible entre placa y bacteria (medido:
-    // la trayectoria entra en los pili hacia t=0.37), no dentro del cuerpo.
+
+
     const tAt = 0.50;
     const p = this.curves[1].getPointAt(tAt);
     const tan = this.curves[1].getTangentAt(tAt).normalize();
@@ -4136,7 +3375,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
 
   createElectronPool() {
     const sceneObj = this.el.sceneEl.object3D;
-    // MUCHO mas pequenos que antes (0.013 -> 0.0038): puntos de energia, no bolas.
+
     const geo = new THREE.SphereGeometry(0.0045, 10, 8);
     const trailGeo = new THREE.SphereGeometry(0.0026, 8, 6);
     const tagTex = this.buildElectronLabelTexture();
@@ -4175,10 +3414,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     }
   },
 
-  /* --------------------------------------------------------------------
-     MICROETIQUETA. Dos lineas, pequena, siempre por debajo de la imagen
-     circular (se calcula con el tope real de la campana, no a ojo).
-     -------------------------------------------------------------------- */
+
   createLabel() {
     const sceneObj = this.el.sceneEl.object3D;
     const group = new THREE.Group();
@@ -4186,8 +3422,8 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     const base = this.electrodeBase;
     const topPlate = this.plateGeom.cy + this.plateGeom.h / 2;
     const bellTop = this.bellBox ? this.bellBox.max.y : topPlate + 0.2;
-    // se queda entre el borde superior de la placa y el tope de la campana:
-    // por encima del electrodo, muy por debajo del circulo de imagen.
+
+
     const y = Math.min(topPlate + 0.048, bellTop - 0.030);
     group.position.set(base.x + this.side.x * 0.022, y, base.z + this.side.z * 0.022);
     sceneObj.add(group);
@@ -4212,9 +3448,8 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     ctx.fillStyle = '#4FE4DC';
     ctx.fillRect(0, 0, 7, c.height);
     ctx.textAlign = 'left';
-    // El titulo cambia de longitud con el idioma ("ELECTRON UPTAKE" /
-    // "CAPTACION DE ELECTRONES"): el cuerpo se reduce hasta que la linea cabe
-    // de verdad en la etiqueta, en vez de salirse por el borde.
+
+
     const fit = (text, weight, maxPx, boxW) => {
       let size = maxPx;
       ctx.font = `${weight} ${size}px Arial, Helvetica, sans-serif`;
@@ -4235,21 +3470,14 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     return tex;
   },
 
-  /* -------------------------------------------------------------------- */
 
-  /*
-    La experiencia SOLO arranca aqui, con un click consciente del visitante
-    sobre el hotspot o sobre el propio electrodo. Acercarse ya no pone
-    electrones a circular: antes parecia que la interaccion ya estaba pasando
-    sola y no habia nada que pulsar.
-  */
   start() {
     if (this.seq >= 0) return;
     this.seq = 0;
     this.spawnElectron(true);
   },
 
-  // circulando = los primeros 4 s de la secuencia
+
   isBoosting() { return this.seq >= 0 && this.seq < 4.0; },
 
   spawnElectron(force) {
@@ -4270,7 +3498,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     const boost = this.isBoosting() ? 1 : 0;
     const g = this.electrode;
     g.group.visible = eased > 0.005;
-    // apagado: el electrodo sigue ahi pero casi no se ve (no desaparece de golpe)
+
     const press = (this.seq >= 0 && this.seq < 0.45) ? 1 - (this.seq / 0.45) : 0;
     const solid = 0.22 + 0.72 * eased;
     g.graphite.opacity = solid;
@@ -4325,13 +3553,12 @@ AFRAME.registerComponent('electroactivity-exhibit', {
         e.mesh.visible = false;
         if (e.tag) { e.tag.visible = false; e.tagMat.opacity = 0; }
         e.trails.forEach((tr) => { tr.mesh.visible = false; });
-        this.pulseT = 1;   // llegada -> destello minimo de la bacteria
+        this.pulseT = 1;
       }
     });
   },
 
-  // Llegada: subida muy pequena de emision, 0.3 s, y vuelta exacta al valor
-  // de fabrica. Nada de flashes ni de pulsos violeta.
+
   updateBacteriaPulse(dt) {
     if (this.pulseT > 0) this.pulseT = Math.max(0, this.pulseT - dt / 0.32);
     const p = Math.sin(this.pulseT * Math.PI);
@@ -4356,7 +3583,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
       if (this.seq === -1) this.nextSpawn = 0;
     }
     const running = this.seq >= 0;
-    this.active = this.isBoosting();          // solo circulan durante la experiencia
+    this.active = this.isBoosting();
     if (museoMobileSkipIdle(this, running)) return;
 
     this.displayT += (((this.near || running) ? 1 : 0) - this.displayT) * 0.075;
@@ -4364,12 +3591,7 @@ AFRAME.registerComponent('electroactivity-exhibit', {
     this.updateParticles(dt, time);
     this.updateBacteriaPulse(dt);
 
-    /*
-      El aviso llega DESPUES: los electrones dejan de circular a los 4 s, el
-      resultado se queda quieto un momento y a los 4.9 s aparece "capacidad
-      descubierta". Asi el visitante puede unir lo que acaba de ver con el
-      premio, en vez de recibirlo encima de la animacion.
-    */
+
     if (running && !this.awarded && this.seq >= 4.9) {
       this.awarded = true;
       if (window.unlockCapability) window.unlockCapability('electro');
@@ -4400,32 +3622,21 @@ AFRAME.registerComponent('electroactivity-exhibit', {
   }
 });
 
-/* ==========================================================================
-   SALA 2 -- estacion de control del reactor. Cuatro botones fisicos sobre
-   la peana cuadrada ya existente (PEANA_Alta_B, sin usar hasta ahora),
-   ninguna geometria/material nuevo en el reactor: solo se reescala, en
-   tiempo de ejecucion, la intensidad emisiva real de sus materiales
-   (Bioreactor_Bubble, Bioreactor_Liquid) y el foco que exhibit-lighting ya
-   crea sobre el -- exactamente el mismo mecanismo de "escalar sobre una
-   base guardada" que usa el hover de las bacterias, nunca un valor o color
-   inventado. Las burbujas siguen animando siempre (gltf-animations, en
-   bucle desde que carga el modulo): lo que cambia con cada boton es cuanto
-   se nota esa animacion (opacidad/brillo), no si existe.
-   ========================================================================== */
+
 AFRAME.registerComponent('reactor-control', {
   init() {
     this.stage = { light: false, flow: false, nutrients: false, active: false };
-    this.buttons = [];        // {id, mesh, material, ring, status, ...}
-    this._hoverT = {};        // id -> 0..1, suavizado de hover por boton
+    this.buttons = [];
+    this._hoverT = {};
     this.reactorLang = this.getReactorLang();
     this.reactorLast = { id: null, on: false };
-    this.msgUntil = 0;        // el mensaje de causa-efecto vive 3.8 s y se va
-    this.rewardUntil = 0;     // banner SISTEMA ACTIVO, ~2.6 s
-    this.rewardActiveAt = 0;  // primero se ve 4/4; despues SISTEMA ACTIVO
-    this.wasComplete = false; // ver checkReward(): la recompensa solo salta en la transicion
-    this.biomassAt = 0;       // instante en que se anota la capacidad, tras el banner
+    this.msgUntil = 0;
+    this.rewardUntil = 0;
+    this.rewardActiveAt = 0;
+    this.wasComplete = false;
+    this.biomassAt = 0;
     this.rewardPulse = 0;
-    this.doses = [];          // dosis de nutrientes en curso (ver injectDose)
+    this.doses = [];
     this.needsRedraw = false;
     this.nextLangCheck = 0;
     this.mobileTmp = new THREE.Vector3();
@@ -4451,12 +3662,7 @@ AFRAME.registerComponent('reactor-control', {
     return value.startsWith('es') ? 'es' : 'en';
   },
 
-  /*
-    La copia del display vive en museum-i18n.js (window.MUSEUM_I18N.reactorPanel),
-    el MISMO sistema ES/EN del resto del museo. REACTOR_CONTROL_I18N queda
-    unicamente como red de seguridad por si ese fichero no hubiera cargado:
-    no es un segundo sistema de idiomas.
-  */
+
   getReactorCopy() {
     const lang = this.getReactorLang();
     this.reactorLang = lang;
@@ -4472,8 +3678,7 @@ AFRAME.registerComponent('reactor-control', {
     return (s.light ? 1 : 0) + (s.flow ? 1 : 0) + (s.nutrients ? 1 : 0) + (s.active ? 1 : 0);
   },
 
-  // Mensaje de causa-efecto del ultimo control pulsado. Caduca solo: pasados
-  // 3.8 s el display vuelve a mostrar unicamente los estados.
+
   getReactorMessage(copy) {
     if (this.reactorLast && this.reactorLast.id && this.now() < this.msgUntil) {
       const m = copy.messages[this.reactorLast.id];
@@ -4489,9 +3694,7 @@ AFRAME.registerComponent('reactor-control', {
   onLoaded() {
     const mesh = this.el.object3D;
 
-    // Materiales reales del reactor (un unico material por nombre: el glTF
-    // los comparte entre sus mallas). Se guarda su valor de fabrica como
-    // "base": los controles solo escalan esa base, nunca la sustituyen.
+
     let bubbleMat = null, liquidMat = null, liquidMesh = null, glassMat = null, glassMesh = null;
     mesh.traverse((o) => {
       if (!o.isMesh || !o.material) return;
@@ -4512,15 +3715,11 @@ AFRAME.registerComponent('reactor-control', {
     this.glassBaseEmissiveIntensity = (glassMat && typeof glassMat.emissiveIntensity === 'number') ? glassMat.emissiveIntensity : 1;
     this.hoverGlow = 0;
 
-    // Cotas reales medidas del propio reactor: techo del cristal (donde
-    // empieza a verse la dosis de nutrientes) y superficie del cultivo.
+
     this.glassBox = glassMesh ? new THREE.Box3().setFromObject(glassMesh) : null;
     this.liquidTopY = liquidMesh ? new THREE.Box3().setFromObject(liquidMesh).max.y : null;
 
-    // Burbujas horneadas del GLB (Bioreactor_Bubbles.000-030, en bucle desde
-    // que carga el modulo). Su VELOCIDAD real la controla ahora ACTIVIDAD --
-    // no FLUJO: burbujas que suben son metabolismo, no circulacion, y asi
-    // los dos controles dejan de leerse igual.
+
     const bioreactorEl = this.el.querySelector('[gltf-model="#bioreactor"]');
     this.bioreactorAnim = bioreactorEl && bioreactorEl.components && bioreactorEl.components['gltf-animations'];
 
@@ -4551,24 +3750,8 @@ AFRAME.registerComponent('reactor-control', {
     this.buildControlStand();
     console.log('[reactor-control] listo -- 0/4, reactor en reposo');
   },
-  /*
-    Un canal visual por control, sin solaparse -- esa era la razon de que
-    "se pulsara y no se notara nada": tres de los cuatro botones movian el
-    mismo brillo.
 
-      01 LUZ        -> iluminacion: foco de exposicion + emision del cultivo.
-                       Apagado NO es negro, es una interior neutra, para que
-                       ON/OFF/ON se reconozcan los dos estados.
-      02 FLUJO      -> circulacion: puntos turquesa girando en horizontal
-                       dentro del volumen del liquido. Ni burbujas ni brillo.
-      03 NUTRIENTES -> dosis: cada pulsacion mete una tanda de gotas que
-                       entran por la tapa, caen al cultivo y se dispersan.
-                       Ademas el nivel del liquido sube mientras esta activo.
-      04 ACTIVIDAD  -> burbujas: unico canal que enciende las burbujas reales
-                       del GLB (opacidad + velocidad de su animacion) y las
-                       burbujas propias que nacen abajo y suben. No enciende
-                       ninguna luz.
-  */
+
   recomputeTargets() {
     const s = this.stage;
     const all = this.activeCount() === 4;
@@ -4599,8 +3782,7 @@ AFRAME.registerComponent('reactor-control', {
     if (this.bioreactorAnim && this.bioreactorAnim.mixer) this.bioreactorAnim.mixer.timeScale = this.curAnimSpeed;
     this.applyLiquidLevel(this.curNutrientLevel || 0);
 
-    // Cristal exterior: comunica que la pieza es seleccionable (hover) y
-    // acompana el pulso de la recompensa. Nunca un contorno duro.
+
     if (this.glassMat) {
       const accent = this._room2AccentColor || (this._room2AccentColor = new THREE.Color(ROOM2_ACCENT));
       const glowMix = Math.min(1, this.hoverGlow * 0.42 + reward * 0.30);
@@ -4609,11 +3791,7 @@ AFRAME.registerComponent('reactor-control', {
     }
   },
 
-  /*
-    02 FLUJO -- circulacion. Los puntos recorren orbitas HORIZONTALES a
-    cuatro alturas dentro del volumen real del cultivo y todas giran a la
-    vez: se lee como liquido que se mueve, nunca como burbujas subiendo.
-  */
+
   buildFlowParticles(mesh) {
     this.flowDots = [];
     if (!this.liquidMesh) return;
@@ -4625,8 +3803,8 @@ AFRAME.registerComponent('reactor-control', {
     const cz = (b.min.z + b.max.z) * 0.5;
     const group = new THREE.Group();
     group.name = 'reactor-flow-circulation';
-    // el turquesa puro se fundia con el propio liquido: se aclara para que
-    // los trazos se lean de verdad a distancia de visita.
+
+
     const color = new THREE.Color(0x8df7ef);
     const RINGS = 4, PER = 5;
     const perRing = museoMobileCount(PER, 0.75, 3);
@@ -4640,7 +3818,7 @@ AFRAME.registerComponent('reactor-control', {
         this.flowDots.push({
           mesh: dot, mat,
           angle: (i / perRing) * Math.PI * 2 + r * 0.5,
-          // radio y altura fijos por anillo: la lectura es "gira", no "flota"
+
           radiusX: sx * (0.20 + r * 0.055),
           radiusZ: sz * (0.20 + r * 0.055),
           y: b.min.y + sy * (0.20 + r * 0.185),
@@ -4663,8 +3841,8 @@ AFRAME.registerComponent('reactor-control', {
     this.flowDots.forEach((d) => {
       const a = d.angle + this.flowAngle * d.dir;
       d.mesh.position.set(c.cx + Math.cos(a) * d.radiusX, d.y, c.cz + Math.sin(a) * d.radiusZ);
-      // cada punto se estira en su direccion real de avance: en una captura
-      // fija ya se lee "esto circula", y nunca se confunde con una burbuja.
+
+
       tan.set(-Math.sin(a) * d.dir, 0, Math.cos(a) * d.dir).normalize();
       d.mesh.quaternion.setFromUnitVectors(axis, tan);
       d.mesh.scale.set(3.0, 0.8, 0.8);
@@ -4673,14 +3851,7 @@ AFRAME.registerComponent('reactor-control', {
     });
   },
 
-  /*
-    03 NUTRIENTES -- dosis. Las gotas NO nacen dentro del cultivo: aparecen
-    a la altura real del techo del cristal (medida sobre Bioreactor_Glass),
-    bajan por el eje del tubo central hasta la superficie real del liquido,
-    entran y se dispersan en abanico mientras se desvanecen. Cada pulsacion
-    del control lanza una tanda nueva, aunque el estado ON/OFF se conserve
-    para el display.
-  */
+
   buildNutrientParticles(mesh) {
     this.nutrientDots = [];
     const tube = mesh.getObjectByName('Bioreactor_CenterTube');
@@ -4694,8 +3865,7 @@ AFRAME.registerComponent('reactor-control', {
       ? new THREE.Box3().setFromObject(this.liquidMesh).min.y
       : liquidTop - 0.3;
 
-    // crema calido: el blanco frio de las burbujas se perdia sobre el
-    // cultivo turquesa, y ademas asi NUTRIENTES no se confunde con ACTIVIDAD.
+
     const color = new THREE.Color(0xf6e9d2);
     const group = new THREE.Group();
     group.name = 'reactor-nutrient-dose';
@@ -4709,14 +3879,13 @@ AFRAME.registerComponent('reactor-control', {
       group.add(dot);
       this.nutrientDots.push({ mesh: dot, mat, active: false, t: 0, delay: 0, ax: 0, az: 0, drop: 0 });
     }
-    // Radio de entrada: las gotas caen JUNTO al tubo central, nunca dentro.
-    // El tubo es metal opaco -- ese era exactamente el motivo de que la dosis
-    // no se viera: las particulas estaban escondidas en su interior.
+
+
     const tubeR = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) * 0.5;
     this.nutrientTravel = {
       cx, cz,
       entryR: tubeR + 0.024,
-      entryY: glassTop - 0.012,           // justo bajo la tapa, ya dentro del cristal
+      entryY: glassTop - 0.012,
       surfaceY: liquidTop,
       depthY: liquidBottom + (liquidTop - liquidBottom) * 0.35
     };
@@ -4724,7 +3893,7 @@ AFRAME.registerComponent('reactor-control', {
     this.nutrientGroup = group;
   },
 
-  // Una dosis = 10 gotas escalonadas. Se lanza en cada clic del control 03.
+
   injectDose() {
     if (!this.nutrientDots || !this.nutrientDots.length) return;
     const free = this.nutrientDots.filter((d) => !d.active);
@@ -4746,8 +3915,8 @@ AFRAME.registerComponent('reactor-control', {
 
   updateNutrientParticles(dt) {
     if (!this.nutrientDots || !this.nutrientTravel) return;
-    // mientras NUTRIENTES esta encendido, un goteo lento mantiene viva la
-    // lectura sin necesidad de volver a pulsar
+
+
     if (this.stage.nutrients && this.now() > (this.nextTrickle || 0)) this.injectDose();
 
     const tr = this.nutrientTravel;
@@ -4757,8 +3926,8 @@ AFRAME.registerComponent('reactor-control', {
       if (d.delay > 0) { d.delay -= dt; d.mat.opacity = 0; return; }
       d.t += dt * 0.42 * d.drop;
       if (d.t >= 1) { d.active = false; d.mesh.visible = false; d.mat.opacity = 0; return; }
-      const fall = THREE.MathUtils.clamp(d.t / 0.34, 0, 1);      // caida por el tubo
-      const spread = THREE.MathUtils.clamp((d.t - 0.34) / 0.66, 0, 1);  // dispersion
+      const fall = THREE.MathUtils.clamp(d.t / 0.34, 0, 1);
+      const spread = THREE.MathUtils.clamp((d.t - 0.34) / 0.66, 0, 1);
       const y = tr.entryY - fallH * fall - (tr.surfaceY - tr.depthY) * spread;
       const rad = tr.entryR + 0.075 * spread;
       d.mesh.position.set(tr.cx + d.ax * rad, y, tr.cz + d.az * rad);
@@ -4798,11 +3967,7 @@ AFRAME.registerComponent('reactor-control', {
     this.currentLiquidTopY = top.y;
   },
 
-  /*
-    04 ACTIVIDAD -- burbujas propias, con tamanos distintos, que nacen abajo,
-    suben y desaparecen al llegar a la superficie. Al apagar el control cada
-    burbuja TERMINA su recorrido antes de irse (no se cortan de golpe).
-  */
+
   buildActivityBubbles(mesh) {
     this.activityBubbles = [];
     if (!this.liquidMesh) return;
@@ -4818,7 +3983,7 @@ AFRAME.registerComponent('reactor-control', {
     const N = museoMobileCount(20, 0.70, 12);
     for (let i = 0; i < N; i++) {
       const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false });
-      const size = 0.008 + ((i * 37) % 5) * 0.0035;    // tamanos variados
+      const size = 0.008 + ((i * 37) % 5) * 0.0035;
       const bub = new THREE.Mesh(new THREE.SphereGeometry(size, 10, 8), mat);
       bub.visible = false;
       group.add(bub);
@@ -4859,18 +4024,12 @@ AFRAME.registerComponent('reactor-control', {
         b.z + Math.cos(secs * 1.1 + b.t * 6) * b.sway
       );
       const fadeIn = Math.min(1, b.t / 0.10);
-      const fadeOut = Math.min(1, (1 - b.t) / 0.16);   // desaparece en la superficie
+      const fadeOut = Math.min(1, (1 - b.t) / 0.16);
       b.mat.opacity = Math.min(fadeIn, fadeOut) * 0.85;
     });
   },
-  /*
-    Encuentra la cara superior REAL de PEANA_Alta_B agrupando triangulos
-    coplanares con normal ascendente. Para una tapa inclinada no sirve
-    filtrar por "vertices con Y maxima": eso captura solo el borde alto y
-    pierde el plano completo. Aqui se elige la mayor superficie ascendente
-    coplanar de la peana, se mide su normal y su huella dentro del propio
-    plano, y el panel se apoya ahi.
-  */
+
+
   computeTopSurface(obj) {
     const tris = [];
     const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
@@ -4927,16 +4086,7 @@ AFRAME.registerComponent('reactor-control', {
     best.pts.forEach((p) => planePoint.add(p));
     planePoint.multiplyScalar(1 / best.pts.length);
 
-    // PCA 2D DENTRO del plano ajustado: la huella real de este remate no es
-    // cuadrada (PEANA_Alta_B mide ~0.32 m en su lado corto y ~0.88 m en el
-    // largo), asi que ademas de la normal se mide aqui su propio eje largo/
-    // corto real -- axisLong/axisShort, ortogonales entre si y a la normal,
-    // con su extension real (extentLong/extentShort) -- para que
-    // buildControlStand pueda ensanchar el panel por el eje que de verdad
-    // tiene sitio, en vez de adivinar la orientacion con un heuristico
-    // generico. Se proyecta cada punto de la "tapa" (top[], ya calculado
-    // arriba) sobre una base 2D cualquiera del plano (uAxis/vAxis) y se
-    // diagonaliza su matriz de covarianza 2x2 (forma cerrada, sin libreria).
+
     const uHelp = Math.abs(normal.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
     const uAxis = new THREE.Vector3().crossVectors(uHelp, normal).normalize();
     const vAxis = new THREE.Vector3().crossVectors(normal, uAxis).normalize();
@@ -4953,7 +4103,7 @@ AFRAME.registerComponent('reactor-control', {
     const trace = Suu + Svv;
     const det = Suu * Svv - Suv * Suv;
     const disc = Math.sqrt(Math.max(0, (trace * trace) / 4 - det));
-    const lambda1 = trace / 2 + disc;   // autovalor mayor -> direccion del eje largo
+    const lambda1 = trace / 2 + disc;
     let ex, ey;
     if (Math.abs(Suv) > 1e-9) { ex = lambda1 - Svv; ey = Suv; }
     else { ex = 1; ey = 0; }
@@ -5020,14 +4170,14 @@ AFRAME.registerComponent('reactor-control', {
 
     const accent = ROOM2_ACCENT;
     const accentLight = ROOM2_ACCENT_LIGHT;
-    const onColor = '#4FE4DC';        // turquesa del museo para ON
+    const onColor = '#4FE4DC';
     const offColor = 'rgba(200, 212, 210, 0.30)';
     const ink = '#F7FCFA';
     const muted = '#9FB2B0';
     const line = 'rgba(90, 153, 148, 0.32)';
     const padX = WPX * 0.048;
 
-    // marco; cuando se completa el sistema respira en turquesa
+
     const pulse = rewarding ? (0.55 + 0.45 * Math.sin(this.now() / 150)) : 0;
     ctx.strokeStyle = complete
       ? `rgba(79, 228, 220, ${0.45 + pulse * 0.5})`
@@ -5035,7 +4185,7 @@ AFRAME.registerComponent('reactor-control', {
     ctx.lineWidth = complete ? 6 : 3;
     ctx.strokeRect(padX * 0.55, HPX * 0.055, WPX - padX * 1.10, HPX * 0.885);
 
-    // ------------------------------------------------ cabecera
+
     const headY = HPX * 0.115;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
@@ -5046,7 +4196,7 @@ AFRAME.registerComponent('reactor-control', {
     ctx.font = '900 62px Arial, Helvetica, sans-serif';
     ctx.fillText(copy.title, padX + 96, headY);
 
-    // contador n / 4 -- hace evidente que se esta construyendo un estado
+
     ctx.textAlign = 'right';
     ctx.fillStyle = muted;
     ctx.font = '800 30px Arial, Helvetica, sans-serif';
@@ -5061,12 +4211,12 @@ AFRAME.registerComponent('reactor-control', {
     ctx.fillStyle = 'rgba(247, 252, 250, 0.10)';
     ctx.fillRect(padX + (WPX - padX * 2) * (count / 4), HPX * 0.178, (WPX - padX * 2) * (1 - count / 4), 5);
 
-    // ------------------------------------------------ columnas de estado
+
     const cols = defs.length;
     const usableW = WPX - padX * 2;
     const colW = usableW / cols;
     const chipY = HPX * 0.248;
-    const buttonY = HPX * 0.49;      // coincide con el boton fisico real
+    const buttonY = HPX * 0.49;
     const labelY = HPX * 0.685;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -5084,7 +4234,7 @@ AFRAME.registerComponent('reactor-control', {
         ctx.stroke();
       }
 
-      // chip ON/OFF: turquesa encendido, gris muy tenue apagado
+
       const chipW = colW * 0.46, chipH = HPX * 0.072, rr = chipH / 2;
       const cx0 = x - chipW / 2, cy0 = chipY - chipH / 2;
       ctx.beginPath();
@@ -5107,7 +4257,7 @@ AFRAME.registerComponent('reactor-control', {
       ctx.font = '900 34px Arial, Helvetica, sans-serif';
       ctx.fillText(isOn ? (copy.on || 'ON') : (copy.off || 'OFF'), x, chipY + 2);
 
-      // aro que rodea al boton fisico
+
       ctx.strokeStyle = isOn ? 'rgba(79, 228, 220, 0.75)' : 'rgba(247, 252, 250, 0.16)';
       ctx.lineWidth = 8;
       ctx.beginPath();
@@ -5123,7 +4273,7 @@ AFRAME.registerComponent('reactor-control', {
       ctx.fillText(label, x, labelY + 8);
     });
 
-    // ------------------------------------------------ franja inferior
+
     const stripY = HPX * 0.775, stripH = HPX * 0.155;
     ctx.fillStyle = rewarding ? 'rgba(79, 228, 220, 0.16)' : 'rgba(247, 252, 250, 0.06)';
     ctx.fillRect(padX, stripY, WPX - padX * 2, stripH);
@@ -5173,18 +4323,7 @@ AFRAME.registerComponent('reactor-control', {
     if (line && lines < maxLines) ctx.fillText(line, x, y + lines * lineHeight);
   },
 
-  /*
-    Estacion de control: una unica placa (misma familia visual que las
-    cartelas del resto del museo -- papel, sin cristal, sin resplandor
-    permanente), apoyada PLANA sobre el remate real de PEANA_Alta_B (no de
-    pie a su lado como antes). computeTopSurface() mide la inclinacion real
-    de ese remate y el panel se orienta exactamente con ella: su eje Z local
-    (la cara con texto/botones) queda alineado con la normal real medida,
-    su centro coincide con el centro real de esa superficie, y su eje
-    "arriba" es la proyeccion sobre ese mismo plano de la direccion generica
-    hacia el punto de partida del visitante (para que el texto quede leible
-    de frente, en el angulo real de la piedra, no vertical).
-  */
+
   buildControlStand() {
     const mesh = this.el.object3D;
     const standObj = mesh.getObjectByName('PEANA_Alta_B');
@@ -5196,24 +4335,15 @@ AFRAME.registerComponent('reactor-control', {
       origin = top.centroid;
       zAxis = top.normal;
     } else {
-      // red de seguridad si la malla no trae geometria legible: se apoya
-      // sobre el techo recto del Box3, normal vertical.
+
+
       const box = new THREE.Box3().setFromObject(standObj);
       origin = box.getCenter(new THREE.Vector3());
       origin.y = box.max.y;
       zAxis = new THREE.Vector3(0, 1, 0);
     }
 
-    // direccion generica "hacia el punto de partida del visitante": antes
-    // decidia DIRECTAMENTE cual eje del panel era "ancho" y cual "alto"
-    // (proyectandola sobre el plano), lo que podia emparejar el ancho del
-    // panel con el lado CORTO real del remate (~0.32 m de PEANA_Alta_B,
-    // frente a ~0.88 m del lado largo) -- de ahi que quedara "de lado",
-    // sobresaliendo por los bordes y sin apoyo completo. Ahora solo se usa
-    // para fijar el SIGNO del eje corto (para que el texto quede del
-    // derecho, mirando al visitante); que eje es "ancho" y cual es "alto"
-    // lo decide la geometria real medida (top.axisLong/axisShort, PCA en
-    // computeTopSurface), nunca este heuristico.
+
     let dirX = 0, dirZ = 1;
     const spawn = window.MUSEO_SPAWN;
     const bounds = window.MUSEO_BOUNDS;
@@ -5232,9 +4362,8 @@ AFRAME.registerComponent('reactor-control', {
       yAxis = top.axisShort.clone();
       if (yAxis.dot(towardVisitor) < 0) yAxis.negate();
     } else {
-      // red de seguridad si por lo que sea no hubo PCA (mesh sin geometria
-      // legible en computeTopSurface): mismo comportamiento generico de
-      // siempre, proyectando "hacia el visitante" sobre el plano.
+
+
       yAxis = towardVisitor.clone();
       yAxis.addScaledVector(zAxis, -yAxis.dot(zAxis));
       if (yAxis.lengthSq() < 1e-6) yAxis.set(0, 1, 0).addScaledVector(zAxis, -zAxis.y);
@@ -5246,16 +4375,14 @@ AFRAME.registerComponent('reactor-control', {
     const basis = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
     const quat = new THREE.Quaternion().setFromRotationMatrix(basis);
 
-    const STANDOFF = 0.002;   // separacion minima para evitar z-fighting, pegado a la tapa
+    const STANDOFF = 0.002;
     const pos = origin.clone().addScaledVector(zAxis, STANDOFF);
 
     const wrapper = document.createElement('a-entity');
     wrapper.object3D.position.copy(pos);
     wrapper.object3D.quaternion.copy(quat);
 
-    // El panel necesita leerse desde la camara en perspectiva: se aprovecha
-    // mucha mas tapa real que antes, manteniendo margen para no salirse del
-    // remate inclinado de la peana.
+
     const fitWithin = (preferred, minimum, maximum) => {
       const max = Math.max(0.001, maximum);
       return Math.min(Math.max(preferred, Math.min(minimum, max)), max);
@@ -5311,8 +4438,7 @@ AFRAME.registerComponent('reactor-control', {
       })
     );
     wrapper.object3D.add(panel);
-    // el panel de fondo no es "una pieza": no abre nada ni se registra en
-    // selectableMeshes, solo los 4 botones son interactivos.
+
 
     const BUTTON_Z = 0.014;
 
@@ -5321,15 +4447,12 @@ AFRAME.registerComponent('reactor-control', {
     const BTN_R = Math.min(HEIGHT * 0.105, WIDTH * 0.043);
     const BTN_DEPTH = HEIGHT * 0.055;
     const BTN_Y = HEIGHT * 0.01;
-    // (el indicador fisico sobre cada boton se retiro: ver mas abajo)
+
 
     defs.forEach((d, i) => {
       const bx = startX + i * spacing;
-      // Los 4 botones son ahora interruptores independientes (ver
-      // onButtonClick): ACTIVATE ya no esta bloqueado hasta que los otros
-      // tres esten encendidos, asi que ya no lleva el aspecto "apagado/
-      // deshabilitado" (gris oscuro, brillo minimo) que tenia antes -- los
-      // 4 arrancan con el mismo aspecto neutro.
+
+
       const btnColor = new THREE.Color(d.off);
       const material = new THREE.MeshStandardMaterial({
         color: btnColor, emissive: new THREE.Color(d.on),
@@ -5350,14 +4473,11 @@ AFRAME.registerComponent('reactor-control', {
       const upZ = BUTTON_Z + BTN_DEPTH * 0.55;
       const downZ = BUTTON_Z + BTN_DEPTH * 0.18;
       btn.position.set(bx, BTN_Y, upZ);
-      btn.userData.museoExhibitId = `reactorBtn_${d.id}`;   // para el hover (setHover)
+      btn.userData.museoExhibitId = `reactorBtn_${d.id}`;
       btn.userData.museoAction = () => this.onButtonClick(d.id);
       wrapper.object3D.add(btn);
       if (exhibitInfo) exhibitInfo.selectableMeshes.push(btn);
 
-      // El indicador fisico (plano fino sobre el boton) se ha retirado: ocupaba
-      // exactamente la banda donde ahora va el chip ON/OFF impreso del display,
-      // que dice mucho mas con el mismo espacio.
 
       this.buttons.push({
         id: d.id, mesh: btn, material, ring, ringMaterial,
@@ -5367,28 +4487,13 @@ AFRAME.registerComponent('reactor-control', {
       this._hoverT[d.id] = 0;
     });
 
-    // igual que las cartelas de peana/ventana: se cuelga directamente del
-    // escenario (sin escala), asi que pos/quat -- ya en espacio de mundo,
-    // medidos sobre la peana ya reescalada -- no se vuelven a reescalar por
-    // error al colgarlo bajo #modelo (que si tiene escala).
+
     this.el.sceneEl.appendChild(wrapper);
     this.wrapper = wrapper;
     this.reactorCenter = pos.clone();
   },
 
-  /*
-    Los 4 botones (LIGHT / FLOW / NUTRIENTS / ACTIVATE) son interruptores
-    independientes: cada clic invierte SU PROPIO estado, en cualquier orden,
-    sin bloqueos entre ellos. Antes solo podian encenderse (nunca apagarse)
-    y ACTIVATE quedaba ademas bloqueado hasta que los otros tres estuvieran
-    ya activos -- el brief pide justo lo contrario ("each button must toggle
-    ON and OFF; clicking again must deactivate that state").
-  */
-  /*
-    Los cuatro controles son interruptores independientes: cada clic invierte
-    su propio estado, en cualquier orden, sin bloqueos. NUTRIENTES ademas
-    funciona como ACCION -- cada pulsacion lanza una dosis visible.
-  */
+
   onButtonClick(id) {
     if (!(id in this.stage)) return;
     this.stage[id] = !this.stage[id];
@@ -5403,15 +4508,7 @@ AFRAME.registerComponent('reactor-control', {
     this.drawControlPanelTexture();
   },
 
-  /*
-    La recompensa SISTEMA ACTIVO solo se dispara en la transicion de un
-    estado incompleto a los cuatro activos (wasComplete). Si el visitante
-    apaga un control el display vuelve a la normalidad, y al volver a
-    completar los cuatro puede reproducirse otra vez. Nunca por frame.
 
-    No es un protocolo cientifico: es una mecanica museografica para animar
-    a explorar los cuatro elementos, y el orden es indiferente.
-  */
   checkReward() {
     const complete = this.activeCount() === 4;
     if (complete && !this.wasComplete) {
@@ -5419,18 +4516,8 @@ AFRAME.registerComponent('reactor-control', {
       this.rewardUntil = now + 2750;
       this.rewardActiveAt = now + 1250;
       this.rewardPulse = 1;
-      /*
-        Conseguir los cuatro controles a la vez es la mecanica museografica
-        que da por explorado el reactor, y con ella se descubre el cultivo de
-        biomasa. No cambia el significado cientifico de ningun boton ni
-        convierte el 4/4 en un protocolo obligatorio: es el mismo premio
-        visual de siempre, ahora tambien anotado en el HUD general.
 
-        Se retrasa casi 3 s a proposito: primero se lee 4/4 con el reactor
-        completo, despues SISTEMA ACTIVO / CULTIVO EN FUNCIONAMIENTO, y solo
-        tras una pausa aparece el aviso de capacidad. Nunca todo a la vez.
-        unlockCapability ya se encarga de que no se repita.
-      */
+
       this.biomassAt = now + 3050;
     }
     this.wasComplete = complete;
@@ -5456,14 +4543,14 @@ AFRAME.registerComponent('reactor-control', {
   tick(time, delta) {
     if (!this.wrapper) return;
     const dt = Math.min((delta || 16) / 1000, 0.1);
-    const speed = 1 - Math.pow(0.004, dt);   // ~0.5 s, la transicion que pide el guion
+    const speed = 1 - Math.pow(0.004, dt);
     const now = this.now();
 
     const info = this.el.components['exhibit-info'];
     const hoverId = info && info.hoverId;
     this.hoverGlow += ((hoverId === 'reactor01' ? 1 : 0) - this.hoverGlow) * 0.12;
 
-    // pulso de la recompensa (solo mientras dura el banner)
+
     const rewarding = now < this.rewardUntil;
     if (this.biomassAt && now >= this.biomassAt) {
       this.biomassAt = 0;
@@ -5492,9 +4579,7 @@ AFRAME.registerComponent('reactor-control', {
     this.updateNutrientParticles(dt);
     this.updateActivityBubbles(dt, time);
 
-    // el display se redibuja mientras dura la recompensa (late) y una vez
-    // mas cuando caduca el mensaje de causa-efecto, para que vuelva solo a
-    // mostrar los estados.
+
     if (rewarding) {
       this.drawControlPanelTexture();
       this._rewardWasOn = true;
@@ -5515,8 +4600,7 @@ AFRAME.registerComponent('reactor-control', {
       }
     }
 
-    // botones: hover minimo, hundido cuando estan ON y microrespuesta de
-    // ~180 ms al recibir el clic o el tap (pressT).
+
     this.buttons.forEach((b) => {
       const isHovered = hoverId === `reactorBtn_${b.id}`;
       const t = this._hoverT[b.id] + ((isHovered ? 1 : 0) - this._hoverT[b.id]) * 0.15;
@@ -5531,14 +4615,7 @@ AFRAME.registerComponent('reactor-control', {
   }
 });
 
-/*
-  Tres acentos puntuales, sin sombra, tomados de la version antigua del
-  proyecto -- son luces reales (THREE.PointLight), no un cambio de
-  material, asi que no tocan el color/emisivo de ningun objeto. Dan
-  movimiento muy sutil (pulso lento) a la sala sin coste de un mapa de
-  sombras adicional: la directional sigue siendo la unica fuente de sombra
-  real.
-*/
+
 AFRAME.registerComponent('mood-lighting', {
   init() {
     this.accentLights = [];
@@ -5587,18 +4664,13 @@ AFRAME.registerComponent('mood-lighting', {
 
 AFRAME.registerComponent('exhibit-lighting', {
   init() {
-    this.spotsByAnchor = {};   // expuesto para reactor-control (foco del reactor)
+    this.spotsByAnchor = {};
     this.el.addEventListener('museo-modules-loaded', () => this.onLoaded());
   },
   onLoaded() {
     const mesh = this.el.object3D;
 
-    // Exactamente dos focos de exposicion, anchos y suaves (no simulacion de
-    // neon, no relleno adicional): uno sobre la bacteria grande, calido y
-    // neutro, con caida suave sobre el muro cercano; otro sobre el reactor,
-    // neutro-frio, que conserva el turquesa del liquido y separa la pieza
-    // del fondo. Angulo abierto (0.95 rad ~ 54 grados) y penumbra al maximo
-    // para que se lea como un lavado amplio, no como un foco puntual.
+
     const focos = [
       { anchor: 'BACTERIA_MASTER',  intensidad: 2.6, alcance: 8.0, angulo: 0.95, color: 0xfff1de },
       { anchor: 'PEANA_Bioreactor', intensidad: 2.4, alcance: 8.0, angulo: 0.95, color: 0xe9f2ff }
@@ -5610,7 +4682,7 @@ AFRAME.registerComponent('exhibit-lighting', {
       const o = mesh.getObjectByName(f.anchor);
       if (!o) return;
       const c = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3());
-      raiz.worldToLocal(c);                       // el rig del modelo esta reescalado
+      raiz.worldToLocal(c);
 
       const spot = new THREE.SpotLight(f.color, f.intensidad, f.alcance, f.angulo, 1.0, 1.4);
       spot.position.set(c.x, c.y + 2.4, c.z);
@@ -5626,20 +4698,14 @@ AFRAME.registerComponent('exhibit-lighting', {
   }
 });
 
-/* Attach debug logging to gltf-model entities */
+
 AFRAME.scenes[0]?.addEventListener('loaded', () => {
   document.querySelectorAll('[gltf-model]').forEach((el) => {
     el.setAttribute('log-when-loaded', '');
   });
 });
 
-/*
-  Bucle robusto de los videos circulares. En desktop se mantiene el
-  comportamiento historico: todos los videos muted intentan reproducirse en
-  bucle. En movil se abarata la decodificacion: solo se reproduce el video
-  cuya pantalla circular esta cerca del visitante; lejos queda pausado sin
-  reiniciar currentTime, de modo que al volver continua desde el mismo punto.
-*/
+
 (function () {
   const videos = Array.from(document.querySelectorAll('video[id^="ppb-video-"]'));
   if (!videos.length) return;
@@ -5751,7 +4817,7 @@ AFRAME.scenes[0]?.addEventListener('loaded', () => {
   window.addEventListener('keydown', onFirstInteraction);
 })();
 
-/* ---------- Loading screen ---------- */
+
 (function () {
   const scene = document.querySelector('a-scene');
   const screen = document.getElementById('loading-screen');
@@ -5770,33 +4836,14 @@ AFRAME.scenes[0]?.addEventListener('loaded', () => {
   scene.addEventListener('museo-ready', () => { museoReady = true; tryHide(); });
 })();
 
-/* ---------- Controls help bar: fade to a low opacity after a few seconds ---------- */
+
 (function () {
   const bar = document.getElementById('controls-help');
   if (!bar) return;
   setTimeout(() => bar.classList.add('faded'), 6000);
 })();
 
-/* ==========================================================================
-   RUBRIVIVAX GELATINOSUS -- demostracion CO -> bacteria -> H2.
 
-   El documento fuente lo resume asi: el monoxido de carbono es toxico para
-   muchos organismos, pero R. gelatinosus puede oxidarlo en anaerobiosis y ese
-   metabolismo puede ir ligado a la produccion de hidrogeno. Esta capa lo
-   enseña en tres tiempos, sin añadir ni una afirmacion nueva:
-
-        CO  ->  [RUBRIVIVAX]  ->  H2
-
-   Toda la geometria se mide en tiempo de ejecucion sobre las piezas reales
-   (la bacteria, su campana de cristal, su base y su peana), como en el resto
-   de microinstalaciones: no hay coordenadas escritas a mano.
-
-   Medido: el cuerpo de la bacteria ocupa casi todo el diametro interior de la
-   campana (deja ~1.7 cm por lado), asi que el CO no cabe "dentro" de la
-   vitrina como pieza aparte. Entra por el lado izquierdo del visitante,
-   cruzando el cristal, y el H2 sale por el extremo opuesto de la propia
-   bacteria y sube: dos comportamientos distintos que no pueden confundirse.
-   ========================================================================== */
 AFRAME.registerComponent('co-hydrogen-exhibit', {
   schema: {
     target: { type: 'string', default: 'bacteriaSmall05' },
@@ -5807,8 +4854,8 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
 
   init() {
     this.ready = false;
-    this.active = false;     // solo mientras corre la experiencia
-    this.near = false;       // acercarse solo enciende el hotspot
+    this.active = false;
+    this.near = false;
     this.seq = -1;
     this.awarded = false;
     this.displayT = 0;
@@ -5878,12 +4925,11 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     const front = (info._placardRowDir)
       ? new THREE.Vector3(info._placardRowDir.x, 0, info._placardRowDir.z).normalize()
       : new THREE.Vector3(0, 0, 1);
-    // derecha del visitante (mira hacia -front) y, por tanto, su izquierda
+
     const right = new THREE.Vector3(front.z, 0, -front.x).normalize();
     const left = right.clone().negate();
 
-    // El CO llega por la izquierda del visitante y el H2 sale por la derecha:
-    // se lee de izquierda a derecha, como el propio rotulo CO -> H2.
+
     let lateral = bellRadius + 0.060;
     const entry = () => bellCenter.clone().addScaledVector(left, lateral);
     if (peana) {
@@ -5950,8 +4996,7 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     this.path = new THREE.QuadraticBezierCurve3(this.coStart.clone(), mid, this.coTarget.clone());
   },
 
-  // Refuerzo direccional: una linea finisima y una punta minuscula, para que
-  // incluso en una captura fija se entienda de donde viene el CO.
+
   buildGuide() {
     const g = new THREE.Group();
     g.name = 'rubrivivax-guia-co';
@@ -5998,10 +5043,7 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     return tex;
   },
 
-  /*
-    CO: moleculas etiquetadas, calidas, que avanzan en horizontal hacia la
-    bacteria y se apagan al entrar. Nunca suben.
-  */
+
   buildCO() {
     const scene = this.el.sceneEl.object3D;
     const geo = new THREE.SphereGeometry(0.0075, 12, 10);
@@ -6020,11 +5062,7 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     }
   },
 
-  /*
-    H2: burbujas mas pequeñas, frias, con alguna etiqueta, que nacen en el extremo
-    opuesto de la bacteria, suben un poco y se desvanecen. Comportamiento
-    deliberadamente distinto del CO para que no puedan leerse como lo mismo.
-  */
+
   buildH2() {
     const scene = this.el.sceneEl.object3D;
     const geo = new THREE.SphereGeometry(0.005, 10, 8);
@@ -6078,9 +5116,8 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
 
     const group = new THREE.Group();
     group.name = 'rubrivivax-microetiqueta';
-    // por encima de la campana y muy por debajo de la imagen circular
-    // justo por encima de la bacteria y del punto de entrada del CO: a la
-    // altura de la campana quedaba flotando lejos, sin relacion con la vitrina
+
+
     group.position.copy(this.coStart).addScaledVector(this.left, 0.048);
     group.position.y = Math.min(this.bellTop - 0.030, this.center.y + 0.115);
     this.el.sceneEl.object3D.add(group);
@@ -6092,14 +5129,10 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
 
   now() { return (window.performance && performance.now) ? performance.now() : Date.now(); },
 
-  // "en marcha" = la fase breve en que entran 2-3 moleculas CO
+
   isRunning() { return this.seq >= 0 && this.seq < 2.35; },
 
-  /*
-    La experiencia la lanza UNICAMENTE el hotspot turquesa. La bacteria y la
-    placa de su peana siguen abriendo la ficha cientifica, como en todo el
-    museo: informacion e interaccion nunca comparten el mismo click.
-  */
+
   start() {
     if (this.seq >= 0) return;
     this.seq = 0;
@@ -6164,8 +5197,8 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
       if (p.t >= 1) {
         p.active = false;
         p.mesh.visible = false;
-        this.pulseT = 1;                                   // pulso minimo de la bacteria
-        this.pendingH2.push(this.now() + 360);             // pausa breve: CO entra, despues sale H2
+        this.pulseT = 1;
+        this.pendingH2.push(this.now() + 360);
       }
     });
   },
@@ -6193,7 +5226,7 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
         this.h2Origin.y + rise,
         this.h2Origin.z + p.dz * (0.006 + p.t * 0.014)
       );
-      p.mesh.scale.setScalar(1 + p.t * 0.45);              // la burbuja crece al subir
+      p.mesh.scale.setScalar(1 + p.t * 0.45);
       const fadeIn = Math.min(1, p.t / 0.14);
       const fadeOut = Math.min(1, (1 - p.t) / 0.34);
       const a = 0.9 * this.displayT * Math.min(fadeIn, fadeOut);
@@ -6233,11 +5266,7 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
     this.active = this.isRunning();
     if (museoMobileSkipIdle(this, running)) return;
 
-    /*
-      Orden deliberado: el CO deja de entrar a los 3.6 s, el H2 que ya sube
-      termina de verse, y solo a los 5.0 s aparece el aviso de capacidad. El
-      premio nunca cae encima de la animacion.
-    */
+
     if (running && !this.awarded && this.seq >= 5.0) {
       this.awarded = true;
       if (window.unlockCapability) window.unlockCapability(this.data.capability);
@@ -6279,27 +5308,7 @@ AFRAME.registerComponent('co-hydrogen-exhibit', {
   }
 });
 
-/* ==========================================================================
-   RHODOSPIRILLUM RUBRUM -- acumulacion de PHA.
 
-   El documento fuente dice que R. rubrum puede acumular PHA en forma de
-   granulos intracelulares, que actuan como reserva de carbono para la celula.
-   Esto lo enseña, y nada mas:
-
-        CARBONO  ->  ACUMULACION  ->  GRANULOS DE PHA
-
-   Nada ocurre por acercarse: solo una microetiqueta muy tenue. La secuencia
-   (particulas de carbono entrando + granulos apareciendo de uno en uno) la
-   lanza el visitante al pulsar sobre la bacteria, y solo al completarla se
-   concede la capacidad.
-
-   Medido en la escena: Bacteria_Mat es OPACO (transparent:false, opacity 1,
-   transmission 0), asi que un granulo colocado literalmente dentro del volumen
-   no se veria. Cada granulo se coloca por tanto sobre la superficie que mira
-   al visitante, ligeramente hundido, de modo que solo asoma su casquete: se
-   lee como una inclusion bajo la membrana. No se modifica ningun material del
-   GLB de forma permanente (el pulso parte de un valor guardado y se restaura).
-   ========================================================================== */
 AFRAME.registerComponent('pha-exhibit', {
   schema: {
     target: { type: 'string', default: 'bacteriaLarge01' },
@@ -6314,7 +5323,7 @@ AFRAME.registerComponent('pha-exhibit', {
     this.near = false;
     this.displayT = 0;
     this.retry = 0;
-    this.seq = -1;            // < 0 = en reposo; si no, segundos desde el click
+    this.seq = -1;
     this.awarded = false;
     this.granules = [];
     this.carbon = [];
@@ -6341,8 +5350,7 @@ AFRAME.registerComponent('pha-exhibit', {
       return;
     }
 
-    // Cuerpo celular real (no los pili): es la superficie sobre la que tienen
-    // sentido las inclusiones.
+
     let body = null;
     anchor.traverse((o) => {
       if (!o.isMesh || !o.material) return;
@@ -6358,23 +5366,18 @@ AFRAME.registerComponent('pha-exhibit', {
       ? new THREE.Vector3(info._placardRowDir.x, 0, info._placardRowDir.z).normalize()
       : new THREE.Vector3(1, 0, 0);
 
-    // Eje largo real del cuerpo, medido, no supuesto.
+
     const axes = [
       { v: new THREE.Vector3(1, 0, 0), len: size.x },
       { v: new THREE.Vector3(0, 1, 0), len: size.y },
       { v: new THREE.Vector3(0, 0, 1), len: size.z }
     ].sort((a, b) => b.len - a.len);
     const along = axes[0];
-    /*
-      De los dos ejes de la seccion, el "A" tiene que ser el que MIRA AL
-      VISITANTE, no simplemente el mas largo de los dos. Ordenandolos solo por
-      tamaño, en esta pieza (0.310 x 0.327 x 0.721) salia elegido el eje Y y
-      los granulos aparecian en el lomo de la celula, donde no se ven desde la
-      sala. Se ordena por alineacion con la direccion del visitante.
-    */
+
+
     const cross = axes.slice(1).sort((a, b) => Math.abs(b.v.dot(front)) - Math.abs(a.v.dot(front)));
 
-    // campana grande de esta pieza (para que nada se salga de ella)
+
     let bell = null;
     this.el.object3D.traverse((o) => {
       if (!o.isMesh || !o.name || o.name.indexOf('VITRINA_Campana') !== 0) return;
@@ -6392,7 +5395,7 @@ AFRAME.registerComponent('pha-exhibit', {
     this.center = center;
     this.halfLong = along.len * 0.5;
     this.axisLong = along.v;
-    this.axisA = cross[0].v;                 // semiejes de la seccion
+    this.axisA = cross[0].v;
     this.axisB = cross[1].v;
     this.radA = cross[0].len * 0.5;
     this.radB = cross[1].len * 0.5;
@@ -6431,12 +5434,7 @@ AFRAME.registerComponent('pha-exhibit', {
     this.mats = Array.from(set).map((mat) => ({ mat, base: mat.emissiveIntensity || 0 }));
   },
 
-  /*
-    Punto sobre la superficie del cuerpo que mira al visitante. u recorre el
-    eje largo (-1..1) y theta gira alrededor de ese eje; theta cerca de 0
-    apunta hacia el lado del visitante. El estrechamiento (taper) evita que un
-    granulo quede colgando fuera de los extremos redondeados.
-  */
+
   surfacePoint(u, theta, sink) {
     const taper = Math.sqrt(Math.max(0.18, 1 - u * u * 0.92));
     const ca = Math.cos(theta), sb = Math.sin(theta);
@@ -6459,7 +5457,7 @@ AFRAME.registerComponent('pha-exhibit', {
     const geo = new THREE.SphereGeometry(1, 18, 14);
     this.granuleGeo = geo;
     for (let i = 0; i < n; i++) {
-      // repartidos a lo largo del eje, ligeramente alternados arriba/abajo
+
       const u = -0.62 + (i + 0.5) * (1.24 / n) + ((i % 2) ? 0.05 : -0.05);
       const theta = (i % 2 ? 1 : -1) * (0.18 + (i % 3) * 0.16);
       const r = 0.034 + ((i * 7) % 3) * 0.008;
@@ -6583,11 +5581,6 @@ AFRAME.registerComponent('pha-exhibit', {
     this.phaCallout = { plane, mat, line, lineMat };
   },
 
-  /*
-    La microexperiencia la lanza UNICAMENTE el hotspot turquesa comun a todo
-    el museo. La pieza y la placa de su peana siguen abriendo la ficha
-    cientifica: informacion e interaccion nunca comparten el mismo click.
-  */
 
   start() {
     this.seq = 0;
@@ -6598,7 +5591,7 @@ AFRAME.registerComponent('pha-exhibit', {
   spawnCarbon() {
     const p = this.carbon.find((x) => !x.active);
     if (!p) return;
-    // nace en una esfera alrededor de la celula, siempre dentro de la campana
+
     const a = Math.random() * Math.PI * 2;
     const b = (Math.random() - 0.5) * 1.1;
     const rad = Math.min(this.bellRadius * 0.80, Math.max(this.radA, this.radB) + 0.28);
@@ -6619,8 +5612,8 @@ AFRAME.registerComponent('pha-exhibit', {
   },
 
   updateCarbon(dt) {
-    // Fase 1 de la secuencia: el carbono entra durante los ~2 primeros
-    // segundos; despues deja de aparecer y solo terminan los que van de camino.
+
+
     if (this.seq >= 0 && this.seq < 2.0 && this.seq >= this.nextCarbon) {
       this.spawnCarbon();
       this.nextCarbon = this.seq + THREE.MathUtils.randFloat(0.10, 0.18);
@@ -6649,12 +5642,7 @@ AFRAME.registerComponent('pha-exhibit', {
     });
   },
 
-  /*
-    Fase 2: los granulos aparecen DE UNO EN UNO (1 -> 2 -> 3 ...), cada uno
-    creciendo suavemente desde cero. Al terminar el ultimo se concede la
-    capacidad. Pasados unos segundos todo vuelve a un estado tranquilo, pero
-    el HUD conserva el descubrimiento.
-  */
+
   updateGranules() {
     const START = 2.05, STEP = 0.25, GROW = 0.42, HOLD = 8.0, FADE = 1.2;
     let done = 0;
@@ -6700,12 +5688,12 @@ AFRAME.registerComponent('pha-exhibit', {
     const dt = Math.min(0.05, Math.max(0.001, (delta || 16) / 1000));
     if (this.seq >= 0) {
       this.seq += dt;
-      if (this.seq > 9.4) this.seq = -1;     // vuelta al reposo
+      if (this.seq > 9.4) this.seq = -1;
     }
     const running = this.seq >= 0;
     if (museoMobileSkipIdle(this, running)) return;
 
-    // Acercarse solo enciende la microetiqueta, muy tenue. Nunca desbloquea.
+
     this.displayT += (((this.near || running) ? 1 : 0) - this.displayT) * 0.07;
     if (this.label) {
       this.label.group.visible = this.displayT > 0.03;
@@ -6713,17 +5701,14 @@ AFRAME.registerComponent('pha-exhibit', {
     }
 
     this.updateCarbon(dt);
-    const done = this.updateGranules();   // en reposo (seq < 0) devuelve 0 y los oculta
+    const done = this.updateGranules();
 
-    /*
-      Los cinco granulos terminan de aparecer hacia los 3.2 s. El aviso espera
-      a los 4.2 s: primero se ve el resultado quieto, despues llega el premio.
-    */
+
     if (running && !this.awarded && done >= this.granules.length && this.seq >= 4.2) {
       this.awarded = true;
       if (window.unlockCapability) window.unlockCapability(this.data.capability);
     }
-    if (!running) this.awarded = false;   // permite repetir la secuencia; el desbloqueo ya no se repite
+    if (!running) this.awarded = false;
 
     const cam = this.el.sceneEl.camera;
     const cw = cam ? cam.getWorldPosition(this.tmp) : null;
@@ -6754,26 +5739,7 @@ AFRAME.registerComponent('pha-exhibit', {
   }
 });
 
-/* ==========================================================================
-   RHODOPSEUDOMONAS PALUSTRIS -- fotoproduccion de hidrogeno.
 
-   El documento fuente dice que R. palustris es especialmente eficaz
-   produciendo hidrogeno mediante fotofermentacion. Esta capa lo enseña de la
-   forma mas simple posible, sin inventar ningun protocolo quimico:
-
-        LUZ + CULTIVO  ->  H2
-
-   Al acercarse solo aparece un pequeño indicador H2 apagado, junto a la
-   vitrina. Al pulsar, un pulso de luz sobre el cultivo enciende el indicador
-   y empiezan a salir burbujas de tamaños distintos que suben despacio, con
-   movimiento organico; algunas llevan un H2 minusculo y todas desaparecen
-   antes de llegar al techo real de la campana. Pocas a la vez: nunca un
-   jacuzzi.
-
-   Geometria medida en tiempo de ejecucion sobre la bacteria, su campana y su
-   peana reales -- ninguna coordenada escrita a mano. No se toca el GLB: el
-   pulso escala un valor emisivo guardado y remove() lo restaura.
-   ========================================================================== */
 AFRAME.registerComponent('hydrogen-exhibit', {
   schema: {
     target: { type: 'string', default: 'bacteriaSmall06' },
@@ -6787,9 +5753,9 @@ AFRAME.registerComponent('hydrogen-exhibit', {
     this.near = false;
     this.displayT = 0;
     this.retry = 0;
-    this.seq = -1;          // < 0 = en reposo; si no, segundos desde el tap
+    this.seq = -1;
     this.awarded = false;
-    this.glow = 0;          // 0..1 del indicador
+    this.glow = 0;
     this.pulseT = 0;
     this.lightPulseDone = false;
     this.nextBubble = 0;
@@ -6847,9 +5813,7 @@ AFRAME.registerComponent('hydrogen-exhibit', {
       : new THREE.Vector3(0, 0, 1);
     const right = new THREE.Vector3(front.z, 0, -front.x).normalize();
 
-    // El indicador se apoya en la tapa de la peana, a la derecha del visitante
-    // (el lado por el que "sale" el gas). Si por lo que sea no cupiera dentro
-    // de la piedra, se prueba el otro lado antes de acercarlo.
+
     const place = (dir, lat) => bellCenter.clone().addScaledVector(dir, lat).addScaledVector(front, -0.018);
     const fits = (p) => !peana || Math.hypot(p.x - peana.center.x, p.z - peana.center.z) <= peana.radius - 0.055;
     let side = right.clone();
@@ -6867,7 +5831,7 @@ AFRAME.registerComponent('hydrogen-exhibit', {
     this.front = front;
     this.side = side;
     this.indicatorBase = pos;
-    this.plateY = center.y - 0.004;                      // a la altura del cultivo
+    this.plateY = center.y - 0.004;
     this.bellTop = bellTop;
     this.riseFrom = center.y + size.y * 0.18;
     this.riseTo = Math.min(bellTop - 0.035, this.riseFrom + 0.145);
@@ -6922,11 +5886,7 @@ AFRAME.registerComponent('hydrogen-exhibit', {
     return tex;
   },
 
-  /*
-    Indicador: una placa pequeña sobre un pie minimo, de cara al visitante.
-    Apagado es gris muy tenue; durante la produccion se enciende en el cian
-    del propio hidrogeno. Nunca compite con la bacteria.
-  */
+
   buildIndicator() {
     const group = new THREE.Group();
     group.name = 'palustris-indicador-h2';
@@ -7024,7 +5984,7 @@ AFRAME.registerComponent('hydrogen-exhibit', {
       const mat = new THREE.MeshBasicMaterial({ color: 0xd8f7ff, transparent: true, opacity: 0, depthWrite: false });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.visible = false;
-      // una de cada tres lleva su H2; el resto son solo burbujas
+
       const tagged = (i % 3 === 0);
       let tag = null, tagMat = null;
       if (tagged) {
@@ -7068,7 +6028,7 @@ AFRAME.registerComponent('hydrogen-exhibit', {
 
     const group = new THREE.Group();
     group.name = 'palustris-microetiqueta-h2';
-    // desplazada hacia fuera para que no se monte sobre la campana
+
     group.position.copy(this.indicatorBase).addScaledVector(this.side, 0.052);
     group.position.y = Math.min(this.bellTop - 0.030, this.center.y + 0.115);
     this.el.sceneEl.object3D.add(group);
@@ -7078,11 +6038,6 @@ AFRAME.registerComponent('hydrogen-exhibit', {
     this.label = { group, mat };
   },
 
-  /*
-    La microexperiencia la lanzan el hotspot turquesa comun y el propio
-    indicador H2 de la instalacion. La pieza y la placa de su peana siguen
-    abriendo la ficha cientifica.
-  */
 
   start() {
     this.seq = 0;
@@ -7096,8 +6051,8 @@ AFRAME.registerComponent('hydrogen-exhibit', {
     if (!b) return;
     b.active = true;
     b.t = 0;
-    b.r = THREE.MathUtils.randFloat(0.0035, 0.0085);      // tamaños distintos
-    b.speed = 1 / THREE.MathUtils.randFloat(2.6, 4.2);    // suben despacio
+    b.r = THREE.MathUtils.randFloat(0.0035, 0.0085);
+    b.speed = 1 / THREE.MathUtils.randFloat(2.6, 4.2);
     b.x = this.center.x + THREE.MathUtils.randFloatSpread(this.spreadX * 2);
     b.z = this.center.z + THREE.MathUtils.randFloatSpread(this.spreadZ * 2);
     b.sway = THREE.MathUtils.randFloat(0.003, 0.009);
@@ -7108,8 +6063,8 @@ AFRAME.registerComponent('hydrogen-exhibit', {
   },
 
   updateBubbles(dt, secs) {
-    // Solo salen mientras dura la secuencia; las que ya van subiendo terminan
-    // su recorrido aunque la secuencia acabe (nada se corta de golpe).
+
+
     if (this.seq >= 0 && this.seq < 3.8 && this.seq >= this.nextBubble) {
       this.spawnBubble();
       this.nextBubble = this.seq + THREE.MathUtils.randFloat(0.26, 0.44);
@@ -7124,7 +6079,7 @@ AFRAME.registerComponent('hydrogen-exhibit', {
         if (b.tag) { b.tag.visible = false; b.tagMat.opacity = 0; }
         return;
       }
-      // movimiento organico: deriva lenta en dos ejes, no una linea recta
+
       const wob = Math.sin(secs * 1.5 + b.phase) * b.sway;
       const wob2 = Math.cos(secs * 1.1 + b.phase * 1.7) * b.sway * 0.7;
       const y = THREE.MathUtils.lerp(this.riseFrom, this.riseTo, b.t);
@@ -7177,7 +6132,7 @@ AFRAME.registerComponent('hydrogen-exhibit', {
     const dt = Math.min(0.05, Math.max(0.001, (delta || 16) / 1000));
     if (this.seq >= 0) {
       this.seq += dt;
-      if (this.seq > 7.8) this.seq = -1;      // vuelta al reposo
+      if (this.seq > 7.8) this.seq = -1;
     }
     const running = this.seq >= 0;
     if (museoMobileSkipIdle(this, running)) return;
@@ -7186,9 +6141,9 @@ AFRAME.registerComponent('hydrogen-exhibit', {
       this.pulseT = 1;
     }
 
-    // Acercarse solo hace aparecer el indicador APAGADO y la etiqueta tenue.
+
     this.displayT += (((this.near || running) ? 1 : 0) - this.displayT) * 0.07;
-    // El indicador se enciende con la produccion y se apaga al terminar.
+
     const glowTarget = (running && this.seq > 0.15 && this.seq < 4.6) ? 1 : 0;
     this.glow += (glowTarget - this.glow) * 0.09;
 
@@ -7215,10 +6170,7 @@ AFRAME.registerComponent('hydrogen-exhibit', {
     this.updateBubbles(dt, (time || 0) / 1000);
     this.updatePulse(dt);
 
-    /*
-      Las burbujas dejan de salir a los 3.8 s; el aviso espera a los 5.0 s
-      para que primero se vea el hidrogeno y despues llegue el premio.
-    */
+
     if (running && !this.awarded && this.seq >= 5.0) {
       this.awarded = true;
       if (window.unlockCapability) window.unlockCapability(this.data.capability);
@@ -7254,24 +6206,7 @@ AFRAME.registerComponent('hydrogen-exhibit', {
   }
 });
 
-/* ==========================================================================
-   RHODOBACTER CAPSULATUS -- fijacion de nitrogeno.
 
-   El documento fuente relaciona en esta especie la fotosintesis, la FIJACION
-   DE NITROGENO y el equilibrio redox. Aqui se enseña unicamente eso, la
-   captacion del nitrogeno, sin representar ningun producto posterior ni
-   ninguna reaccion que el documento no describa:
-
-        N2  ->  [RHODOBACTER CAPSULATUS]
-
-   Al acercarse aparecen tres moleculas de N2 (parejas de esferas unidas),
-   claramente fuera de la bacteria y de su campana, flotando despacio. Al
-   pulsar se desplazan hacia la celula, se apagan al llegar, la bacteria da un
-   pulso interno minimo y la microetiqueta aparece unos segundos.
-
-   Geometria medida en tiempo de ejecucion sobre la bacteria, su campana y su
-   peana: ninguna coordenada escrita a mano.
-   ========================================================================== */
 AFRAME.registerComponent('nitrogen-exhibit', {
   schema: {
     target: { type: 'string', default: 'bacteriaSmall03' },
@@ -7344,7 +6279,7 @@ AFRAME.registerComponent('nitrogen-exhibit', {
     const right = new THREE.Vector3(front.z, 0, -front.x).normalize();
     const left = right.clone().negate();
 
-    // Las moleculas esperan fuera de la campana, sobre la tapa de la peana.
+
     const place = (dir, lat) => bellCenter.clone().addScaledVector(dir, lat);
     const fits = (p) => !peana || Math.hypot(p.x - peana.center.x, p.z - peana.center.z) <= peana.radius - 0.050;
     let side = left.clone();
@@ -7363,7 +6298,7 @@ AFRAME.registerComponent('nitrogen-exhibit', {
     this.side = side;
     this.hub = hub;
     this.bellTop = bellTop;
-    // punto de llegada: el flanco de la celula que da al lado de las moleculas
+
     const halfSide = 0.5 * (Math.abs(side.x) * size.x + Math.abs(side.z) * size.z);
     this.arrival = center.clone().addScaledVector(side, halfSide * 0.45);
 
@@ -7396,10 +6331,7 @@ AFRAME.registerComponent('nitrogen-exhibit', {
     this.mats = Array.from(set).map((mat) => ({ mat, base: mat.emissiveIntensity || 0 }));
   },
 
-  /*
-    Cada N2 son dos esferas iguales unidas por un enlace corto y una etiqueta
-    N2 discreta: doble molecula + nombre legible desde la distancia normal.
-  */
+
   buildMolecules() {
     const scene = this.el.sceneEl.object3D;
     const n = THREE.MathUtils.clamp(Math.round(this.data.molecules), 2, 4);
@@ -7409,7 +6341,7 @@ AFRAME.registerComponent('nitrogen-exhibit', {
     const tagTex = this.buildN2LabelTexture();
     this.atomGeo = atomGeo;
     this.bondGeo = bondGeo;
-    // pequeño racimo alrededor del punto de espera, nunca en fila
+
     const spots = [
       { f: 0.000, u: 0.030 },
       { f: 0.034, u: -0.010 },
@@ -7501,14 +6433,9 @@ AFRAME.registerComponent('nitrogen-exhibit', {
     this.label = { group, mat };
   },
 
-  /*
-    La microexperiencia la lanza UNICAMENTE el hotspot turquesa comun a todo
-    el museo. La pieza y la placa de su peana siguen abriendo la ficha
-    cientifica: informacion e interaccion nunca comparten el mismo click.
-  */
 
   start() {
-    if (this.seq >= 0) return;                 // ya esta en marcha
+    if (this.seq >= 0) return;
     this.seq = 0;
     this.arrivedAt = null;
     this.mol.forEach((m) => { m.moving = true; m.arrived = false; m.t = 0; });
@@ -7532,7 +6459,7 @@ AFRAME.registerComponent('nitrogen-exhibit', {
         return;
       }
       if (!m.moving) {
-        // en espera: flotan muy despacio, girando apenas
+
         m.group.position.copy(m.home);
         m.group.position.y += Math.sin(secs * 0.7 + m.phase) * 0.006;
         m.group.position.x += Math.cos(secs * 0.5 + m.phase) * 0.004;
@@ -7567,7 +6494,7 @@ AFRAME.registerComponent('nitrogen-exhibit', {
         m.group.visible = false;
         m.tag.visible = false;
         m.tagMat.opacity = 0;
-        this.pulseT = 1;                        // pulso interno minimo
+        this.pulseT = 1;
       }
     });
     return arrived;
@@ -7593,7 +6520,7 @@ AFRAME.registerComponent('nitrogen-exhibit', {
     const dt = Math.min(0.05, Math.max(0.001, (delta || 16) / 1000));
     if (this.seq >= 0) {
       this.seq += dt;
-      if (this.seq > 8.0) { this.seq = -1; this.resetMolecules(); }   // vuelve a estar listo
+      if (this.seq > 8.0) { this.seq = -1; this.resetMolecules(); }
     }
     const running = this.seq >= 0;
     if (museoMobileSkipIdle(this, running)) return;
@@ -7602,8 +6529,7 @@ AFRAME.registerComponent('nitrogen-exhibit', {
     const arrived = this.updateMolecules(dt, (time || 0) / 1000);
     this.updatePulse(dt);
 
-    // La etiqueta aparece al llegar el nitrogeno y se va sola unos segundos
-    // despues: no esta puesta de forma permanente sobre la vitrina.
+
     const showLabel = running && arrived > 0 && this.seq < 7.0;
     this.labelT += ((showLabel ? 1 : 0) - this.labelT) * 0.09;
     if (this.label) {
@@ -7611,10 +6537,7 @@ AFRAME.registerComponent('nitrogen-exhibit', {
       this.label.mat.opacity = 0.94 * this.labelT;
     }
 
-    /*
-      Al llegar la ultima molecula se guarda el momento; el aviso llega 0.9 s
-      despues, con la etiqueta N2 FIJADO ya visible. Nunca encima del viaje.
-    */
+
     if (running && arrived >= this.mol.length && this.arrivedAt === null) this.arrivedAt = this.seq;
     if (running && !this.awarded && this.arrivedAt !== null && this.seq >= this.arrivedAt + 0.9) {
       this.awarded = true;

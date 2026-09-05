@@ -6,7 +6,7 @@ html, body {
   background: #efe6d8;
 }
 
-/* ---------- Loading screen ---------- */
+
 #loading-screen {
   position: fixed;
   inset: 0;
@@ -43,7 +43,7 @@ html, body {
   animation: loading-spin 0.9s linear infinite;
 }
 
-/* ---------- Language selector ---------- */
+
 #language-switcher {
   position: fixed;
   top: 18px;
@@ -117,7 +117,7 @@ html, body {
   to { transform: rotate(360deg); }
 }
 
-/* ---------- Controls help bar ---------- */
+
 #controls-help {
   position: fixed;
   left: 50%;
@@ -147,16 +147,12 @@ html, body {
   opacity: 0.28;
 }
 
-/* ---------- Ayuda / instrucciones segun dispositivo ----------
-   is-mobile la añade script.js a <body> nada mas cargar (deteccion por
-   user-agent + puntero "coarse", ver MUSEO_IS_MOBILE). Sin esa clase
-   (escritorio) se ven las instrucciones de teclado; con ella, las tactiles.
-   Nunca las dos a la vez. */
+
 .hint-mobile { display: none; }
 .is-mobile .hint-mobile { display: inline; }
 .is-mobile .hint-desktop { display: none; }
 
-/* ---------- Joystick tactil de movimiento (solo moviles) ---------- */
+
 #mobile-controls {
   display: none;
   position: fixed;
@@ -165,14 +161,10 @@ html, body {
   z-index: 400;
 }
 .is-mobile #mobile-controls { display: block; }
-/* con una ficha abierta no hace falta seguir moviendose, y en pantallas
-   pequeñas el panel puede solapar esta esquina -- ver exhibit-info.open/close */
+
 .is-mobile.panel-open #mobile-controls { display: none; }
 
-/* el canvas de A-Frame no debe heredar gestos tactiles del navegador
-   (scroll/zoom/refresh-al-tirar) mientras se arrastra para mirar alrededor
-   -- drag-look-controls ya hace preventDefault() en el toque que arrastra,
-   esto es solo la señal a nivel de CSS para que el navegador no compita. */
+
 a-scene canvas { touch-action: none; }
 
 #joystick-base {
@@ -197,10 +189,7 @@ a-scene canvas { touch-action: none; }
   pointer-events: none;
 }
 
-/* ==========================================================================
-   Capa curatorial: aviso de proximidad, panel de informacion y ficha de
-   ventana. Interfaz de museo contemporaneo, separada del diseño del espacio.
-   ========================================================================== */
+
 :root {
   --mus-crema: rgba(250, 246, 240, 0.94);
   --mus-tinta: #2a2622;
@@ -208,13 +197,7 @@ a-scene canvas { touch-action: none; }
   --mus-borde: rgba(42, 38, 34, 0.12);
 }
 
-/* Sala 2 (Reactores/Aplicaciones) usa verde/turquesa como color de acento,
-   no el morado de la Sala 1 -- misma ficha compartida (#exhibit-panel), solo
-   cambia el valor de --mus-morado cuando open() marca la pieza como de Sala
-   2 (id que empieza por "reactor"/"window"). Tono derivado del propio
-   Neon_Turquoise del modelo (no inventado), con el mismo peso/saturacion
-   que el morado que sustituye, para que ambas familias de color se sientan
-   parte del mismo sistema. */
+
 #exhibit-panel.room2 { --mus-morado: #2c8c82; }
 
 #exhibit-panel,
@@ -226,17 +209,7 @@ a-scene canvas { touch-action: none; }
   color: var(--mus-tinta);
 }
 
-/* El aviso flotante "EXPLORE +"/"VIEW +" se ha retirado: las placas fisicas
-   en cada peana son ahora la unica señal de interaccion (ver script.js,
-   createPedestalPlacard). */
 
-/* --- panel de informacion ---
-   Tarjeta compacta de museo (editorial, no un overlay de pagina web): alto
-   FIJO, no proporcional a la pantalla -- el panel ya no crece con el texto,
-   es el body (dentro de panel-scroll) el que se desplaza. Cabecera
-   (numero + imagen + nombre cientifico + subtitulo) y el boton de cerrar
-   quedan siempre visibles; solo el cuerpo del texto y el pie de etiquetas
-   se desplazan. */
 #exhibit-panel {
   display: flex;
   flex-direction: column;
@@ -263,16 +236,12 @@ a-scene canvas { touch-action: none; }
   font-size: 20px; line-height: 1; color: var(--mus-tinta); opacity: 0.5;
 }
 #exhibit-panel .panel-close:hover { opacity: 1; }
-/* zona tactil comoda (min. ~44px recomendados) sin agrandar el glifo visual
-   -- el padding negativo en el margen compensa para que siga viendose en el
-   mismo sitio */
+
 .is-mobile #exhibit-panel .panel-close {
   top: 4px; right: 6px; padding: 10px 12px;
 }
 
-/* cabecera fija: numero, imagen, nombre cientifico, subtitulo. Nunca se
-   desplaza -- ver panel-scroll-wrap mas abajo, que solo envuelve el cuerpo
-   del texto y el pie de etiquetas. */
+
 #exhibit-panel .panel-head { flex: 0 0 auto; padding-right: 20px; }
 #exhibit-panel .panel-section {
   display: block; margin-bottom: 10px;
@@ -286,9 +255,7 @@ a-scene canvas { touch-action: none; }
   letter-spacing: 0.08em; font-weight: 600; color: var(--mus-morado);
 }
 
-/* zona de scroll: solo el cuerpo del texto + el pie de etiquetas. El
-   degradado (panel-fade) se ancla al fondo de ESTA zona, no del panel
-   entero, para avisar de que hay mas texto sin un scrollbar grueso. */
+
 #exhibit-panel .panel-scroll-wrap { position: relative; flex: 1 1 auto; min-height: 0; }
 #exhibit-panel .panel-scroll {
   height: 100%;
@@ -298,8 +265,7 @@ a-scene canvas { touch-action: none; }
   padding-bottom: 10px;
   scrollbar-width: thin;
   scrollbar-color: var(--mus-morado) transparent;
-  /* scroll tactil suave (momentum) en iOS antiguo, y evita que un gesto que
-     llega al final del texto "se escape" y arrastre la camara/pagina detras */
+
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   touch-action: pan-y;
@@ -314,18 +280,12 @@ a-scene canvas { touch-action: none; }
   background: linear-gradient(to bottom, transparent, var(--mus-crema) 78%);
   pointer-events: none;
 }
-/* cuerpo: margenes comodos, interlineado un poco mas generoso,
-   parrafos con espacio consistente entre si (cada \n\n de museumContent se
-   convierte en <p> propio, ver script.js:renderPanelBody) -- lineas cortas
-   por el ancho reducido del panel. Los terminos clave via <strong> (ver
-   highlightKeywords) guian la lectura sin gritar: mismo tamaño, solo mas
-   peso y algo mas de opacidad que el resto del cuerpo. */
+
 #exhibit-panel .panel-body { margin: 0; font-size: 13px; line-height: 1.68; opacity: 0.85; }
 #exhibit-panel .panel-body p { margin: 0 0 12px; }
 #exhibit-panel .panel-body p:last-child { margin-bottom: 0; }
 #exhibit-panel .panel-body strong { font-weight: 700; opacity: 1; color: var(--mus-tinta); }
-/* medios de apoyo (opcional, imagenes o videos cortos): en la cabecera fija,
-   nunca vacios a medias -- proporcionales, centrados, sin recortes forzados. */
+
 #exhibit-panel .panel-images {
   display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px;
 }
@@ -343,8 +303,7 @@ a-scene canvas { touch-action: none; }
   height: 138px;
   background: #050415;
 }
-/* las piezas secundarias/terciarias se leen mas rapido: tarjeta aun mas
-   compacta */
+
 #exhibit-panel.secondary { width: 270px; height: 380px; padding: 20px 22px 18px; }
 #exhibit-panel.secondary .panel-title { font-size: 15px; }
 #exhibit-panel.secondary .panel-lead { font-size: 11px; margin-bottom: 10px; }
@@ -352,7 +311,7 @@ a-scene canvas { touch-action: none; }
 #exhibit-panel.secondary .panel-images img { height: 82px; }
 #exhibit-panel.secondary .panel-images video { height: 112px; }
 
-/* --- ficha de ventana (contenido pasivo) --- */
+
 #exhibit-caption {
   left: 32px; bottom: 84px; margin: 0; width: 250px;
   padding: 14px; background: var(--mus-crema);
@@ -370,7 +329,7 @@ a-scene canvas { touch-action: none; }
 }
 #exhibit-caption .cap-text { display: block; font-size: 12px; line-height: 1.55; opacity: 0.8; }
 
-/* --- mensaje inicial --- */
+
 #intro-msg {
   left: 50%; top: 46px; transform: translateX(-50%);
   text-align: center; padding: 16px 26px;
@@ -388,8 +347,7 @@ a-scene canvas { touch-action: none; }
   #intro-msg { left: 12px; right: 12px; transform: none; }
 }
 
-/* --- pie de etiquetas: dentro de la zona de scroll (ver panel-scroll-wrap
-   mas arriba), secundario visualmente frente al cuerpo --- */
+
 #exhibit-panel .panel-tags {
   display: block; margin-top: 14px; padding-top: 12px;
   border-top: 1px solid var(--mus-borde);
@@ -397,8 +355,7 @@ a-scene canvas { touch-action: none; }
   color: var(--mus-tinta); opacity: 0.45;
 }
 
-/* --- creditos y fuentes: misma familia visual que las fichas, pero acceso
-   discreto desde una esquina para no competir con la visita. --- */
+
 #credits-panel {
   position: fixed;
   right: 28px;
@@ -481,10 +438,12 @@ a-scene canvas { touch-action: none; }
   letter-spacing: 0.14em;
   font-weight: 800;
 }
+/* Los creditos van ahora por material concreto, no por año, asi que el
+   rotulo necesita la linea entera: 52 px solo daban para "2017". */
 #credits-panel .credits-year {
   display: grid;
-  grid-template-columns: 52px 1fr;
-  gap: 10px;
+  grid-template-columns: 1fr;
+  gap: 3px;
   padding: 10px 0;
   border-top: 1px solid rgba(42, 38, 34, 0.07);
 }
@@ -515,7 +474,7 @@ a-scene canvas { touch-action: none; }
   #credits-panel .credits-close { top: 4px; right: 6px; padding: 10px 12px; }
 }
 
-/* --- grafismo de sala --- */
+
 #wall-graphic {
   position: fixed; left: 26px; top: 26px; width: 132px; height: 132px;
   z-index: 5; pointer-events: none; opacity: 0.13;
@@ -523,14 +482,7 @@ a-scene canvas { touch-action: none; }
 }
 @media (max-width: 640px) { #wall-graphic { width: 84px; height: 84px; left: 14px; top: 14px; } }
 
-/* ==========================================================================
-   HUD de capacidades descubiertas.
-   Vive arriba a la izquierda, la unica esquina libre de la interfaz: el
-   selector de idioma esta arriba a la derecha, la ayuda de controles abajo al
-   centro y el joystick tactil abajo a la izquierda. No recibe eventos
-   (pointer-events: none), asi que nunca compite con el arrastre de camara ni
-   con el tap sobre las piezas.
-   ========================================================================== */
+
 #capability-hud {
   position: fixed;
   top: 18px;
@@ -568,8 +520,7 @@ a-scene canvas { touch-action: none; }
   letter-spacing: 0.06em;
   opacity: 0.92;
 }
-/* con cinco capacidades la fila puede no caber en un movil estrecho: envuelve
-   en vez de desbordar la pantalla */
+
 #capability-hud .cap-row { display: flex; flex-wrap: wrap; gap: 6px; max-width: 210px; }
 #capability-hud .cap-chip {
   min-width: 30px;
@@ -590,8 +541,7 @@ a-scene canvas { touch-action: none; }
 }
 #capability-hud.complete .cap-counter { color: #d7b4f3; }
 
-/* Aviso de descubrimiento: misma tarjeta de museo que la ficha cientifica
-   (crema, tinta, morado de acento), arriba al centro y durante ~3.6 s. */
+
 #capability-toast {
   position: fixed;
   top: 22px;
@@ -628,8 +578,7 @@ a-scene canvas { touch-action: none; }
   color: var(--mus-tinta);
 }
 
-/* En movil el HUD se compacta para no comerse la pantalla, y con una ficha
-   abierta se aparta igual que hace el joystick. */
+
 .is-mobile #capability-hud {
   top: 12px;
   left: 12px;
@@ -643,8 +592,7 @@ a-scene canvas { touch-action: none; }
 .is-mobile #capability-toast { top: 14px; padding: 9px 16px; }
 .is-mobile #capability-toast .cap-toast-name { font-size: 11.5px; }
 
-/* Bienvenida del HUD: unos segundos al entrar, para que se entienda que es un
-   marcador de descubrimientos y no un adorno. Despues se encoge solo. */
+
 #capability-hud .cap-intro {
   display: none;
   flex-direction: column;
@@ -664,7 +612,7 @@ a-scene canvas { touch-action: none; }
   line-height: 1.35;
   opacity: 0.78;
 }
-/* la linea que recuerda lo que el visitante acaba de ver */
+
 #capability-toast .cap-toast-result {
   font-size: 12px;
   letter-spacing: 0.10em;

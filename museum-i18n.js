@@ -1,12 +1,5 @@
-/*
-  Internationalisation layer for the museum.
 
-  English remains the default language. A language explicitly selected by
-  the visitor is stored locally, while ?lang=en / ?lang=es makes a shared
-  link open in the intended language. The museum is reloaded after a change
-  because several labels are rendered into Three.js canvas textures during
-  start-up and cannot be translated safely by changing HTML alone.
-*/
+
 (function museumI18n() {
   const supported = ['en', 'es'];
   const queryLanguage = new URLSearchParams(window.location.search).get('lang');
@@ -68,12 +61,29 @@
       scienceTitle: 'SCIENTIFIC CONTENT',
       developmentTitle: 'MUSEUM DEVELOPMENT',
       media: [
-        { year: '2017', names: ['Berber Stevens', 'Demi Ligtenberg', 'Marta Cerruti', 'David Weissbrodt', 'Heleen Ouboter'] },
-        { year: '2019', names: ['Marta Cerruti', 'Guillaume Crosset-Perrotin', 'David Weissbrodt', 'Maria Paula Giulianetti de Almeida', 'Camille Mondini'] },
-        { year: '2020', names: ['Marta Cerruti', 'Mythili Ananth', 'David Weissbrodt'] }
+        { year: 'Photobioreactor experiments, 2017', names: ['Berber Stevens', 'Demi Ligtenberg', 'Marta Cerruti', 'David Weissbrodt'] },
+        { year: 'Purple reactor, 2017', names: ['Berber Stevens', 'Demi Ligtenberg', 'Marta Cerruti', 'David Weissbrodt'] },
+        { year: 'Reactor laboratory, 2017', names: ['Heleen Ouboter', 'Marta Cerruti', 'David Weissbrodt'] },
+        { year: 'Photobioreactor experiment, 2019', names: ['Marta Cerruti', 'Guillaume Crosset-Perrotin', 'David Weissbrodt'] },
+        { year: 'Photobioreactor video, 2019', names: ['Marta Cerruti', 'Guillaume Crosset-Perrotin', 'David Weissbrodt'] },
+        { year: 'Purple reactor, 2019', names: ['Marta Cerruti', 'David Weissbrodt'] },
+        { year: 'Green reactor, 2019', names: ['Maria Paula Giulianetti de Almeida', 'Camille Mondini', 'David Weissbrodt'] },
+        { year: 'Reactor, culture and equipment, 2020', names: ['Marta Cerruti', 'Mythili Ananth', 'David Weissbrodt'] },
+        { year: 'Acetate / butyrate bottles, 2020', names: ['Marta Cerruti', 'Mythili Ananth', 'David Weissbrodt'] },
+        { year: 'Purple culture and biomass, 2020', names: ['Marta Cerruti', 'Mythili Ananth', 'David Weissbrodt'] },
+        { year: 'R. rubrum, mCherry fluorescence and PHA granules', names: ["Baptiste Leroy's lab"] },
+        { year: 'R. palustris 42OL photobioreactor', names: ["Alessandra Adessi's lab"] },
+        { year: 'R. palustris TIE-1 on an electrode', names: ['Bose et al., 2014, Nature Communications (adapted with permission)'] },
+        { year: 'Rhodovulum sulfidophilum AB26 and bioelectrochemical device', names: ["Arpita Bose's lab"] },
+        { year: 'Rhodomicrobium spp. from freshwater wetland soil', names: ["Arpita Bose's lab"] }
       ],
       science: [
-        'Scientific references and DOI are not clearly available in the current museum content yet.'
+        'Blastochloris viridis — photosynthetic reaction center. PDB 5M7J · DOI 10.2210/pdb5M7J/pdb',
+        'Rhodospirillum rubrum — spaceflight. Ilgrande et al., 2019 · DOI 10.1089/ast.2018.1973',
+        'Rhodovulum sulfidophilum AB26. ISME Journal, 2021 · DOI 10.1038/s41396-021-01015-8',
+        'Rhodopseudomonas palustris 42OL — hydrogen / photofermentation · DOI 10.1155/2012/590693',
+        'Rhodospirillum rubrum — PHA · DOI 10.1016/0141-8130(89)90040-8',
+        'Rhodopseudomonas palustris TIE-1 — Bose et al., 2014, Nature Communications'
       ],
       development: [
         'Virtual museum design, integration and interactive implementation.'
@@ -85,12 +95,29 @@
       scienceTitle: 'CONTENIDO CIENTÍFICO',
       developmentTitle: 'DESARROLLO DEL MUSEO',
       media: [
-        { year: '2017', names: ['Berber Stevens', 'Demi Ligtenberg', 'Marta Cerruti', 'David Weissbrodt', 'Heleen Ouboter'] },
-        { year: '2019', names: ['Marta Cerruti', 'Guillaume Crosset-Perrotin', 'David Weissbrodt', 'Maria Paula Giulianetti de Almeida', 'Camille Mondini'] },
-        { year: '2020', names: ['Marta Cerruti', 'Mythili Ananth', 'David Weissbrodt'] }
+        { year: 'Experimentos con fotobiorreactor, 2017', names: ['Berber Stevens', 'Demi Ligtenberg', 'Marta Cerruti', 'David Weissbrodt'] },
+        { year: 'Reactor púrpura, 2017', names: ['Berber Stevens', 'Demi Ligtenberg', 'Marta Cerruti', 'David Weissbrodt'] },
+        { year: 'Laboratorio de reactores, 2017', names: ['Heleen Ouboter', 'Marta Cerruti', 'David Weissbrodt'] },
+        { year: 'Experimento con fotobiorreactor, 2019', names: ['Marta Cerruti', 'Guillaume Crosset-Perrotin', 'David Weissbrodt'] },
+        { year: 'Vídeo de fotobiorreactor, 2019', names: ['Marta Cerruti', 'Guillaume Crosset-Perrotin', 'David Weissbrodt'] },
+        { year: 'Reactor púrpura, 2019', names: ['Marta Cerruti', 'David Weissbrodt'] },
+        { year: 'Reactor verde, 2019', names: ['Maria Paula Giulianetti de Almeida', 'Camille Mondini', 'David Weissbrodt'] },
+        { year: 'Reactor, cultivo y equipos, 2020', names: ['Marta Cerruti', 'Mythili Ananth', 'David Weissbrodt'] },
+        { year: 'Botellas de acetato / butirato, 2020', names: ['Marta Cerruti', 'Mythili Ananth', 'David Weissbrodt'] },
+        { year: 'Cultivo púrpura y biomasa, 2020', names: ['Marta Cerruti', 'Mythili Ananth', 'David Weissbrodt'] },
+        { year: 'R. rubrum, fluorescencia mCherry y gránulos de PHA', names: ['Laboratorio de Baptiste Leroy'] },
+        { year: 'Fotobiorreactor de R. palustris 42OL', names: ['Laboratorio de Alessandra Adessi'] },
+        { year: 'R. palustris TIE-1 sobre electrodo', names: ['Bose et al., 2014, Nature Communications (adaptada con permiso)'] },
+        { year: 'Rhodovulum sulfidophilum AB26 y dispositivo bioelectroquímico', names: ['Laboratorio de Arpita Bose'] },
+        { year: 'Rhodomicrobium spp. de suelo de humedal de agua dulce', names: ['Laboratorio de Arpita Bose'] }
       ],
       science: [
-        'Las referencias científicas y DOI no están todavía claramente disponibles en el contenido actual del museo.'
+        'Blastochloris viridis — centro de reacción fotosintético. PDB 5M7J · DOI 10.2210/pdb5M7J/pdb',
+        'Rhodospirillum rubrum — vuelo espacial. Ilgrande et al., 2019 · DOI 10.1089/ast.2018.1973',
+        'Rhodovulum sulfidophilum AB26. ISME Journal, 2021 · DOI 10.1038/s41396-021-01015-8',
+        'Rhodopseudomonas palustris 42OL — hidrógeno / fotofermentación · DOI 10.1155/2012/590693',
+        'Rhodospirillum rubrum — PHA · DOI 10.1016/0141-8130(89)90040-8',
+        'Rhodopseudomonas palustris TIE-1 — Bose et al., 2014, Nature Communications'
       ],
       development: [
         'Diseño, integración digital e implementación interactiva del museo virtual.'
@@ -123,7 +150,7 @@
         steps: ['BACTERIUM', 'e⁻', 'ELECTRODE']
       },
       scale: {
-        title: 'SCALE BY NUMBERING-UP',
+        title: 'ILLUSTRATION OF SCALE-UP THROUGH PARALLEL UNITS',
         short: '1 → 4 → 8 → 16',
         steps: ['1', '4', '8', '16']
       }
@@ -152,7 +179,7 @@
         steps: ['BACTERIA', 'e⁻', 'ELECTRODO']
       },
       scale: {
-        title: 'ESCALAR MULTIPLICANDO UNIDADES',
+        title: 'REPRESENTACIÓN DEL ESCALADO MEDIANTE UNIDADES EN PARALELO',
         short: '1 → 4 → 8 → 16',
         steps: ['1', '4', '8', '16']
       }
@@ -221,12 +248,7 @@
     }
   };
 
-  /*
-    Copia del display del reactor (Sala 2). Vive aqui, en el mismo sistema
-    ES/EN que el resto del museo: script.js la lee via
-    window.MUSEUM_I18N.reactorPanel y solo cae en su copia local de
-    seguridad si este fichero no hubiera cargado.
-  */
+
   const reactorPanel = {
     en: {
       title: 'PHOTOBIOREACTOR',
@@ -272,11 +294,7 @@
     }
   };
 
-  /*
-    Capa de juego: capacidades que el visitante descubre interactuando.
-    El HUD y unlockCapability() (script.js) leen de aqui, asi que añadir una
-    capacidad nueva es añadir su id y sus textos en estos dos bloques.
-  */
+
   const capabilities = {
     en: {
       title: 'CAPABILITIES',
@@ -294,7 +312,7 @@
         hydrogen: 'H₂ · HYDROGEN PRODUCTION',
         biomass: 'BIOMASS · CULTIVATION'
       },
-      // lo que el visitante acaba de ver, en una linea
+
       result: {
         pha: 'PHA ACCUMULATED',
         nitrogen: 'N₂ FIXED',
@@ -309,7 +327,7 @@
         lead: 'YOU HAVE DISCOVERED THEIR FULL POTENTIAL',
         body: 'Continue exploring the museum to learn about the bacteria and their applications.'
       },
-      // verbo del hotspot de cada vitrina
+
       verbs: {
         pha: 'SHOW ACCUMULATION',
         nitrogen: 'OBSERVE N₂',
@@ -358,7 +376,7 @@
     }
   };
 
-  /* Microetiquetas 3D de las microinstalaciones dentro de las vitrinas. */
+
   const exhibitLabels = {
     en: {
       coHydrogen: { title: 'CO → H₂', sub: 'FROM GAS TO HYDROGEN', co: 'CO' },
@@ -380,19 +398,19 @@
       tags: ['FOTOSÍNTESIS', 'DIVERSIDAD METABÓLICA', 'PHA'],
       title: 'BACTERIAS FOTOTRÓFICAS PÚRPURAS',
       label: 'EXPLORAR +',
-      body: 'Las bacterias fototróficas púrpuras (PPB) son un grupo diverso de microorganismos capaces de utilizar la luz como fuente de energía. Sin embargo, lo que las hace especialmente interesantes no es solo su capacidad fotosintética, sino también la extraordinaria variedad de estrategias metabólicas que pueden desarrollar.\n\nSegún la especie y las condiciones ambientales, estas bacterias pueden modificar su metabolismo, fijar nitrógeno, transformar compuestos orgánicos, utilizar determinados gases, intercambiar electrones con minerales o electrodos y almacenar carbono en forma de PHA (biopolímeros con posibles aplicaciones en la producción de plásticos de origen biológico). Algunas cepas también son especialmente eficientes en la producción de hidrógeno, mientras que la biomasa obtenida de su cultivo se investiga para aplicaciones alimentarias y de nutrición animal.\n\nEsta diversidad convierte a las bacterias fototróficas púrpuras en organismos importantes tanto para comprender procesos biológicos fundamentales —como la conversión de la luz en energía y la adaptación celular a las condiciones ambientales— como para investigar procesos biotecnológicos más sostenibles. Su cultivo abre posibilidades relacionadas con la producción de hidrógeno, los bioplásticos, la biomasa y los sistemas bioelectroquímicos.\n\nPero no todas se comportan del mismo modo.\n\nA partir de este punto, la exposición se centra en ocho cepas concretas y muestra las características y capacidades que diferencian a cada una.\n\n01. RHODOSPIRILLUM RUBRUM\nUna bacteria clave para comprender la fotosíntesis\n\nRhodospirillum rubrum ha desempeñado un papel importante en la historia de la investigación sobre la fotosíntesis bacteriana. Su aparato fotosintético relativamente sencillo la convirtió en uno de los primeros organismos modelo utilizados para estudiar cómo la energía de la luz se transforma, mediante la transferencia de electrones, en energía que la célula puede utilizar.\n\nSu estudio también ha ayudado a comprender la relación entre la producción de energía, la fijación de nitrógeno y el metabolismo del carbono, y ha mostrado cómo una bacteria coordina distintos procesos según sus necesidades y las condiciones ambientales.\n\nSu relevancia no se limita a la investigación fundamental. R. rubrum puede acumular PHA en forma de gránulos intracelulares. Estos compuestos actúan como reservas de carbono para la bacteria y pueden utilizarse en la producción de materiales de origen biológico y biodegradables. Actualmente, la especie también se investiga como posible ingrediente nutritivo para alimentación humana y animal.'
+      body: 'Las bacterias fototróficas púrpuras (PPB) son un grupo diverso de microorganismos capaces de utilizar la luz como fuente de energía. Sin embargo, lo que las hace especialmente interesantes no es solo su capacidad fotosintética, sino también la extraordinaria variedad de estrategias metabólicas que pueden desarrollar.\n\nSegún la especie y las condiciones ambientales, estas bacterias pueden modificar su metabolismo, fijar nitrógeno, transformar compuestos orgánicos, utilizar determinados gases, intercambiar electrones con minerales o electrodos y almacenar carbono en forma de PHA (biopolímeros con posibles aplicaciones en la producción de plásticos de origen biológico). Algunas cepas también son especialmente eficientes en la producción de hidrógeno, mientras que la biomasa obtenida de su cultivo se investiga para aplicaciones alimentarias y de nutrición animal.\n\nEsta diversidad convierte a las bacterias fototróficas púrpuras en organismos importantes tanto para comprender procesos biológicos fundamentales —como la conversión de la luz en energía y la adaptación celular a las condiciones ambientales— como para investigar procesos biotecnológicos más sostenibles. Su cultivo abre posibilidades relacionadas con la producción de hidrógeno, los bioplásticos, la biomasa y los sistemas bioelectroquímicos.\n\nPero no todas se comportan del mismo modo.\n\nA partir de este punto, la exposición se centra en ocho cepas concretas y muestra las características y capacidades que diferencian a cada una.\n\n01. RHODOSPIRILLUM RUBRUM\nUna bacteria clave para comprender la fotosíntesis\n\nRhodospirillum rubrum ha desempeñado un papel importante en la historia de la investigación sobre la fotosíntesis bacteriana. Su aparato fotosintético relativamente sencillo la convirtió en uno de los primeros organismos modelo utilizados para estudiar cómo la energía de la luz se transforma, mediante la transferencia de electrones, en energía que la célula puede utilizar.\n\nSu estudio también ha ayudado a comprender la relación entre la producción de energía, la fijación de nitrógeno y el metabolismo del carbono, y ha mostrado cómo una bacteria coordina distintos procesos según sus necesidades y las condiciones ambientales.\n\nSu relevancia no se limita a la investigación fundamental. R. rubrum puede acumular PHA en forma de gránulos intracelulares. Estos compuestos actúan como reservas de carbono para la bacteria y pueden utilizarse en la producción de materiales de origen biológico y biodegradables. Actualmente, la especie también se investiga como posible ingrediente nutritivo para alimentación humana y animal.\n\nFUENTE\nPHA en R. rubrum · DOI 10.1016/0141-8130(89)90040-8'
     },
     spaceMission: {
       title: 'RHODOSPIRILLUM RUBRUM EN EL ESPACIO',
       lead: 'Siete días a bordo de la Estación Espacial Internacional',
       tags: ['VUELO ESPACIAL', 'MICROGRAVEDAD', 'SOPORTE VITAL DE CICLO CERRADO'],
-      body: 'Las futuras misiones espaciales necesitarán formas de producir alimentos, reciclar residuos y regenerar el aire y el agua sin depender de suministros constantes desde la Tierra. Una posible solución consiste en utilizar microorganismos beneficiosos dentro de ecosistemas cerrados diseñados para este fin.\n\nEn 2015, un grupo de científicos envió Rhodospirillum rubrum y otras especies bacterianas útiles a la Estación Espacial Internacional durante siete días. El cultivo original se dividió en dos grupos: uno permaneció en la Tierra y el otro viajó a la órbita terrestre baja, donde estuvo expuesto a la microgravedad y a una radiación más elevada.\n\nDespués del vuelo, el equipo reactivó ambos cultivos y los comparó. R. rubrum sobrevivió al viaje, creció con normalidad y continuó realizando sus funciones biológicas esperadas. El vuelo espacial pareció tener poco efecto sobre su rendimiento general.\n\nEstos resultados respaldan la posibilidad de utilizar esta bacteria púrpura comestible en sistemas experimentales de soporte vital. En el futuro, microorganismos como R. rubrum podrían ayudar a reciclar recursos, reducir la dependencia del suministro terrestre y quizá contribuir a alimentar a los astronautas durante misiones de larga duración.'
+      body: 'Las futuras misiones espaciales necesitarán formas de producir alimentos, reciclar residuos y regenerar el aire y el agua sin depender de suministros constantes desde la Tierra. Una posible solución consiste en utilizar microorganismos beneficiosos dentro de ecosistemas cerrados diseñados para este fin.\n\nEn 2015, un grupo de científicos envió Rhodospirillum rubrum y otras especies bacterianas útiles a la Estación Espacial Internacional durante siete días. El cultivo original se dividió en dos grupos: uno permaneció en la Tierra y el otro viajó a la órbita terrestre baja, donde estuvo expuesto a la microgravedad y a una radiación más elevada.\n\nDespués del vuelo, el equipo reactivó ambos cultivos y los comparó. R. rubrum sobrevivió al viaje, creció con normalidad y continuó realizando sus funciones biológicas esperadas. El vuelo espacial pareció tener poco efecto sobre su rendimiento general.\n\nEstos resultados respaldan la posibilidad de utilizar esta bacteria púrpura, investigada como posible ingrediente para alimentación humana y animal, en sistemas experimentales de soporte vital. En el futuro, microorganismos como R. rubrum podrían ayudar a reciclar recursos, reducir la dependencia del suministro terrestre y quizá contribuir a alimentar a los astronautas durante misiones de larga duración.\n\nFUENTE\nIlgrande et al., 2019 · DOI 10.1089/ast.2018.1973'
     },
     bacteriaSmall01: {
       lead: 'La maquinaria que convierte la luz en energía',
       tags: ['CENTRO DE REACCIÓN', 'PREMIO NOBEL'],
       label: 'VER +',
-      body: 'Dentro de las bacterias fotosintéticas, unas estructuras especializadas captan la energía luminosa e inician su conversión en energía química. El centro de reacción fotosintético de Blastochloris viridis ocupa un lugar especialmente importante en la historia de la ciencia.\n\nFue el primer complejo de proteínas de membrana cuya estructura se resolvió a escala atómica. Observar su organización con este nivel de detalle permitió comprender mejor uno de los procesos esenciales de la fotosíntesis: la conversión inicial de la energía luminosa en energía química.\n\nEste descubrimiento fue mucho más allá del estudio de una sola bacteria. Abrió nuevas posibilidades para investigar la estructura de las proteínas de membrana y contribuyó a las investigaciones reconocidas con el Premio Nobel de Química de 1988.'
+      body: 'Dentro de las bacterias fotosintéticas, unas estructuras especializadas captan la energía luminosa e inician su conversión en energía química. El centro de reacción fotosintético de Blastochloris viridis ocupa un lugar especialmente importante en la historia de la ciencia.\n\nFue el primer complejo de proteínas de membrana cuya estructura se resolvió a escala atómica. Observar su organización con este nivel de detalle permitió comprender mejor uno de los procesos esenciales de la fotosíntesis: la conversión inicial de la energía luminosa en energía química.\n\nEste descubrimiento fue mucho más allá del estudio de una sola bacteria. Abrió nuevas posibilidades para investigar la estructura de las proteínas de membrana y contribuyó a las investigaciones reconocidas con el Premio Nobel de Química de 1988.\n\nLa estructura que se muestra aquí es una estructura posterior del mismo centro de reacción, no la original asociada a aquel premio.\n\nFUENTE\nEstructura del centro de reacción fotosintético de Blastochloris viridis. PDB 5M7J · DOI 10.2210/pdb5M7J/pdb'
     },
     bacteriaSmall02: {
       lead: 'Cambiar desde dentro para adaptarse',
@@ -416,7 +434,7 @@
       lead: 'Bacterias conectadas a la electricidad',
       tags: ['ELECTROACTIVIDAD', 'BIOELECTROQUÍMICA'],
       label: 'VER +',
-      body: 'Algunas bacterias fototróficas púrpuras poseen una capacidad especialmente sorprendente: son electroactivas. Esto significa que pueden intercambiar electrones con elementos situados fuera de la célula.\n\nLas especies de Rhodovulum —entre ellas Rhodovulum sulfidophilum y Rhodovulum visakhapatnamense— pueden obtener electrones del hidrógeno, del hierro o incluso directamente de un electrodo.\n\nEstos procesos permiten comprender la bacteria no como un organismo aislado, sino como parte de un sistema en el que la materia biológica y los materiales conductores pueden intercambiar cargas eléctricas.\n\nLos mecanismos responsables de esta electroactividad todavía no se conocen por completo. Por ello, estas bacterias siguen siendo un campo activo de investigación y ofrecen nuevas oportunidades para estudiar las interacciones entre microorganismos, minerales y sistemas bioelectroquímicos.'
+      body: 'Algunas bacterias fototróficas púrpuras poseen una capacidad especialmente sorprendente: son electroactivas. Esto significa que pueden intercambiar electrones con elementos situados fuera de la célula.\n\nLas especies de Rhodovulum —entre ellas Rhodovulum sulfidophilum y Rhodovulum visakhapatnamense— pueden obtener electrones del hidrógeno, del hierro o incluso directamente de un electrodo.\n\nEstos procesos permiten comprender la bacteria no como un organismo aislado, sino como parte de un sistema en el que la materia biológica y los materiales conductores pueden intercambiar cargas eléctricas.\n\nLos mecanismos responsables de esta electroactividad todavía no se conocen por completo. Por ello, estas bacterias siguen siendo un campo activo de investigación y ofrecen nuevas oportunidades para estudiar las interacciones entre microorganismos, minerales y sistemas bioelectroquímicos.\n\nFUENTE\nRhodovulum sulfidophilum AB26 · DOI 10.1038/s41396-021-01015-8'
     },
     bacteriaSmall05: {
       lead: 'Vivir de un gas tóxico',
@@ -428,7 +446,7 @@
       lead: 'Cuando una capacidad biológica se convierte en una oportunidad',
       tags: ['FOTOFERMENTACIÓN', 'ELECTROACTIVIDAD'],
       label: 'VER +',
-      body: 'Rhodopseudomonas palustris reúne varias de las capacidades exploradas a lo largo de la exposición.\n\nPuede utilizar la luz para favorecer la degradación anaerobia de compuestos aromáticos derivados de las plantas, contribuyendo al reciclaje de materia orgánica compleja y a procesos relacionados con el ciclo del carbono.\n\nTambién es especialmente eficaz en la producción de hidrógeno mediante fotofermentación. Entre las bacterias fototróficas púrpuras estudiadas para este proceso, determinadas cepas de R. palustris —como la cepa 42OL— han alcanzado una productividad de hidrógeno especialmente elevada.\n\nAdemás, presenta otra característica importante: la electroactividad. Algunas cepas pueden intercambiar electrones con electrodos y, al combinar electricidad y luz, utilizar estos procesos para generar productos valiosos como PHA y determinados biocombustibles.\n\nEn este punto hemos terminado de observar de cerca las bacterias. El siguiente paso consiste en comprender cómo pueden cultivarse y cómo aprovechar estas capacidades a una escala mayor.'
+      body: 'Rhodopseudomonas palustris reúne varias de las capacidades exploradas a lo largo de la exposición.\n\nPuede utilizar la luz para favorecer la degradación anaerobia de compuestos aromáticos derivados de las plantas, contribuyendo al reciclaje de materia orgánica compleja y a procesos relacionados con el ciclo del carbono.\n\nTambién es especialmente eficaz en la producción de hidrógeno mediante fotofermentación. Entre las bacterias fototróficas púrpuras estudiadas para este proceso, determinadas cepas de R. palustris —como la cepa 42OL— han alcanzado una productividad de hidrógeno especialmente elevada.\n\nAdemás, presenta otra característica importante: la electroactividad. Algunas cepas pueden intercambiar electrones con electrodos y, al combinar electricidad y luz, utilizar estos procesos para generar productos valiosos como PHA y determinados biocombustibles.\n\nEn este punto hemos terminado de observar de cerca las bacterias. El siguiente paso consiste en comprender cómo pueden cultivarse y cómo aprovechar estas capacidades a una escala mayor.\n\nR. palustris también es un modelo para estudiar la electroactividad microbiana. La cepa TIE-1 puede captar electrones de un electrodo en condiciones iluminadas y utilizar dióxido de carbono como fuente de carbono. Este metabolismo se ha investigado para la producción de compuestos como PHA y n-butanol.\n\nFUENTE\nR. palustris 42OL, fotofermentación · DOI 10.1155/2012/590693\nTIE-1 sobre electrodo: Bose et al., 2014, Nature Communications'
     },
     reactor01: {
       lead: 'Crear las condiciones adecuadas para el crecimiento microbiano',
@@ -465,7 +483,7 @@
       title: 'ESCALADO',
       lead: 'Del laboratorio a una producción mayor',
       tags: ['ESCALADO', 'PRODUCCIÓN'],
-      body: 'Un proceso biológico satisfactorio debe acabar saliendo del laboratorio.\n\nUna estrategia para reducir los costes de producción e instalación consiste en cultivar bacterias fototróficas púrpuras en reactores de bolsas de plástico de bajo coste, utilizando equipos de calidad alimentaria.\n\nEn lugar de construir un único reactor cada vez más grande, la capacidad de producción puede ampliarse operando varios reactores en paralelo.\n\nEste enfoque ofrece una forma flexible de aumentar la capacidad de cultivo y mantener, al mismo tiempo, un sistema relativamente sencillo.'
+      body: 'Un proceso biológico satisfactorio debe acabar saliendo del laboratorio.\n\nUna estrategia para reducir los costes de producción e instalación consiste en cultivar bacterias fototróficas púrpuras en reactores de bolsas de plástico de bajo coste, utilizando equipos de calidad alimentaria.\n\nEn lugar de construir un único reactor cada vez más grande, la capacidad de producción puede ampliarse operando varios reactores en paralelo.\n\nEste enfoque ofrece una forma flexible de aumentar la capacidad de cultivo y mantener, al mismo tiempo, un sistema relativamente sencillo, y puede funcionar en condiciones estériles.\n\nLa biomasa obtenida se estudia como ingrediente para aplicaciones de alimentación humana y animal. La productividad todavía puede mejorarse, pero el sistema es viable y escalable.\n\nEstos sistemas se optimizan actualmente en UMONS (Bélgica), mientras que PurpleTech desarrolla su ampliación de capacidad mediante el funcionamiento en paralelo de múltiples reactores de bolsa.'
     },
     window06: {
       title: 'UN MICROORGANISMO, MUCHOS RESULTADOS',

@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <link rel="icon" href="data:,">
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <link rel="stylesheet" href="./style.css?v=3385dd7">
+  <link rel="stylesheet" href="./style.css?v=50b38af">
 </head>
 <body>
 
@@ -23,10 +23,7 @@
     <div id="loading-spinner"></div>
   </div>
 
-  <!-- Texto de ayuda segun dispositivo: is-mobile (ver script.js, deteccion
-       arriba del todo del fichero) decide via CSS cual de los dos pares de
-       <span> se muestra -- nunca los dos a la vez, para no mostrar
-       instrucciones de teclado a quien no tiene teclado. -->
+
   <div id="controls-help">
     <span class="hint-desktop"><b>WASD</b> <span class="control-action">Move</span></span>
     <span class="hint-desktop"><b>Drag</b> <span class="control-action">Look</span></span>
@@ -34,10 +31,7 @@
     <span class="hint-mobile"><b>Swipe</b> <span class="control-action">Look</span></span>
   </div>
 
-  <!-- Joystick tactil de movimiento: solo visible en moviles (is-mobile).
-       Logica en script.js (setupMobileJoystick); nunca anidado dentro del
-       canvas de a-scene, para que sus toques no compitan con drag-look-
-       controls (mirar) ni con el tap-to-select sobre las piezas. -->
+
   <div id="mobile-controls" aria-hidden="true">
     <div id="joystick-base"><div id="joystick-nub"></div></div>
   </div>
@@ -49,40 +43,26 @@
     fog="type: linear; color: #8c748e; near: 9; far: 24"
   >
     <a-assets timeout="60000">
-      <a-asset-item id="museum_floor" src="./modulos/museum_floor.glb?v=3385dd7"></a-asset-item>
-      <a-asset-item id="museum_walls" src="./modulos/museum_walls.glb?v=3385dd7"></a-asset-item>
-      <a-asset-item id="museum_neons" src="./modulos/museum_neons.glb?v=3385dd7"></a-asset-item>
-      <a-asset-item id="bacteria_large_01" src="./modulos/bacteria_large_01.glb?v=3385dd7"></a-asset-item>
-      <a-asset-item id="bacteria_large_02" src="./modulos/bacteria_large_02.glb?v=3385dd7"></a-asset-item>
-      <a-asset-item id="bacteria_small_01" src="./modulos/bacteria_small_01.glb?v=3385dd7"></a-asset-item>
-      <a-asset-item id="bacteria_small_02" src="./modulos/bacteria_small_02.glb?v=3385dd7"></a-asset-item>
-      <a-asset-item id="bacteria_small_03" src="./modulos/bacteria_small_03.glb?v=3385dd7"></a-asset-item>
-      <a-asset-item id="bacteria_small_04" src="./modulos/bacteria_small_04.glb?v=3385dd7"></a-asset-item>
-      <a-asset-item id="bacteria_small_05" src="./modulos/bacteria_small_05.glb?v=3385dd7"></a-asset-item>
-      <a-asset-item id="bacteria_small_06" src="./modulos/bacteria_small_06.glb?v=3385dd7"></a-asset-item>
-      <a-asset-item id="bioreactor" src="./modulos/bioreactor.glb?v=3385dd7"></a-asset-item>
-      <a-asset-item id="iss_space_mission" src="./modulos/iss_space_mission.glb?v=3385dd7"></a-asset-item>
+      <a-asset-item id="museum_floor" src="./modulos/museum_floor.glb?v=50b38af"></a-asset-item>
+      <a-asset-item id="museum_walls" src="./modulos/museum_walls.glb?v=50b38af"></a-asset-item>
+      <a-asset-item id="museum_neons" src="./modulos/museum_neons.glb?v=50b38af"></a-asset-item>
+      <a-asset-item id="bacteria_large_01" src="./modulos/bacteria_large_01.glb?v=50b38af"></a-asset-item>
+      <a-asset-item id="bacteria_large_02" src="./modulos/bacteria_large_02.glb?v=50b38af"></a-asset-item>
+      <a-asset-item id="bacteria_small_01" src="./modulos/bacteria_small_01.glb?v=50b38af"></a-asset-item>
+      <a-asset-item id="bacteria_small_02" src="./modulos/bacteria_small_02.glb?v=50b38af"></a-asset-item>
+      <a-asset-item id="bacteria_small_03" src="./modulos/bacteria_small_03.glb?v=50b38af"></a-asset-item>
+      <a-asset-item id="bacteria_small_04" src="./modulos/bacteria_small_04.glb?v=50b38af"></a-asset-item>
+      <a-asset-item id="bacteria_small_05" src="./modulos/bacteria_small_05.glb?v=50b38af"></a-asset-item>
+      <a-asset-item id="bacteria_small_06" src="./modulos/bacteria_small_06.glb?v=50b38af"></a-asset-item>
+      <a-asset-item id="bioreactor" src="./modulos/bioreactor.glb?v=50b38af"></a-asset-item>
+      <a-asset-item id="iss_space_mission" src="./modulos/iss_space_mission.glb?v=50b38af"></a-asset-item>
       <video id="ppb-video-02" src="./assets/videos/scientific-animation.mp4" autoplay loop muted playsinline crossorigin="anonymous"></video>
       <video id="ppb-video-03" src="./assets/videos/cereibacter-sphaeroides-animation.mp4" autoplay loop muted playsinline crossorigin="anonymous"></video>
       <video id="ppb-video-04" src="./assets/videos/rhodobacter-capsulatus-animation.mp4" autoplay loop muted playsinline crossorigin="anonymous"></video>
       <video id="ppb-video-05" src="./assets/videos/rhodomicrobium-vannielii-animation.mp4" autoplay loop muted playsinline crossorigin="anonymous"></video>
     </a-assets>
 
-    <!-- Modelo (museo_bacterias.glb?v=3385dd7"tira de techo" que cruzaba la
-         sala como una curva flotante. El resto de neones sí está pegado a
-         bordes reales (ventana, nicho, peana, junta) y se exporta intacto.
-         Suelo y pared llevan ahora textura horneada (antes eran nodos
-         procedurales de Blender -- Noise/Bump/ColorRamp -- que glTF no
-         puede leer y se exportaban como color plano). Coloca el rig del
-         jugador dentro del espacio orientado a la exposición, y calcula los
-         límites/huecos de navegación (ver script.js). -->
-    <!-- El museo se carga como doce modulos independientes. Cada GLB conserva
-         las coordenadas de mundo de Blender, asi que todos van en el mismo
-         origen (0 0 0) y el conjunto se reconstruye solo. La escala se calcula
-         UNA vez sobre el contenedor cuando todos han terminado de cargar: si
-         cada modulo se midiera por separado, cada uno saldria con un factor
-         distinto y las piezas no encajarian. Para sustituir una pieza basta
-         con reemplazar su .glb, sin reexportar el resto. -->
+
     <a-entity
       id="modelo"
       setup-museum-model="length: 10.7; height: 8; wallMargin: 0.4; playerRadius: 0.15; eyeHeight: 1.0"
@@ -115,12 +95,7 @@
       <a-entity gltf-model="#bioreactor" gltf-animations></a-entity>
     </a-entity>
 
-    <!-- Pieza espacial de R. rubrum. Vive fuera de #modelo porque el museo
-         usa una escala XZ/Y no uniforme: asi la estacion conserva sus
-         proporciones y el componente puede hacerla bajar en metros reales.
-         Se posiciona automaticamente sobre la segunda bacteria grande al
-         recibir museo-modules-loaded; no hay coordenadas fragiles escritas
-         a mano. -->
+
     <a-entity
       id="space-mission"
       gltf-model="#iss_space_mission"
@@ -129,21 +104,7 @@
       visible="false"
     ></a-entity>
 
-    <!-- Pantallas circulares (sala violeta): 6 circulos independientes. Sus
-         valores de posicion/normal/radio (en placeholder abajo) son crudos,
-         sin escalar, tal y como se miden en el propio circulo de Blender
-         (centro y normal reales de la malla visible, nunca el origen del
-         objeto, que esta en 0,0,0). NO van anidados dentro de #modelo: el
-         componente place-ppb-circle (script.js) espera a museo-modules-
-         loaded, lee ahi la escala real ya aplicada al museo (no uniforme:
-         X/Z y altura se calculan por separado) y coloca cada circulo con esa
-         transformacion de mundo real -- anidarlos bajo #modelo combinaba mal
-         la rotacion con esa escala no uniforme y los dejaba mal orientados.
-         El orden tecnico de PPB_VIDEO_* no coincide con la numeracion de
-         las fichas; cada display se asigna aqui a la bacteria que tiene
-         debajo en Blender. Las ventanas redondas solo muestran videos:
-         cuando todavia no hay pieza animada para una bacteria, se dejan
-         oscuras para no mezclar fotos estaticas dentro de los circulos. -->
+
     <a-circle id="PPB_VIDEO_01" place-ppb-circle="id: PPB_VIDEO_01" radius="0.01" material="color: #050415; shader: flat; side: double"></a-circle>
     <a-circle id="PPB_VIDEO_02" place-ppb-circle="id: PPB_VIDEO_02" radius="0.01" material="color: #050415; shader: flat; side: double"></a-circle>
     <a-circle id="PPB_VIDEO_03" place-ppb-circle="id: PPB_VIDEO_03" radius="0.01" material="src: #ppb-video-05; shader: flat; side: double"></a-circle>
@@ -151,25 +112,12 @@
     <a-circle id="PPB_VIDEO_05" place-ppb-circle="id: PPB_VIDEO_05" radius="0.01" material="src: #ppb-video-03; shader: flat; side: double"></a-circle>
     <a-circle id="PPB_VIDEO_06" place-ppb-circle="id: PPB_VIDEO_06" radius="0.01" material="src: #ppb-video-02; shader: flat; side: double"></a-circle>
 
-    <!-- Iluminación general: hemisferio cálido (crema arriba / tierra cálida
-         abajo), bajado a 0.20 para que deje de aplanar la sala -- el volumen
-         real ahora lo aporta la directional y los dos focos de exposición.
-         La directional sigue moderada (0.85, calida) para no repetir el
-         quemado de las cápsulas moradas (Exhibit_Capsule_Purple, roughness
-         bajo → brillo especular marcado) que ya se corrigió una vez: el
-         color base/emisivo morado está bien en Blender y en el glTF
-         exportado, el problema era solo de exposición combinada. -->
+
     <a-entity light="type: hemisphere; color: #f2d9cd; groundColor: #38233f; intensity: 0.20"></a-entity>
     <a-entity light="type: ambient; color: #824b96; intensity: 0.11"></a-entity>
     <a-entity light="type: directional; intensity: 0.62; color: #f0c4a9; castShadow: true; shadowBias: -0.0005; shadowMapWidth: 512; shadowMapHeight: 512" position="4 7 2" shadow="cast: true"></a-entity>
 
-    <!-- Player rig: el rig va a nivel de suelo, la cámara dentro lleva la
-         altura de ojos. museum-movement da WASD + flechas, suave, sin volar
-         (ver script.js: aframe-extras/movement-controls y nav-mesh están
-         rotos en esta versión de three.js, así que no se usan). clamp-to-
-         bounds es nuestro "navmesh" (rectángulo real del suelo con huecos
-         en cada peana). respawn-guard es la red de seguridad si algo
-         fallara. -->
+
     <a-entity
       id="rig"
       position="0 0 0"
@@ -188,15 +136,13 @@
   </a-scene>
 
 
-  <!-- Capa curatorial: un unico aviso, un unico panel y una unica ficha de
-       ventana, reutilizados por todas las piezas desde museumContent -->
   <div id="intro-msg">
     <p>MOVE THROUGH THE SPACE AND APPROACH THE EXHIBITS TO DISCOVER MORE</p>
     <span class="hint-desktop"><b>WASD</b> — <span class="intro-move">MOVE</span> &nbsp;&nbsp; <b class="intro-drag">DRAG</b> — <span class="intro-look">LOOK</span></span>
     <span class="hint-mobile"><b>JOYSTICK</b> — <span class="intro-move">MOVE</span> &nbsp;&nbsp; <b class="intro-swipe">SWIPE</b> — <span class="intro-look">LOOK</span></span>
   </div>
 
-  <!-- Grafismo de sala: una sola pieza, muy tenue, como señaletica de museo -->
+
   <svg id="wall-graphic" viewBox="0 0 200 200" aria-hidden="true">
     <circle cx="100" cy="100" r="72"/><circle cx="100" cy="100" r="46"/>
     <circle cx="100" cy="100" r="22"/><circle cx="82" cy="78" r="7"/>
@@ -242,7 +188,7 @@
   </aside>
 
 
-  <script src="./museum-i18n.js?v=3385dd7"></script>
-  <script src="./script.js?v=3385dd7"></script>
+  <script src="./museum-i18n.js?v=50b38af"></script>
+  <script src="./script.js?v=50b38af"></script>
 </body>
 </html>
