@@ -1,6 +1,15 @@
 
 
 
+/*
+  Ancho de la sala. X es el eje transversal medido (el recorrido va por Z), asi
+  que solo se multiplica X: la longitud y la altura no cambian, y ninguna pieza
+  de la exposicion se deforma. Ver setup-museum-model.widenRoom().
+*/
+const MUSEO_WIDTH_FACTOR = 1.25;
+// cuanto se arriman a su pared las dos piezas grandes que invadian el centro
+const MUSEO_WALL_PULL = 0.30;
+
 const CLICK_MAX_MOVE_PX = 6;
 
 const TAP_MAX_MOVE_PX = 16;
@@ -849,6 +858,123 @@ AFRAME.registerComponent('setup-museum-model', {
       });
     });
   },
+
+  /*
+    ENSANCHADO DE LA SALA (+25 % SOLO EN ANCHO).
+
+    Medido: X es el eje transversal (5.04 m de suelo pisable, 5.84 m de
+    envolvente) y Z el recorrido (9.90 m). Se ensancha X y no se toca ni Z ni Y.
+
+    NO se puede hacer con una escala global de #modelo: eso estiraria tambien
+    las bacterias, las peanas, el reactor y la carteleria. Y tampoco por
+    modulos, porque los modulos no separan arquitectura de exposicion:
+      - museum_walls.glb contiene PAREDES_Sala Y PEANA_Alta_B (el pupitre del
+        reactor), que no debe deformarse;
+      - de los 85 neones, 42 son anillos de peana/vitrina, no arquitectura.
+
+    Asi que se clasifica pieza a pieza:
+      ARQUITECTURA (suelo, paredes, neones de pared/ventana) -> se ENSANCHA en X
+      EXPOSICION  (peanas, vitrinas, bacterias, reactor, anillos de sus peanas)
+                  -> conserva su tamaño y solo se RECOLOCA
+
+    Todo esto ocurre ANTES de calcular la escala del museo, los limites, los
+    obstaculos y el spawn, y antes de emitir museo-modules-loaded. Por eso el
+    resto del museo (cartelas, hotspots, micro-instalaciones, ventanas, foco
+    del reactor, nave) mide la sala YA ensanchada y se coloca solo: no hay ni
+    una coordenada absoluta que reescribir.
+  */
+  widenRoom() {
+    const F = MUSEO_WIDTH_FACTOR;
+    if (!(F > 1)) return;
+    const mesh = this.el.object3D;
+    mesh.updateMatrixWorld(true);
+
+    // eje central del recinto, medido sobre las paredes reales
+    const wallsMesh = mesh.getObjectByName('PAREDES_Sala');
+    const wallBox = new THREE.Box3().setFromObject(wallsMesh || mesh);
+    const cx = (wallBox.min.x + wallBox.max.x) / 2;
+    window.MUSEO_WIDEN = { cx, factor: F };
+    window.MUSEO_WIDEN_X = (rawX) => cx + (rawX - cx) * F;
+
+    const boxOf = (o) => new THREE.Box3().setFromObject(o);
+    const centreX = (o) => { const b = boxOf(o); return (b.min.x + b.max.x) / 2; };
+
+    // la sala se hace mas ancha manteniendo su eje: x -> cx + (x - cx) * F
+    const stretchX = (o) => { o.scale.x *= F; o.position.x += cx * (1 - F); };
+    // la pieza no cambia de tamaño, solo acompaña al ensanchado
+    const moveX = (o, extra) => { o.position.x += (centreX(o) - cx) * (F - 1) + (extra || 0); };
+
+    /*
+      Las dos piezas grandes del lado -X invaden el centro del recorrido. Ademas
+      del reparto proporcional se arriman MUSEO_WALL_PULL hacia su propia pared,
+      que es justo lo que libera el pasillo central.
+    */
+    const extraFor = (src, ox) => {
+      if (/bacteria_large_0[12]/.test(src)) return Math.sign(ox - cx) * MUSEO_WALL_PULL;
+      return 0;
+    };
+
+    // peanas -> para saber que neones pertenecen a una exposicion y cuanto se
+    // desplaza cada una (los anillos tienen que seguir a SU peana, no al centro)
+    const peanas = [];
+    this.el.querySelectorAll('[gltf-model]').forEach((ent) => {
+      const src = ent.getAttribute('gltf-model') || '';
+      ent.object3D.traverse((o) => {
+        if (!o.isMesh || !/^PEANA_/.test(o.name || '')) return;
+        const b = boxOf(o);
+        peanas.push({ box: b, extra: extraFor(src, (b.min.x + b.max.x) / 2) });
+      });
+    });
+    const peanaDe = (o) => {
+      const b = boxOf(o);
+      return peanas.find((p) => b.min.x >= p.box.min.x - 0.18 && b.max.x <= p.box.max.x + 0.18 &&
+                                b.min.z >= p.box.min.z - 0.18 && b.max.z <= p.box.max.z + 0.18) || null;
+    };
+
+    let arq = 0, piezas = 0;
+    this.el.querySelectorAll('[gltf-model]').forEach((ent) => {
+      const src = ent.getAttribute('gltf-model') || '';
+
+      if (/museum_floor/.test(src)) { stretchX(ent.object3D); arq++; return; }
+
+      if (/museum_walls/.test(src)) {
+        // el pupitre del reactor viaja dentro de este modulo: se traslada, nunca
+        // se estira (el panel de control se apoya en su tapa inclinada real)
+        ent.object3D.traverse((o) => {
+          if (!o.isMesh) return;
+          if (o.name === 'PAREDES_Sala') { stretchX(o); arq++; }
+          else { moveX(o, 0); piezas++; }
+        });
+        return;
+      }
+
+      if (/museum_neons/.test(src)) {
+        ent.object3D.traverse((o) => {
+          if (!o.isMesh) return;
+          const p = peanaDe(o);
+          if (p) { moveX(o, p.extra); piezas++; }      // anillo de peana/vitrina
+          else { stretchX(o); arq++; }                 // neon de pared o ventana
+        });
+        return;
+      }
+
+      // modulos de exposicion: se mueven enteros, sin deformarse
+      moveX(ent.object3D, extraFor(src, centreX(ent.object3D)));
+      piezas++;
+    });
+
+    mesh.updateMatrixWorld(true);
+    const nuevo = new THREE.Box3().setFromObject(wallsMesh || mesh);
+    console.log('[setup-museum-model] sala ensanchada x' + F, {
+      ejeAncho: 'X',
+      centro: +cx.toFixed(3),
+      anchoAntes: +(wallBox.max.x - wallBox.min.x).toFixed(3),
+      anchoDespues: +(nuevo.max.x - nuevo.min.x).toFixed(3),
+      arquitectura: arq,
+      piezasRecolocadas: piezas
+    });
+  },
+
   onLoaded() {
     const mesh = this.el.object3D;
     if (!mesh) return;
@@ -865,6 +991,12 @@ AFRAME.registerComponent('setup-museum-model', {
 
     this.el.object3D.scale.set(1, 1, 1);
     this.el.object3D.updateMatrixWorld(true);
+
+    // Ensanchado ANTES de medir nada: escala, limites, obstaculos y spawn se
+    // calculan ya sobre la sala nueva.
+    this.widenRoom();
+    this.el.object3D.updateMatrixWorld(true);
+
     let box = new THREE.Box3().setFromObject(mesh);
     const size = new THREE.Vector3();
     box.getSize(size);
@@ -1611,7 +1743,10 @@ AFRAME.registerComponent('place-ppb-circle', {
     const uRaw = new THREE.Vector3(data.u[0], data.u[1], data.u[2]);
     const vRaw = new THREE.Vector3().crossVectors(nRaw, uRaw).normalize();
 
-    const worldPos = new THREE.Vector3(c.x * scale.x, c.y * scale.y, c.z * scale.z);
+    // los circulos van en los nichos de las paredes laterales, asi que siguen
+    // el mismo transporte en X que la arquitectura (ver widenRoom)
+    const cxRaw = window.MUSEO_WIDEN_X ? window.MUSEO_WIDEN_X(c.x) : c.x;
+    const worldPos = new THREE.Vector3(cxRaw * scale.x, c.y * scale.y, c.z * scale.z);
 
     const worldNormal = new THREE.Vector3(nRaw.x / scale.x, nRaw.y / scale.y, nRaw.z / scale.z).normalize();
 
