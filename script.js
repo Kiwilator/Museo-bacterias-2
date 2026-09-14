@@ -1502,7 +1502,7 @@ const museumContent = {
     section: '01', title: 'PURPLE PHOTOTROPHIC BACTERIA', label: 'EXPLORE +',
 
 
-    images: ['./assets/images/ppb-microscopy-overview.jpg', './assets/images/pha-granules-tem.jpg'],
+    images: ['./assets/images/pha-granules-tem.jpg?v=20260914-img2', './assets/images/rhodobacter-capsulatus-microscopy.jpg?v=20260914-img2'],
 
 
     imageSources: [{ label: 'Own source' }, { label: 'Own source' }],
@@ -1525,7 +1525,7 @@ const museumContent = {
     lead: 'How light begins to become chemical energy', tags: ['REACTION CENTRE', 'PHOTOSYNTHESIS'], icon: 'form',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_base',
     section: '02', title: 'BLASTOCHLORIS VIRIDIS', label: 'VIEW +',
-    images: ['./assets/images/blastochloris-viridis.png'],
+    images: ['./assets/images/blastochloris-viridis.png?v=20260914-img2'],
     imageSources: [{ label: 'Source: University of Bayreuth', url: 'https://www.uni-bayreuth.de/press-releases/genetic-magnetization-of-living-bacteria' }],
     body: 'Blastochloris viridis is important because it helped researchers understand, at molecular scale, how a bacterium converts light energy into chemical energy.\n\nThe key element is the photosynthetic reaction centre: a group of proteins and pigments located in the membrane. This is where electron transfer begins, allowing light energy to be converted into a form the cell can use.\n\nThe reaction centre of this bacterium also played an important historical role. It was one of the first membrane protein complexes whose structure could be resolved in great detail. For this reason, B. viridis remains a reference organism in the study of bacterial photosynthesis.'
   },
@@ -1534,7 +1534,7 @@ const museumContent = {
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_10',
     section: '03', title: 'CEREIBACTER SPHAEROIDES', label: 'VIEW +',
 
-    images: ['./assets/images/cereibacter-sphaeroides-microscopy.jpg'],
+    images: ['./assets/images/cereibacter-sphaeroides-microscopy.jpg?v=20260914-img2'],
 
     imageSources: [{ label: 'Source: Cereibacter sphaeroides — Wikipedia', url: 'https://de.wikipedia.org/wiki/Cereibacter_sphaeroides' }],
 
@@ -1545,7 +1545,7 @@ const museumContent = {
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_12',
     section: '04', title: 'RHODOBACTER CAPSULATUS', label: 'VIEW +',
 
-    images: ['./assets/images/rhodobacter-capsulatus-microscopy.jpg'],
+    images: ['./assets/images/rhodobacter-capsulatus-microscopy.jpg?v=20260914-img2'],
 
     imageSources: [{ label: 'Source: Fedotova & Zeilstra-Ryalls (2014)', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC3923116/' }],
 
@@ -1557,7 +1557,7 @@ const museumContent = {
     section: '05', title: 'RHODOMICROBIUM VANNIELII', label: 'EXPLORE +',
 
 
-    images: ['./assets/videos/rhodomicrobium-vannielii-animation.mp4', './assets/images/rhodomicrobium-budding.jpg'],
+    images: ['./assets/videos/rhodomicrobium-vannielii-animation.mp4', './assets/images/rhodomicrobium-budding.jpg?v=20260914-img2'],
     imageSources: [{ label: 'Own source' }, { label: 'Own source' }],
     body: 'Rhodomicrobium vannielii is notable for the way it reproduces. Instead of simply dividing into two identical cells, it develops extensions known as hyphae.\n\nA new cell forms by budding at the end of these hyphae. When it is ready, the daughter cell separates and can begin its own cycle.\n\nThis system is useful for studying how a bacterium controls cell shape, growth and differentiation between different stages of the cell cycle.'
   },
@@ -1567,7 +1567,7 @@ const museumContent = {
     section: '06', title: 'RHODOVULUM', label: 'VIEW +',
 
 
-    images: ['./assets/images/rhodovulum-electroactivity.jpg'],
+    images: ['./assets/images/rhodovulum-electroactivity.jpg?v=20260914-img2'],
     imageSources: [{ label: 'Own source' }],
     body: 'Similar electroactive capabilities have been studied in Rhodovulum species. Some can obtain electrons from hydrogen, reduced iron or directly from an electrode.\n\nThese properties are of interest for bioelectrochemical processes and for converting low-value compounds into useful products.'
   },
@@ -1576,7 +1576,7 @@ const museumContent = {
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_16',
     section: '07', title: 'RUBRIVIVAX GELATINOSUS', label: 'VIEW +',
 
-    images: ['./assets/images/rubrivivax-gelatinosus-tem.jpg'],
+    images: ['./assets/images/rubrivivax-gelatinosus-tem.jpg?v=20260914-img2'],
 
     imageSources: [{ label: 'Source: Markov & Weaver (2008)', url: 'https://doi.org/10.1007/s12010-007-8032-z' }],
 
@@ -1588,7 +1588,7 @@ const museumContent = {
     section: '08', title: 'RHODOPSEUDOMONAS PALUSTRIS', label: 'VIEW +',
 
 
-    images: ['./assets/images/b1.png', './assets/images/b3.png'],
+    images: ['./assets/images/b1.png?v=20260914-img2', './assets/images/b3.png?v=20260914-img2'],
     imageSources: [{ label: 'Own source' }, { label: 'Own source' }],
     body: 'Rhodopseudomonas palustris is notable for its metabolic versatility. It can use aromatic compounds derived from plants, and some strains produce hydrogen through photofermentation.\n\nSome strains are also electroactive. This means that they can exchange electrons with solid materials or with an electrode. In a controlled system, the electrode can act as an electron source.'
   },
@@ -1937,6 +1937,16 @@ AFRAME.registerComponent('exhibit-info', {
       }
     });
 
+
+    // Six small bacteria are arranged in two banks of three.
+    // When facing this wall, +Z is the visual left: left must be 01–03 and right 04–06.
+    const numberedBacteria = this.items
+      .filter((i) => i.data.tier === 'secondary' && i.id.startsWith('bacteria'))
+      .slice()
+      .sort((a, b) => b.pos.z - a.pos.z);
+    numberedBacteria.forEach((it, index) => {
+      it.data.section = String(index + 1).padStart(2, '0');
+    });
 
     this._placardRowDir = null;
     {
