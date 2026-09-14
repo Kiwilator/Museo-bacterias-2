@@ -1497,131 +1497,161 @@ const museumContent = {
 
 
   bacteriaLarge01: {
-    lead: 'Much more than photosynthesis', tags: ['PHOTOSYNTHESIS', 'METABOLIC DIVERSITY', 'PHA'], icon: 'cell',
+    lead: 'What they are, why they are studied and what they can do', tags: ['PHOTOSYNTHESIS', 'PIGMENTS', 'METABOLIC DIVERSITY', 'PHA'], icon: 'cell',
     tier: 'primary', anchor: 'BACTERIA_MASTER',
     section: '01', title: 'PURPLE PHOTOTROPHIC BACTERIA', label: 'EXPLORE +',
 
 
-    body: 'Purple phototrophic bacteria (PPB) are a diverse group of microorganisms capable of using light as a source of energy. What makes them particularly interesting, however, is not only their photosynthetic ability, but also the extraordinary variety of metabolic strategies they can develop.\n\nDepending on the species and environmental conditions, these bacteria can modify their metabolism, fix nitrogen, transform organic compounds, use certain gases, exchange electrons with minerals or electrodes, and store carbon in the form of PHA (biopolymers with potential applications in the production of bio-based plastics). Some strains are also particularly efficient at producing hydrogen, while the biomass obtained from their cultivation is being investigated for food and feed applications.\n\nThis diversity makes purple phototrophic bacteria important both for understanding fundamental biological processes (such as the conversion of light into energy and cellular adaptation to environmental conditions) and for investigating more sustainable biotechnological processes. Their cultivation opens possibilities related to hydrogen production, bioplastics, biomass and bioelectrochemical systems.\n\nBut they do not all behave in the same way.\n\nFrom this point onwards, the exhibition focuses on eight specific strains, revealing the characteristics and capabilities that distinguish each one.\n\n01. RHODOSPIRILLUM RUBRUM\nA key bacterium for understanding photosynthesis\n\nRhodospirillum rubrum has played an important role in the history of bacterial photosynthesis research. Its relatively simple photosynthetic apparatus made it one of the first model organisms used to investigate how energy from light is transformed, through electron transfer, into energy that the cell can use.\n\nIts study has also helped researchers understand the relationship between energy production, nitrogen fixation and carbon metabolism, showing how a bacterium can coordinate different processes depending on its needs and environmental conditions.\n\nIts relevance is not limited to fundamental research. R. rubrum can accumulate PHA in the form of intracellular granules. These compounds act as carbon reserves for the bacterium and can be used in the production of bio-based and biodegradable materials. The species is also currently being investigated as a potential nutritious ingredient for food and feed applications.'
+    images: ['./assets/images/ppb-microscopy-overview.jpg', './assets/images/pha-granules-tem.jpg'],
+
+
+    imageSources: [{ label: 'Own source' }, { label: 'Own source' }],
+
+
+    body: 'Purple phototrophic bacteria are microorganisms able to use light as an energy source. Their photosynthesis is anoxygenic: they capture light energy but do not release oxygen as plants do.\n\nTheir colours are caused by photosynthetic pigments. Bacteriochlorophylls absorb part of the light, while carotenoids complement light capture and help protect the cell. For this reason, cultures can appear red, purple, brown or orange.\n\nThey are investigated because they combine several useful capabilities. Some transform compounds present in residues or wastewater; others produce biomass, hydrogen, pigments or bioplastics; and others are model organisms for understanding bacterial photosynthesis, electron transfer and adaptation to changing environments.\n\nIn the museum, the first part shows what each bacterium can contribute and why it is interesting. The second part explains how these results are obtained using photobioreactors, i.e. cultivation systems in which light, mixing, nutrients and other process conditions can be controlled.\n\nBEYOND PHOTOSYNTHESIS\n\nLight provides energy, but a bacterium also needs carbon, nitrogen and electrons in order to grow. This is where one of the most useful characteristics of purple phototrophic bacteria appears: they do not all need exactly the same resources.\n\nDifferent species can use different organic compounds. Some degrade molecules present in waste streams; others produce hydrogen; others can obtain electrons from minerals or from an electrode.\n\nPhotosynthesis is therefore only the starting point. What matters is how each species combines light with other metabolic pathways. The following examples show this diversity.\n\nRHODOSPIRILLUM RUBRUM\n\nRhodospirillum rubrum and Rhodobacter capsulatus are two purple phototrophic bacteria widely used as research models. Both convert light energy into chemical energy, but they help researchers study different processes.\n\nR. rubrum can fix atmospheric nitrogen and can also store carbon as PHA. PHAs are polymers accumulated by the cell as a reserve and can be used to produce bio-based plastics.'
   },
 
 
   spaceMission: {
     dynamic: true, tier: 'primary',
     section: 'ISS', title: 'RHODOSPIRILLUM RUBRUM IN SPACE',
-    lead: 'Seven days aboard the International Space Station',
-    tags: ['SPACEFLIGHT', 'MICROGRAVITY', 'CLOSED-LOOP LIFE SUPPORT'],
+    lead: 'From a single cell to future closed systems',
+    tags: ['SPACEFLIGHT', 'CLOSED SYSTEMS', 'LIFE SUPPORT'],
     images: ['./assets/images/rhodospirillum-space-mission.jpg'],
-    body: 'Future space missions will need ways to produce food, recycle waste and regenerate air and water without depending on constant supplies from Earth. One possible solution is to use beneficial microorganisms inside engineered closed-loop ecosystems.\n\nIn 2015, scientists sent Rhodospirillum rubrum and several other useful bacterial species to the International Space Station for seven days. The original culture was divided into two groups: one remained on Earth while the other travelled into low Earth orbit, where it experienced microgravity and increased radiation.\n\nAfter the flight, the researchers reactivated both cultures and compared them. R. rubrum survived the journey, grew normally and continued to perform its expected biological functions. The spaceflight appeared to have little effect on its overall performance.\n\nThese results support the possibility of using this purple bacterium, which is being investigated as a potential food/feed ingredient, in experimental life-support systems. In the future, microorganisms such as R. rubrum could help recycle resources, reduce dependence on terrestrial resupply and perhaps contribute to feeding astronauts during long-duration missions.'
+    imageSources: [{ label: 'Own source' }],
+    body: 'Future space missions will need to produce food, recycle waste and regenerate air and water with fewer supplies from Earth. One line of research studies whether selected microorganisms could become part of these closed systems.\n\nIn 2015, a team of scientists sent Rhodospirillum rubrum and other useful bacterial species to the International Space Station for seven days. A control culture remained on Earth while another travelled to low Earth orbit.\n\nAfter the flight, the cultures were reactivated and compared. According to the scientific material provided, R. rubrum survived the journey, grew normally and maintained its expected biological functions.\n\nThese results support further study of this bacterium in experimental life-support systems. R. rubrum is also being investigated as a potential food and feed ingredient.\n\nThis final example takes the story from the behaviour of a single cell to its possible use in future closed systems, even beyond Earth.'
   },
   bacteriaSmall01: {
-    lead: 'The machinery that converts light into energy', tags: ['REACTION CENTER', 'NOBEL PRIZE'], icon: 'form',
+    lead: 'How light begins to become chemical energy', tags: ['REACTION CENTRE', 'PHOTOSYNTHESIS'], icon: 'form',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_base',
     section: '02', title: 'BLASTOCHLORIS VIRIDIS', label: 'VIEW +',
     images: ['./assets/images/blastochloris-viridis.png'],
-    body: 'Inside photosynthetic bacteria, specialized structures capture light energy and begin its conversion into chemical energy. The photosynthetic reaction center of Blastochloris viridis occupies a particularly important place in the history of science.\n\nIt was the first membrane protein complex whose structure was resolved at atomic resolution. Observing its organization at this level of detail made it possible to better understand one of the essential processes of photosynthesis (the initial conversion of light energy into chemical energy).\n\nThis discovery went far beyond the study of a single bacterium. It opened new possibilities for investigating the structure of membrane proteins and contributed to the research recognized by the 1988 Nobel Prize in Chemistry.\n\nThe structure shown here is a later structure of the same reaction center, not the original one behind that prize.'
+    imageSources: [{ label: 'Source: University of Bayreuth', url: 'https://www.uni-bayreuth.de/press-releases/genetic-magnetization-of-living-bacteria' }],
+    body: 'Blastochloris viridis is important because it helped researchers understand, at molecular scale, how a bacterium converts light energy into chemical energy.\n\nThe key element is the photosynthetic reaction centre: a group of proteins and pigments located in the membrane. This is where electron transfer begins, allowing light energy to be converted into a form the cell can use.\n\nThe reaction centre of this bacterium also played an important historical role. It was one of the first membrane protein complexes whose structure could be resolved in great detail. For this reason, B. viridis remains a reference organism in the study of bacterial photosynthesis.'
   },
   bacteriaSmall02: {
-    lead: 'Changing from within to adapt', tags: ['CHROMATOPHORES', 'ADAPTATION'], icon: 'surface',
+    lead: 'Changing strategy when the environment changes', tags: ['OXYGEN', 'PHOTOSYNTHESIS', 'ADAPTATION'], icon: 'surface',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_10',
     section: '03', title: 'CEREIBACTER SPHAEROIDES', label: 'VIEW +',
 
-    body: 'Bacteria are not static organisms. Some can modify their own cellular architecture in response to the conditions around them.\n\nCereibacter sphaeroides (formerly known as Rhodobacter sphaeroides) is one of the most extensively studied photosynthetic microorganisms and provides a particularly clear example of this ability to adapt.\n\nWhen oxygen availability decreases, the bacterium develops extensive intracellular membranes known as chromatophores. These membranes contain the machinery required for photosynthesis. As environmental conditions change, the internal organization of the cell changes as well.\n\nResearch on C. sphaeroides has helped scientists understand both the molecular mechanisms of electron transfer during photosynthesis and the way microorganisms regulate and reorganize their metabolism in response to changing environments.'
+    images: ['./assets/images/cereibacter-sphaeroides-microscopy.jpg'],
+
+    imageSources: [{ label: 'Source: Cereibacter sphaeroides — Wikipedia', url: 'https://de.wikipedia.org/wiki/Cereibacter_sphaeroides' }],
+
+    body: 'Cereibacter sphaeroides, formerly known as Rhodobacter sphaeroides, can change how it obtains energy depending on the environment.\n\nWhen oxygen is abundant, it can obtain energy through respiration. When oxygen decreases and light is available, it activates its photosynthetic machinery. The cell does not keep the same system running all the time: it adapts it to the conditions.\n\nThis ability to switch strategies makes it a model organism for studying photosynthesis, oxygen regulation, electron transfer and carbon metabolism.'
   },
   bacteriaSmall03: {
-    lead: 'Coordinating light, nitrogen and energy', tags: ['NITROGEN FIXATION', 'REDOX BALANCE'], icon: 'wave',
+    lead: 'Regulating photosynthesis as conditions change', tags: ['PHOTOSYNTHESIS', 'REGULATION', 'NUTRIENTS'], icon: 'wave',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_12',
     section: '04', title: 'RHODOBACTER CAPSULATUS', label: 'VIEW +',
 
-    body: 'A cell must coordinate many processes at the same time. Rhodobacter capsulatus has become an important model organism for studying how a photosynthetic bacterium maintains this balance.\n\nResearch on this species has revealed important connections between photosynthesis, nitrogen fixation and cellular redox balance. These processes are interconnected and form part of the regulatory networks controlling how the cell obtains and uses energy.\n\nMore recently, structural studies have revealed an unusually compact architecture in its light-harvesting and reaction-center complex.\n\nIts study demonstrates that even within purple phototrophic bacteria, different biological solutions exist for capturing light, managing energy and responding to changing environmental conditions.'
+    images: ['./assets/images/rhodobacter-capsulatus-microscopy.jpg'],
+
+    imageSources: [{ label: 'Source: Fedotova & Zeilstra-Ryalls (2014)', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC3923116/' }],
+
+    body: 'Rhodospirillum rubrum and Rhodobacter capsulatus are two purple phototrophic bacteria widely used as research models. Both convert light energy into chemical energy, but they help researchers study different processes.\n\nR. capsulatus is used to study how a bacterium regulates photosynthesis when light, oxygen and nutrient availability change. The aim is to understand how it decides which metabolic pathways to activate in each situation.'
   },
   bacteriaLarge02: {
-    lead: 'A different way to reproduce', tags: ['HYPHAE', 'BUDDING', 'LIFE CYCLE'], icon: 'transform',
+    lead: 'A different way to reproduce', tags: ['HYPHAE', 'BUDDING', 'CELL CYCLE'], icon: 'transform',
     tier: 'primary', anchor: 'Exhibit_Mesh0_Capsule',
     section: '05', title: 'RHODOMICROBIUM VANNIELII', label: 'EXPLORE +',
 
 
     images: ['./assets/videos/rhodomicrobium-vannielii-animation.mp4', './assets/images/rhodomicrobium-budding.jpg'],
-    body: 'We often imagine bacteria reproducing through a simple division in which one cell produces two almost identical cells. Rhodomicrobium vannielii shows that bacterial reproduction can be considerably more complex.\n\nThis bacterium develops filamentous extensions known as hyphae. New cells are formed by budding from the tips of these structures. A small bud appears, gradually grows and eventually separates to form a new cell.\n\nThis life cycle includes processes of cellular differentiation and unusual multicellular stages, making R. vannielii an important organism for studying the evolution of complex bacterial life cycles.\n\nIts distinctive morphology also provides a striking example of the extraordinary diversity found among photosynthetic bacteria.'
+    imageSources: [{ label: 'Own source' }, { label: 'Own source' }],
+    body: 'Rhodomicrobium vannielii is notable for the way it reproduces. Instead of simply dividing into two identical cells, it develops extensions known as hyphae.\n\nA new cell forms by budding at the end of these hyphae. When it is ready, the daughter cell separates and can begin its own cycle.\n\nThis system is useful for studying how a bacterium controls cell shape, growth and differentiation between different stages of the cell cycle.'
   },
   bacteriaSmall04: {
-    lead: 'Bacteria connected to electricity', tags: ['ELECTROACTIVITY', 'BIOELECTROCHEMISTRY'], icon: 'grid',
+    lead: 'Exchanging electrons with the environment', tags: ['ELECTROACTIVITY', 'BIOELECTROCHEMISTRY'], icon: 'grid',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_14',
     section: '06', title: 'RHODOVULUM', label: 'VIEW +',
 
 
     images: ['./assets/images/rhodovulum-electroactivity.jpg'],
-    body: 'Some purple phototrophic bacteria have a particularly remarkable ability (they are electroactive). This means that they can exchange electrons with elements outside the cell.\n\nSpecies of Rhodovulum (including Rhodovulum sulfidophilum and Rhodovulum visakhapatnamense) can obtain electrons from hydrogen, iron or even directly from an electrode.\n\nThese processes allow us to understand the bacterium not as an isolated organism, but as part of a system in which biological matter and conductive materials can exchange electrical charges.\n\nThe mechanisms responsible for this electroactivity are still not completely understood. For this reason, these bacteria remain an active field of research and provide new opportunities to investigate interactions between microorganisms, minerals and bioelectrochemical systems.'
+    imageSources: [{ label: 'Own source' }],
+    body: 'Similar electroactive capabilities have been studied in Rhodovulum species. Some can obtain electrons from hydrogen, reduced iron or directly from an electrode.\n\nThese properties are of interest for bioelectrochemical processes and for converting low-value compounds into useful products.'
   },
   bacteriaSmall05: {
-    lead: 'Living from a toxic gas', tags: ['CARBON MONOXIDE', 'BIOHYDROGEN'], icon: 'scale',
+    lead: 'Using a toxic gas as part of its metabolism', tags: ['CARBON MONOXIDE', 'HYDROGEN'], icon: 'scale',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_16',
     section: '07', title: 'RUBRIVIVAX GELATINOSUS', label: 'VIEW +',
 
-    body: 'Carbon monoxide (CO) is toxic to many organisms. Rubrivivax gelatinosus, however, is able to use it as an energy source.\n\nUnder anaerobic conditions (in the absence of oxygen), some purple phototrophic bacteria can oxidize CO using specialized enzyme systems. In R. gelatinosus, this metabolism can also be linked to hydrogen production.\n\nThis ability has made the species an important model for studying both the biological conversion of carbon monoxide and potential processes for biohydrogen production.\n\nIts case illustrates one of the key ideas running throughout this room (the remarkable metabolic flexibility of purple phototrophic bacteria and their ability to exploit substances and environmental conditions that would be unfavorable for many other organisms).'
+    images: ['./assets/images/rubrivivax-gelatinosus-tem.jpg'],
+
+    imageSources: [{ label: 'Source: Markov & Weaver (2008)', url: 'https://doi.org/10.1007/s12010-007-8032-z' }],
+
+    body: 'Rubrivivax gelatinosus can use carbon monoxide (CO), a gas that is toxic to many organisms, as part of its metabolism.\n\nSome strains have enzymes able to oxidise CO. In this process they can produce carbon dioxide and hydrogen. In simple terms, CO is transformed and part of its energy ends up as H₂.\n\nThis capability is being studied because it offers a biological way to transform gases and produce hydrogen under relatively mild conditions.'
   },
   bacteriaSmall06: {
-    lead: 'When a biological capability becomes an opportunity', tags: ['PHOTOFERMENTATION', 'ELECTROACTIVITY'], icon: 'transform',
+    lead: 'Versatility, hydrogen and electron exchange', tags: ['PHOTOFERMENTATION', 'ELECTROACTIVITY', 'HYDROGEN'], icon: 'transform',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_18',
     section: '08', title: 'RHODOPSEUDOMONAS PALUSTRIS', label: 'VIEW +',
 
 
     images: ['./assets/images/b1.png', './assets/images/b3.png'],
-    body: 'Rhodopseudomonas palustris brings together several of the capabilities explored throughout the exhibition.\n\nIt can use light to support the anaerobic degradation of aromatic compounds derived from plants, contributing to the recycling of complex organic matter and to processes associated with the carbon cycle.\n\nIt is also particularly effective at producing hydrogen through photofermentation. Among the purple phototrophic bacteria studied for this process, certain strains of R. palustris (such as strain 42OL) have achieved especially high hydrogen productivity.\n\nIt has another important characteristic as well (electroactivity). Some strains can exchange electrons with electrodes and, by combining electricity and light, use these processes to generate valuable products such as PHA and certain biofuels.\n\nAt this point, we have finished looking closely at the bacteria themselves. The next step is to understand how they can be cultivated and how these capabilities can be used at a larger scale.\n\nR. palustris is also a model for microbial electroactivity. The strain TIE-1 can take up electrons from an electrode under illuminated conditions and use carbon dioxide as a carbon source. This metabolism has been investigated for the production of compounds including PHA and n-butanol.'
+    imageSources: [{ label: 'Own source' }, { label: 'Own source' }],
+    body: 'Rhodopseudomonas palustris is notable for its metabolic versatility. It can use aromatic compounds derived from plants, and some strains produce hydrogen through photofermentation.\n\nSome strains are also electroactive. This means that they can exchange electrons with solid materials or with an electrode. In a controlled system, the electrode can act as an electron source.'
   },
 
 
   reactor01: {
-    lead: 'Creating the right conditions for microbial growth',
-    tags: ['CULTIVATION', 'CONTROLLED CONDITIONS', 'PROCESS'], icon: 'reactor',
+    lead: 'From the bacterium to a controlled process',
+    tags: ['CULTURE', 'LIGHT', 'MIXING', 'NUTRIENTS'], icon: 'reactor',
     tier: 'primary', anchor: 'PEANA_Bioreactor',
     title: 'PHOTOBIOREACTOR', label: 'VIEW PROCESS +',
 
 
     images: ['./assets/images/reactor-cultivation-01.jpg', './assets/images/reactor-cultivation-02.jpg'],
-    body: 'FROM BACTERIA TO BIOPROCESS\n\nIn the previous room, we discovered the remarkable metabolic diversity of purple phototrophic bacteria.\n\nBut understanding what these microorganisms can do is only the beginning. To use their capabilities, researchers need to create controlled environments where bacteria receive the appropriate light, nutrients and operating conditions. Photobioreactors make this possible.\n\nInside these systems, microorganisms can be cultivated under controlled conditions, allowing researchers to study and develop processes related to hydrogen production, bioplastics, biomass and bioelectrochemical applications.\n\nIn this room, the focus moves from the microorganism itself to the process.\n\nPHOTOBIOREACTOR\n\nA photobioreactor provides a controlled environment for cultivating photosynthetic microorganisms.\n\nThe system allows key conditions such as light, nutrient supply and circulation to be managed while the culture grows. By controlling these variables, researchers can investigate how purple phototrophic bacteria transform resources and produce compounds of potential interest.\n\nThe reactor therefore represents the transition between understanding the biology of these microorganisms and using their capabilities in technological processes.'
+    imageSources: [{ label: 'Own source' }, { label: 'Own source' }],
+    body: 'In this part of the museum, the focus shifts from the bacterium alone to the whole system that allows it to grow, remain stable and deliver the desired result.\n\nPhotobioreactors are those systems. They make it possible to decide how much light the culture receives, how it is mixed, which nutrients are added and when biomass or the target product should be collected.\n\nA photobioreactor is a vessel designed to grow microorganisms that use light. It allows cultivation conditions to be controlled so the process can be repeated in a stable way.\n\nIt is not enough to fill a vessel with bacteria and switch on a lamp. We need to decide how much light the cells receive, how they are mixed, which nutrients are added, how pH is controlled and how products are recovered.\n\nThis area presents those elements one by one.'
   },
 
 
   window01: { display: false, tier: 'tertiary', windowIndex: 0, openable: true, icon: 'wave',
-    section: '01', title: 'FROM LIGHT TO HYDROGEN', lead: 'Photofermentation',
-    tags: ['HYDROGEN', 'PHOTOFERMENTATION'],
-    images: ['./assets/images/photofermentation-culture.jpg'],
-    body: 'Some purple phototrophic bacteria can use light energy to produce hydrogen through a process known as photofermentation.\n\nRhodopseudomonas palustris is particularly relevant in this field, with certain strains showing high hydrogen productivity.\n\nThis process illustrates how the metabolism of a microorganism can become the basis of a potential renewable energy pathway.' },
+    section: '01', title: 'LIGHT', lead: 'Energy for the culture',
+    tags: ['LIGHT', 'PHOTOSYNTHESIS'],
+    images: ['./assets/images/reactor-cultivation-02.jpg'],
+    imageSources: [{ label: 'Own source' }],
+    body: 'Light is the energy source, but it does not reach every cell equally. Outer layers can receive too much light while inner layers can remain shaded.\n\nFor this reason, lamp intensity, distance and distribution are adjusted. The aim is for as many cells as possible to receive a useful amount of light.' },
   window02: { display: false, tier: 'tertiary', windowIndex: 1, openable: true, icon: 'form',
-    section: '02', title: 'FROM CARBON TO BIOPLASTIC', lead: 'PHA production',
-    tags: ['PHA', 'BIOPLASTIC'],
+    section: '02', title: 'FLOW & MIXING', lead: 'Keeping the culture homogeneous',
+    tags: ['MIXING', 'GAS EXCHANGE'],
 
-    images: ['./assets/images/pha-granules-tem.jpg'],
-    body: 'Some purple phototrophic bacteria can accumulate carbon inside their cells in the form of PHA.\n\nFor the microorganism, these compounds function as carbon and energy reserves. For biotechnology, however, PHA is especially interesting because it can be used as a basis for producing bio-based and biodegradable materials.\n\nThe process creates a direct connection between microbial metabolism and the development of alternative materials.' },
+    images: ['./assets/images/reactor-cultivation-01.jpg'],
+    imageSources: [{ label: 'Own source' }],
+    body: 'Mixing moves cells through the reactor and prevents some areas from having many nutrients while others have very little. It also helps gas exchange.\n\nMixing must be strong enough to keep the culture homogeneous, but not so strong that it wastes energy or damages the cells.' },
   window03: { display: false, tier: 'tertiary', windowIndex: 2, openable: true, icon: 'scale',
-    section: '03', title: 'FROM CULTURE TO BIOMASS', lead: 'Food and feed applications',
-    tags: ['BIOMASS', 'FOOD & FEED'],
-    images: ['./assets/images/biomass-concentration.jpg'],
-    body: 'Cultivating purple phototrophic bacteria also produces microbial biomass.\n\nThis biomass contains compounds of nutritional interest and is being investigated for possible applications in food and animal feed.\n\nThe challenge is not only to produce biomass, but also to develop cultivation systems capable of generating it efficiently and at an appropriate scale.' },
+    section: '03', title: 'NUTRIENTS', lead: 'Feeding the process',
+    tags: ['CARBON', 'NITROGEN', 'PHOSPHORUS'],
+    images: ['./assets/images/photofermentation-culture.jpg'],
+    imageSources: [{ label: 'Own source' }],
+    body: 'Besides light, bacteria need carbon, nitrogen, phosphorus and other nutrients. The amount of each one changes how they grow and which products they generate.\n\nFeeding a reactor therefore does not simply mean adding more substrate. The composition of the medium must be adjusted to the goal of the culture.' },
   window04: { display: false, tier: 'tertiary', windowIndex: 3, openable: true, icon: 'grid',
-    section: '04', title: 'BIOELECTRICITY', lead: 'Microorganisms and electrodes',
-    tags: ['ELECTROACTIVITY', 'BIOELECTROCHEMISTRY'],
+    section: '04', title: 'BIOMASS', lead: 'When the cells are the product',
+    tags: ['BIOMASS', 'RECOVERY'],
 
 
-    images: ['./assets/images/electroactivity-electrode-sem.jpg'],
-    body: 'Some purple phototrophic bacteria are electroactive.\n\nThis means that they can exchange electrons with external materials, including electrodes.\n\nThese interactions allow researchers to investigate bioelectrochemical systems in which living microorganisms and conductive materials become part of the same process.\n\nElectroactivity opens new possibilities for connecting microbial metabolism with technological systems.' },
+    images: ['./assets/images/biomass-concentration.jpg'],
+    imageSources: [{ label: 'Own source' }],
+    body: 'In some processes, the main product is the cells themselves. As the culture grows, biomass increases and eventually has to be separated from the liquid.\n\nIt can then be concentrated, dried or processed depending on its intended use. Biomass from these bacteria is being studied, among other uses, for feed and other biotechnological products.' },
   window05: { display: false, tier: 'tertiary', windowIndex: 4, openable: true, icon: 'surface',
-    section: '05', title: 'SCALE UP', lead: 'From laboratory to larger production',
-    tags: ['SCALE-UP', 'PRODUCTION'],
+    section: '05', title: 'BAG REACTOR', lead: 'A simple way to increase illuminated surface',
+    tags: ['BAG REACTOR', 'SCALE-UP'],
 
 
-    images: ['./assets/images/scaleup-bag-reactors-01.jpg', './assets/images/scaleup-bag-reactors-02.jpg'],
-    body: 'A successful biological process must eventually move beyond the laboratory.\n\nOne strategy for reducing production and installation costs is to cultivate purple phototrophic bacteria in low-cost plastic bag reactors using food-grade equipment.\n\nInstead of building one increasingly large reactor, production capacity can be expanded by operating several reactors in parallel.\n\nThis approach offers a flexible way of increasing cultivation capacity while keeping the system relatively simple, and it can be run under sterile conditions.\n\nThe biomass obtained is studied as an ingredient for food and feed applications. Productivity can still be improved, but the system is viable and scalable.\n\nThese systems are currently being optimised at UMONS (Belgium), while PurpleTech develops capacity expansion through the parallel operation of multiple bag reactors.' },
+    images: ['./assets/images/scaleup-bag-reactors-01.jpg'],
+    imageSources: [{ label: 'Own source' }],
+    body: 'One way to reduce reactor cost is to use transparent plastic bags. The bag provides a large illuminated surface with a relatively simple structure.\n\nThis type of system has been studied for biomass production and for working at larger volumes without building a complex rigid reactor.' },
 
 
   window06: { display: false, tier: 'tertiary', windowIndex: 5, openable: true, icon: 'transform',
-    section: '06', title: 'ONE MICROORGANISM, MANY OUTPUTS', lead: 'Different processes, different possibilities',
-    tags: ['HYDROGEN', 'PHA', 'BIOMASS', 'ELECTRON EXCHANGE'],
+    section: '06', title: 'MODULAR SCALE-UP', lead: 'Growing by repeating units that already work',
+    tags: ['SCALE-UP', 'MODULAR SYSTEM'],
 
 
-    images: ['./assets/images/process-overview.jpg'],
-    body: 'Purple phototrophic bacteria do not lead to a single product or application.\n\nDepending on the strain, cultivation conditions and process, their metabolism can be connected to different outcomes.\n\nHYDROGEN\nPHA\nBIOMASS\nELECTRON EXCHANGE\n\nThe value of these microorganisms lies precisely in this diversity.\n\nDifferent bacteria, different processes and different possibilities.\n\nBACTERIA → PROCESS → RESULT\n\nUnderstanding the microorganism is the first step. Controlling the process is what allows its capabilities to be explored at a larger scale.' }
+    images: ['./assets/images/scaleup-bag-reactors-02.jpg'],
+    imageSources: [{ label: 'Own source' }],
+    body: 'Increasing production does not require building one enormous reactor. Another option is to repeat a module that already works.\n\nThe challenge then becomes operating all modules in a coordinated way and keeping similar conditions across them.' }
 };
 
 
@@ -2382,8 +2412,10 @@ AFRAME.registerComponent('exhibit-info', {
     const imagesEl = this.panel.querySelector('.panel-images');
     if (imagesEl) {
       imagesEl.innerHTML = '';
-      (d.images || []).forEach((src) => {
+      (d.images || []).forEach((src, index) => {
         const isVideo = /\.(mp4|webm|mov)(\?|#|$)/i.test(src);
+        const media = document.createElement('figure');
+        media.className = 'panel-media' + (isVideo ? ' media-video' : '');
         if (isVideo) {
           const video = document.createElement('video');
           video.src = src;
@@ -2396,13 +2428,33 @@ AFRAME.registerComponent('exhibit-info', {
             const p = video.play();
             if (p && p.catch) p.catch(() => {});
           }, { once: true });
-          imagesEl.appendChild(video);
+          media.appendChild(video);
         } else {
           const img = document.createElement('img');
           img.src = src;
           img.alt = d.title || '';
-          imagesEl.appendChild(img);
+          media.appendChild(img);
         }
+
+        const source = d.imageSources && d.imageSources[index];
+        if (source) {
+          const caption = document.createElement('figcaption');
+          caption.className = 'panel-image-source';
+          if (typeof source === 'string') {
+            caption.textContent = source;
+          } else if (source.url) {
+            const link = document.createElement('a');
+            link.href = source.url;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.textContent = source.label || source.url;
+            caption.appendChild(link);
+          } else {
+            caption.textContent = source.label || '';
+          }
+          media.appendChild(caption);
+        }
+        imagesEl.appendChild(media);
       });
     }
     const tags = this.panel.querySelector('.panel-tags');
@@ -2775,11 +2827,12 @@ AFRAME.registerComponent('image-windows', {
 });
 
 const MUSEO_APPLICATIONS = [
-  { id: 'window01', key: 'hydrogen', cap: 'hydrogen' },
-  { id: 'window02', key: 'pha', cap: 'pha' },
-  { id: 'window03', key: 'biomass', cap: 'biomass' },
-  { id: 'window04', key: 'electro', cap: 'electro' },
-  { id: 'window05', key: 'scale' }
+  { id: 'window01', key: 'light' },
+  { id: 'window02', key: 'flow' },
+  { id: 'window03', key: 'nutrients' },
+  { id: 'window04', key: 'biomass' },
+  { id: 'window05', key: 'bag' },
+  { id: 'window06', key: 'scale' }
 ];
 
 function canvasRoundRect(ctx, x, y, w, h, r) {
