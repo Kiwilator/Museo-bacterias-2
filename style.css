@@ -304,6 +304,39 @@ a-scene canvas { touch-action: none; }
   background: #050415;
 }
 
+
+#exhibit-panel .panel-media {
+  flex: 1 1 45%;
+  min-width: 90px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+#exhibit-panel .panel-media.media-video { flex-basis: 100%; }
+#exhibit-panel .panel-media img,
+#exhibit-panel .panel-media video {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  flex: none;
+}
+#exhibit-panel .panel-image-source {
+  display: block;
+  font-size: 8px;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  color: var(--mus-tinta);
+  opacity: 0.58;
+  overflow-wrap: anywhere;
+}
+#exhibit-panel .panel-image-source a {
+  color: var(--mus-morado);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+#exhibit-panel .panel-image-source a:hover { opacity: 0.78; }
+
 #exhibit-panel.secondary { width: 270px; height: 380px; padding: 20px 22px 18px; }
 #exhibit-panel.secondary .panel-title { font-size: 15px; }
 #exhibit-panel.secondary .panel-lead { font-size: 11px; margin-bottom: 10px; }
