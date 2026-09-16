@@ -1285,6 +1285,121 @@ AFRAME.registerComponent('respawn-guard', {
 
 
 
+AFRAME.registerComponent('sponsor-wall-anchor', {
+  init() {
+    this._placed = false;
+    this._tries = 0;
+
+    this._place = () => {
+      if (this._placed) return;
+
+      const modelo = document.querySelector('#modelo');
+      const spawn = window.MUSEO_SPAWN;
+      const bounds = window.MUSEO_BOUNDS;
+
+      if (!modelo || !spawn || !bounds) {
+        if (this._tries++ < 20) window.setTimeout(this._place, 250);
+        return;
+      }
+
+      const roomCenter = new THREE.Vector3(
+        (bounds.minX + bounds.maxX) / 2,
+        spawn.y + 1.54,
+        (bounds.minZ + bounds.maxZ) / 2
+      );
+
+      const turquoise = [];
+      modelo.object3D.updateMatrixWorld(true);
+
+      modelo.object3D.traverse((o) => {
+        if (!o.isMesh || !o.material || o.material.name !== 'Neon_Turquoise') return;
+
+        const b = new THREE.Box3().setFromObject(o);
+        const size = b.getSize(new THREE.Vector3());
+        const center = b.getCenter(new THREE.Vector3());
+
+        if (center.x < 1.2 &&
+            size.y >= 0.9 &&
+            size.y <= 2.6 &&
+            Math.max(size.x, size.z) <= 1.6) {
+          turquoise.push({ p: center });
+        }
+      });
+
+      turquoise.sort((a, b) => a.p.z - b.p.z);
+
+      const windows = [];
+      turquoise.forEach((n) => {
+        const close = windows.find((w) => Math.abs(w.p.z - n.p.z) < 0.6);
+        if (close) close.p.lerp(n.p, 0.5);
+        else windows.push({ p: n.p.clone() });
+      });
+
+      // BAG REACTOR is window 05 in the existing museum mapping.
+      const bag = windows[4];
+      const next = windows[5];
+
+      if (!bag) {
+        if (this._tries++ < 20) window.setTimeout(this._place, 250);
+        return;
+      }
+
+      // Start at the bag-reactor wall position.
+      const pos = bag.p.clone();
+      pos.y = spawn.y + 1.54;
+
+      // RIGHT = continue along THIS SAME WALL toward the next turquoise module.
+      // No mirroring, no opposite-wall references, no capsule references.
+      let alongWall;
+      if (next) {
+        alongWall = next.p.clone().sub(bag.p);
+        alongWall.y = 0;
+      } else {
+        alongWall = new THREE.Vector3(0, 0, 1);
+      }
+
+      if (alongWall.lengthSq() < 0.0001) alongWall.set(0, 0, 1);
+      alongWall.normalize();
+
+      // Move into the empty wall bay to the right of BAG REACTOR.
+      pos.addScaledVector(alongWall, 1.85);
+
+      // Bring it slightly into the room so the curved wall cannot clip it.
+      const inward = roomCenter.clone().sub(pos);
+      inward.y = 0;
+      if (inward.lengthSq() > 0.0001) {
+        inward.normalize();
+        pos.addScaledVector(inward, 0.48);
+      }
+
+      this.el.object3D.position.copy(pos);
+      this.el.object3D.lookAt(new THREE.Vector3(roomCenter.x, pos.y, roomCenter.z));
+      this.el.object3D.visible = true;
+      this.el.setAttribute('visible', true);
+
+      this._placed = true;
+
+      console.log('[sponsor-wall-anchor] BAG wall, shifted right toward next window', {
+        x: pos.x.toFixed(3),
+        y: pos.y.toFixed(3),
+        z: pos.z.toFixed(3),
+        windows: windows.length
+      });
+    };
+
+    const modelo = document.querySelector('#modelo');
+    if (modelo) modelo.addEventListener('museo-modules-loaded', this._place);
+    window.setTimeout(this._place, 300);
+  },
+
+  remove() {
+    const modelo = document.querySelector('#modelo');
+    if (modelo && this._place) {
+      modelo.removeEventListener('museo-modules-loaded', this._place);
+    }
+  }
+});
+
 AFRAME.registerComponent('gltf-animations', {
 
 
