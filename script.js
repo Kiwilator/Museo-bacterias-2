@@ -1325,64 +1325,76 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
       });
 
       const bagWindow = windows[4];
-      const palustris = byName['Bacteria_GRUPO_Mesh_18'];
-      if (!bagWindow || !palustris) {
-        console.warn('[sponsor-wall-anchor] missing placement anchors');
+      const capsule = byName['Exhibit_Mesh0_Capsule'];
+      if (!bagWindow || !capsule) {
+        console.warn('[sponsor-wall-anchor] missing bag-reactor or capsule anchor');
         return;
       }
 
-      const palBox = new THREE.Box3().setFromObject(palustris);
-      const palCenter = palBox.getCenter(new THREE.Vector3());
-
-      // First calculate the longitudinal position from the known exhibits.
-      const sourceSide = bagWindow.p.clone().lerp(palCenter, 0.50);
+      const capsuleBox = new THREE.Box3().setFromObject(capsule);
+      const capsuleCenter = capsuleBox.getCenter(new THREE.Vector3());
 
       const roomCenter = new THREE.Vector3(
         (bounds.minX + bounds.maxX) / 2,
-        spawn.y + 1.68,
+        spawn.y + 1.60,
         (bounds.minZ + bounds.maxZ) / 2
       );
 
-      // The user wants the frame on the OPPOSITE side of the room:
-      // mirror the previous position across the room's X centre line.
-      const target = new THREE.Vector3(
-        (2 * roomCenter.x) - sourceSide.x,
+      // Start from the same opposite wall, but DO NOT move "forward" along Z.
+      // The previous attempts changed depth. We now move laterally ALONG the wall,
+      // explicitly toward the bacteria capsules.
+      const baseTarget = new THREE.Vector3(
+        (2 * roomCenter.x) - bagWindow.p.x,
         spawn.y + 1.54,
-        THREE.MathUtils.lerp(sourceSide.z, palCenter.z, 2.15)
+        bagWindow.p.z
       );
 
-      // Snap it to the actual wall surface on that side, then pull it a few
-      // centimetres into the room so the architecture cannot occlude it.
-      let pos = target.clone();
-      if (wallMeshes.length) {
-        const direction = target.clone().sub(roomCenter);
-        direction.y = 0;
-        const maxDist = direction.length() + 1.5;
-        if (direction.lengthSq() > 0.0001) {
-          direction.normalize();
-          const ray = new THREE.Raycaster(roomCenter.clone(), direction, 0, maxDist);
-          const hits = ray.intersectObjects(wallMeshes, true);
-          if (hits.length) {
-            pos.copy(hits[0].point);
-            pos.y = target.y;
-          }
-        }
-      }
+      const snapToWall = (target) => {
+        if (!wallMeshes.length) return target.clone();
+        const dir = target.clone().sub(roomCenter);
+        dir.y = 0;
+        if (dir.lengthSq() < 0.0001) return target.clone();
+        const ray = new THREE.Raycaster(roomCenter.clone(), dir.clone().normalize(), 0, dir.length() + 2.0);
+        const hits = ray.intersectObjects(wallMeshes, true);
+        if (!hits.length) return target.clone();
+        const p = hits[0].point.clone();
+        p.y = target.y;
+        return p;
+      };
 
-      const inward = roomCenter.clone().sub(pos);
+      let pos = snapToWall(baseTarget);
+
+      // Wall normal, pointing into the room.
+      let inward = roomCenter.clone().sub(pos);
       inward.y = 0;
       if (inward.lengthSq() > 0.0001) inward.normalize();
-      // Give the whole frame more clearance from the curved wall/protrusions.
-      // This prevents the architecture from cutting the left/top edge of the sign.
-      pos.addScaledVector(inward, 0.42);
+
+      // Direction toward the capsule, projected onto the wall plane.
+      // This is the actual "RIGHT" movement the user is asking for.
+      const rightAlongWall = capsuleCenter.clone().sub(pos);
+      rightAlongWall.y = 0;
+      rightAlongWall.addScaledVector(inward, -rightAlongWall.dot(inward));
+      if (rightAlongWall.lengthSq() > 0.0001) {
+        rightAlongWall.normalize();
+        pos.addScaledVector(rightAlongWall, 1.20);
+      }
+
+      // Re-snap after the lateral move so the sign follows the curved wall.
+      pos = snapToWall(pos);
+
+      inward = roomCenter.clone().sub(pos);
+      inward.y = 0;
+      if (inward.lengthSq() > 0.0001) inward.normalize();
+
+      // Keep enough clearance so the curved wall cannot clip the frame.
+      pos.addScaledVector(inward, 0.52);
 
       this.el.object3D.position.copy(pos);
-      // Face the room from the new, more central wall position.
       this.el.object3D.lookAt(new THREE.Vector3(roomCenter.x, pos.y, roomCenter.z));
       this.el.setAttribute('visible', true);
       this._placed = true;
 
-      console.log('[sponsor-wall-anchor] opposite-wall position', {
+      console.log('[sponsor-wall-anchor] moved laterally toward capsules', {
         x: pos.x.toFixed(3),
         y: pos.y.toFixed(3),
         z: pos.z.toFixed(3)
