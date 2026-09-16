@@ -67,12 +67,12 @@
         'Xabier Clemente Mintegui — Design & Technical Development'
       ],
       science: [
+        'Baptiste Leroy — Scientific Coordination & PPB Species Content',
         'Daniel Melchor Puyol Santos — Scientific Coordination & Content Review',
         'Ralph Lindeboom — Scientific Advisory & Content Development',
         'Gabriel Capson-Tojo — Scientific Coordination & Contributor Liaison',
         'Luis Diaz Allegue — Scientific Contributor',
         'David Weissbrodt — Scientific & Visual Contributor',
-        'Baptiste Leroy — Scientific & Visual Contributor',
         'Alessandra Adessi — Scientific & Visual Contributor',
         'Arpita Bose — Scientific & Visual Contributor',
         'Cristina Cavinato — Scientific & Visual Contributor',
@@ -81,10 +81,7 @@
         'Hartmut Grammel — Scientific & Visual Contributor',
         'Andrea Turolla — Scientific & Visual Contributor',
         'Joana Fradinho — Scientific & Visual Contributor',
-        'Damien Batstone — Scientific & Visual Contributor',
-        'Amanda Prado de Nicolás — Scientific & Visual Contributor',
-        'Víctor Galve Santacruz — Scientific & Visual Contributor',
-        'María José García López — Scientific & Visual Contributor'
+        'Damien Batstone — Scientific & Visual Contributor'
       ],
       media: [
         'Berber Stevens',
@@ -94,7 +91,10 @@
         'Guillaume Crosset-Perrotin',
         'Maria Paula Giulianetti de Almeida',
         'Camille Mondini',
-        'Mythili Ananth'
+        'Mythili Ananth',
+        'Amanda Prado de Nicolás',
+        'Víctor Galve Santacruz',
+        'María José García López'
       ],
       references: [
         { label: 'Photobioreactor experiments, 2017 — Berber Stevens, Demi Ligtenberg, Marta Cerruti, David Weissbrodt' },
@@ -134,12 +134,12 @@
         'Xabier Clemente Mintegui — Design & Technical Development'
       ],
       science: [
+        'Baptiste Leroy — Scientific Coordination & PPB Species Content',
         'Daniel Melchor Puyol Santos — Scientific Coordination & Content Review',
         'Ralph Lindeboom — Scientific Advisory & Content Development',
         'Gabriel Capson-Tojo — Scientific Coordination & Contributor Liaison',
         'Luis Diaz Allegue — Scientific Contributor',
         'David Weissbrodt — Scientific & Visual Contributor',
-        'Baptiste Leroy — Scientific & Visual Contributor',
         'Alessandra Adessi — Scientific & Visual Contributor',
         'Arpita Bose — Scientific & Visual Contributor',
         'Cristina Cavinato — Scientific & Visual Contributor',
@@ -148,10 +148,7 @@
         'Hartmut Grammel — Scientific & Visual Contributor',
         'Andrea Turolla — Scientific & Visual Contributor',
         'Joana Fradinho — Scientific & Visual Contributor',
-        'Damien Batstone — Scientific & Visual Contributor',
-        'Amanda Prado de Nicolás — Scientific & Visual Contributor',
-        'Víctor Galve Santacruz — Scientific & Visual Contributor',
-        'María José García López — Scientific & Visual Contributor'
+        'Damien Batstone — Scientific & Visual Contributor'
       ],
       media: [
         'Berber Stevens',
@@ -161,7 +158,10 @@
         'Guillaume Crosset-Perrotin',
         'Maria Paula Giulianetti de Almeida',
         'Camille Mondini',
-        'Mythili Ananth'
+        'Mythili Ananth',
+        'Amanda Prado de Nicolás',
+        'Víctor Galve Santacruz',
+        'María José García López'
       ],
       references: [
         { label: 'Photobioreactor experiments, 2017 — Berber Stevens, Demi Ligtenberg, Marta Cerruti, David Weissbrodt' },
@@ -422,9 +422,9 @@
 
   const esContent = {
     bacteriaLarge01: {
-      lead: 'Qué son, por qué se investigan y qué pueden hacer',
+      lead: 'Una bacteria fototrófica púrpura: fotosíntesis, pigmentos y PHA',
       tags: ['FOTOSÍNTESIS', 'PIGMENTOS', 'DIVERSIDAD METABÓLICA', 'PHA'],
-      title: 'BACTERIAS FOTOTRÓFICAS PÚRPURAS',
+      title: 'RHODOSPIRILLUM RUBRUM',
       label: 'EXPLORAR +',
       imageSources: [{ label: 'Fuente propia' }, { label: 'Fuente propia' }],
       body: 'Las bacterias fototróficas púrpuras son microorganismos capaces de usar la luz como fuente de energía. Su fotosíntesis es anoxigénica: captan energía luminosa, pero no liberan oxígeno como hacen las plantas.\n\nSus colores se deben a sus pigmentos fotosintéticos. Las bacterioclorofilas absorben parte de la luz y los carotenoides completan esa captación y ayudan a proteger la célula. Por eso los cultivos pueden verse rojos, púrpuras, marrones o anaranjados.\n\nSe investigan porque combinan varias capacidades útiles. Algunas transforman compuestos presentes en residuos o aguas residuales; otras producen biomasa, hidrógeno, pigmentos o bioplásticos; y otras sirven como modelos para entender mejor la fotosíntesis bacteriana, el intercambio de electrones y la adaptación a distintos ambientes.\n\nEn el museo, primero se muestra qué puede aportar cada bacteria y qué la hace interesante. Después se explica cómo se consiguen esos resultados mediante fotobiorreactores, es decir, sistemas de cultivo en los que se controlan la luz, la mezcla, los nutrientes y otras condiciones del proceso.\n\nMÁS ALLÁ DE LA FOTOSÍNTESIS\n\nLa luz aporta energía, pero para crecer una bacteria necesita también carbono, nitrógeno y electrones. Aquí aparece una de las características más útiles de las bacterias fototróficas púrpuras: no todas necesitan exactamente lo mismo.\n\nDistintas especies pueden aprovechar compuestos orgánicos diferentes. Algunas degradan moléculas presentes en residuos; otras producen hidrógeno; otras pueden captar electrones de minerales o de un electrodo.\n\nPor eso la fotosíntesis es solo el punto de partida. Lo interesante es cómo cada especie combina la luz con otras rutas metabólicas. Los siguientes ejemplos muestran esa diversidad.\n\nRHODOSPIRILLUM RUBRUM\n\nRhodospirillum rubrum y Rhodobacter capsulatus son dos bacterias fototróficas púrpuras muy utilizadas como modelos de estudio. Ambas convierten la energía de la luz en energía química, pero permiten investigar procesos distintos.\n\nR. rubrum puede fijar nitrógeno atmosférico y también almacenar carbono en forma de PHA. Los PHA son polímeros que la célula acumula como reserva y que pueden utilizarse para producir bioplásticos de origen biológico.'
@@ -469,7 +469,7 @@
       body: 'Rhodomicrobium vannielii llama la atención por su forma de reproducirse. En lugar de dividirse simplemente en dos células iguales, desarrolla prolongaciones llamadas hifas.\n\nEn el extremo de esas hifas se forma una nueva célula por gemación. Cuando está preparada, la célula hija se separa y puede iniciar su propio ciclo.\n\nEste sistema permite estudiar cómo una bacteria controla su forma, su crecimiento y la diferenciación entre distintas etapas del ciclo celular.'
     },
     bacteriaSmall04: {
-      title: 'RHODOVULUM',
+      title: 'RHODOVULUM SP.',
       lead: 'Intercambiar electrones con el entorno',
       tags: ['ELECTROACTIVIDAD', 'BIOELECTROQUÍMICA'],
       label: 'VER +',
