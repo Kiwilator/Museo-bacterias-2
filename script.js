@@ -1601,9 +1601,9 @@ const museumContent = {
 
 
   bacteriaLarge01: {
-    lead: 'What they are, why they are studied and what they can do', tags: ['PHOTOSYNTHESIS', 'PIGMENTS', 'METABOLIC DIVERSITY', 'PHA'], icon: 'cell',
+    lead: 'A purple phototrophic bacterium: photosynthesis, pigments and PHA', tags: ['PHOTOSYNTHESIS', 'PIGMENTS', 'METABOLIC DIVERSITY', 'PHA'], icon: 'cell',
     tier: 'primary', anchor: 'BACTERIA_MASTER',
-    section: '01', title: 'PURPLE PHOTOTROPHIC BACTERIA', label: 'EXPLORE +',
+    section: '01', title: 'RHODOSPIRILLUM RUBRUM', label: 'EXPLORE +',
 
 
     images: ['./assets/images/pha-granules-tem.jpg?v=20260914-img2', './assets/images/rhodobacter-capsulatus-microscopy.jpg?v=20260914-img2'],
@@ -1668,7 +1668,7 @@ const museumContent = {
   bacteriaSmall04: {
     lead: 'Exchanging electrons with the environment', tags: ['ELECTROACTIVITY', 'BIOELECTROCHEMISTRY'], icon: 'grid',
     tier: 'secondary', anchor: 'Bacteria_GRUPO_Mesh_14',
-    section: '06', title: 'RHODOVULUM', label: 'VIEW +',
+    section: '06', title: 'RHODOVULUM SP.', label: 'VIEW +',
 
 
     images: ['./assets/images/rhodovulum-electroactivity.jpg?v=20260914-img2'],
