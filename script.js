@@ -1295,95 +1295,76 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
 
       const modelo = document.querySelector('#modelo');
       const spawn = window.MUSEO_SPAWN;
-      const bounds = window.MUSEO_BOUNDS;
 
-      if (!modelo || !spawn || !bounds) {
+      if (!modelo || !spawn) {
         if (this._tries++ < 20) window.setTimeout(this._place, 250);
         return;
       }
 
-      const roomCenter = new THREE.Vector3(
-        (bounds.minX + bounds.maxX) / 2,
-        spawn.y + 1.54,
-        (bounds.minZ + bounds.maxZ) / 2
-      );
-
-      const turquoise = [];
       modelo.object3D.updateMatrixWorld(true);
 
+      // Reliable anchor: the same PEANA_Bioreactor mesh the real BAG REACTOR
+      // hotspot uses (see exhibit-info / reactor01). No more guessing from
+      // Neon_Turquoise material counts — that heuristic silently broke as
+      // soon as the neon mesh count in the GLB changed.
+      let reactorPeana = null;
+      let wallMesh = null;
       modelo.object3D.traverse((o) => {
-        if (!o.isMesh || !o.material || o.material.name !== 'Neon_Turquoise') return;
-
-        const b = new THREE.Box3().setFromObject(o);
-        const size = b.getSize(new THREE.Vector3());
-        const center = b.getCenter(new THREE.Vector3());
-
-        if (center.x < 1.2 &&
-            size.y >= 0.9 &&
-            size.y <= 2.6 &&
-            Math.max(size.x, size.z) <= 1.6) {
-          turquoise.push({ p: center });
-        }
+        if (!o.isMesh) return;
+        if (o.name === 'PEANA_Bioreactor') reactorPeana = o;
+        if (o.name === 'PAREDES_Sala') wallMesh = o;
       });
 
-      turquoise.sort((a, b) => a.p.z - b.p.z);
-
-      const windows = [];
-      turquoise.forEach((n) => {
-        const close = windows.find((w) => Math.abs(w.p.z - n.p.z) < 0.6);
-        if (close) close.p.lerp(n.p, 0.5);
-        else windows.push({ p: n.p.clone() });
-      });
-
-      // BAG REACTOR is window 05 in the existing museum mapping.
-      const bag = windows[4];
-      const next = windows[5];
-
-      if (!bag) {
+      if (!reactorPeana || !wallMesh) {
         if (this._tries++ < 20) window.setTimeout(this._place, 250);
         return;
       }
 
-      // Start at the bag-reactor wall position.
-      const pos = bag.p.clone();
-      pos.y = spawn.y + 1.54;
+      const reactorBox = new THREE.Box3().setFromObject(reactorPeana);
+      const reactorCenter = reactorBox.getCenter(new THREE.Vector3());
 
-      // RIGHT = continue along THIS SAME WALL toward the next turquoise module.
-      // No mirroring, no opposite-wall references, no capsule references.
-      let alongWall;
-      if (next) {
-        alongWall = next.p.clone().sub(bag.p);
-        alongWall.y = 0;
-      } else {
-        alongWall = new THREE.Vector3(0, 0, 1);
+      const SIGN_HEIGHT = spawn.y + 1.54;      // same height convention used elsewhere in the museum
+      const ALONG_WALL_OFFSET = 2.0;           // clears the BAG REACTOR plaques, lands in the open wall bay
+      const WALL_MARGIN = 0.03;                // small stand-off from the wall face to avoid z-fighting
+
+      const targetZ = reactorCenter.z + ALONG_WALL_OFFSET;
+
+      // Find the real wall surface (PAREDES_Sala) near the target spot by sampling
+      // its own geometry once — a single lookup against real geometry, not a
+      // raycast, not a lerp, no per-frame work.
+      const geo = wallMesh.geometry;
+      const posAttr = geo && geo.attributes && geo.attributes.position;
+      let sumX = 0;
+      let sampleCount = 0;
+      if (posAttr) {
+        const v = new THREE.Vector3();
+        for (let i = 0; i < posAttr.count; i += 3) {
+          v.set(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
+          wallMesh.localToWorld(v);
+          if (v.x < reactorCenter.x) continue;           // only the wall behind the reactor, not the opposite side
+          if (Math.abs(v.z - targetZ) > 0.35) continue;   // near the target spot along the wall
+          if (Math.abs(v.y - SIGN_HEIGHT) > 0.9) continue; // roughly at sign height
+          sumX += v.x;
+          sampleCount++;
+        }
       }
+      const wallX = sampleCount > 0 ? sumX / sampleCount : reactorCenter.x + 1.2;
 
-      if (alongWall.lengthSq() < 0.0001) alongWall.set(0, 0, 1);
-      alongWall.normalize();
-
-      // Move into the empty wall bay to the right of BAG REACTOR.
-      pos.addScaledVector(alongWall, 1.85);
-
-      // Bring it slightly into the room so the curved wall cannot clip it.
-      const inward = roomCenter.clone().sub(pos);
-      inward.y = 0;
-      if (inward.lengthSq() > 0.0001) {
-        inward.normalize();
-        pos.addScaledVector(inward, 0.48);
-      }
+      const pos = new THREE.Vector3(wallX - WALL_MARGIN, SIGN_HEIGHT, targetZ);
 
       this.el.object3D.position.copy(pos);
-      this.el.object3D.lookAt(new THREE.Vector3(roomCenter.x, pos.y, roomCenter.z));
+      // Face into the room. The wall here runs along Z with the room interior
+      // toward -X, so the panel's front (local +Z) is turned to face -X.
+      this.el.object3D.rotation.set(0, -Math.PI / 2, 0);
       this.el.object3D.visible = true;
       this.el.setAttribute('visible', true);
 
       this._placed = true;
 
-      console.log('[sponsor-wall-anchor] BAG wall, shifted right toward next window', {
-        x: pos.x.toFixed(3),
-        y: pos.y.toFixed(3),
-        z: pos.z.toFixed(3),
-        windows: windows.length
+      console.log('[sponsor-wall-anchor] placed on the real wall behind BAG REACTOR', {
+        reactor: reactorCenter.toArray().map((v) => +v.toFixed(3)),
+        pos: pos.toArray().map((v) => +v.toFixed(3)),
+        wallSamples: sampleCount
       });
     };
 
