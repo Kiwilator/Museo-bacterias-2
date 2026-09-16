@@ -1295,76 +1295,87 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
 
       const modelo = document.querySelector('#modelo');
       const spawn = window.MUSEO_SPAWN;
+      const bounds = window.MUSEO_BOUNDS;
+      const wallMeshes = window.MUSEO_WALL_MESHES || [];
 
-      if (!modelo || !spawn) {
-        if (this._tries++ < 20) window.setTimeout(this._place, 250);
+      if (!modelo || !spawn || !bounds || !wallMeshes.length) {
+        if (this._tries++ < 30) window.setTimeout(this._place, 250);
         return;
       }
 
       modelo.object3D.updateMatrixWorld(true);
 
-      // Reliable anchor: the same PEANA_Bioreactor mesh the real BAG REACTOR
-      // hotspot uses (see exhibit-info / reactor01). No more guessing from
-      // Neon_Turquoise material counts — that heuristic silently broke as
-      // soon as the neon mesh count in the GLB changed.
       let reactorPeana = null;
-      let wallMesh = null;
       modelo.object3D.traverse((o) => {
-        if (!o.isMesh) return;
-        if (o.name === 'PEANA_Bioreactor') reactorPeana = o;
-        if (o.name === 'PAREDES_Sala') wallMesh = o;
+        if (o.isMesh && o.name === 'PEANA_Bioreactor') reactorPeana = o;
       });
 
-      if (!reactorPeana || !wallMesh) {
-        if (this._tries++ < 20) window.setTimeout(this._place, 250);
+      if (!reactorPeana) {
+        if (this._tries++ < 30) window.setTimeout(this._place, 250);
         return;
       }
 
-      const reactorBox = new THREE.Box3().setFromObject(reactorPeana);
-      const reactorCenter = reactorBox.getCenter(new THREE.Vector3());
+      const reactorCenter = new THREE.Box3()
+        .setFromObject(reactorPeana)
+        .getCenter(new THREE.Vector3());
 
-      const SIGN_HEIGHT = spawn.y + 1.54;      // same height convention used elsewhere in the museum
-      const ALONG_WALL_OFFSET = 2.0;           // clears the BAG REACTOR plaques, lands in the open wall bay
-      const WALL_MARGIN = 0.03;                // small stand-off from the wall face to avoid z-fighting
+      const roomCenter = new THREE.Vector3(
+        (bounds.minX + bounds.maxX) / 2,
+        reactorCenter.y,
+        (bounds.minZ + bounds.maxZ) / 2
+      );
 
-      const targetZ = reactorCenter.z + ALONG_WALL_OFFSET;
+      // Direction from the visitor/room centre toward the BAG REACTOR wall.
+      const outward = reactorCenter.clone().sub(roomCenter);
+      outward.y = 0;
+      if (outward.lengthSq() < 0.0001) outward.set(1, 0, 0);
+      outward.normalize();
 
-      // Find the real wall surface (PAREDES_Sala) near the target spot by sampling
-      // its own geometry once — a single lookup against real geometry, not a
-      // raycast, not a lerp, no per-frame work.
-      const geo = wallMesh.geometry;
-      const posAttr = geo && geo.attributes && geo.attributes.position;
-      let sumX = 0;
-      let sampleCount = 0;
-      if (posAttr) {
-        const v = new THREE.Vector3();
-        for (let i = 0; i < posAttr.count; i += 3) {
-          v.set(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
-          wallMesh.localToWorld(v);
-          if (v.x < reactorCenter.x) continue;           // only the wall behind the reactor, not the opposite side
-          if (Math.abs(v.z - targetZ) > 0.35) continue;   // near the target spot along the wall
-          if (Math.abs(v.y - SIGN_HEIGHT) > 0.9) continue; // roughly at sign height
-          sumX += v.x;
-          sampleCount++;
-        }
+      // TRUE visitor-right while facing the BAG REACTOR wall.
+      // This is the only direction used to shift the panel laterally.
+      const up = new THREE.Vector3(0, 1, 0);
+      const right = outward.clone().cross(up).normalize();
+
+      // Move into the empty wall bay to the visitor's RIGHT of BAG REACTOR.
+      const lateralTarget = reactorCenter.clone().addScaledVector(right, 1.95);
+      lateralTarget.y = spawn.y + 1.54;
+
+      // Find the actual wall directly BEHIND that lateral target.
+      // Start well inside the room and cast only outward toward the same wall.
+      const rayOrigin = lateralTarget.clone().addScaledVector(outward, -3.0);
+      rayOrigin.y = lateralTarget.y;
+
+      const ray = new THREE.Raycaster(rayOrigin, outward, 0, 6.0);
+      const hits = ray.intersectObjects(wallMeshes, true);
+
+      let pos;
+      if (hits.length) {
+        pos = hits[0].point.clone();
+        pos.y = lateralTarget.y;
+        // Pull a little into the room so the curved wall cannot clip the frame.
+        pos.addScaledVector(outward, -0.10);
+      } else {
+        // Safe fallback: still on the BAG REACTOR side and still to visitor-right.
+        pos = lateralTarget.clone().addScaledVector(outward, 0.35);
       }
-      const wallX = sampleCount > 0 ? sumX / sampleCount : reactorCenter.x + 1.2;
-
-      const pos = new THREE.Vector3(wallX - WALL_MARGIN, SIGN_HEIGHT, targetZ);
 
       this.el.object3D.position.copy(pos);
-      // Face into the room. The wall here runs along Z with the room interior
-      // toward -X, so the panel's front (local +Z) is turned to face -X.
-      this.el.object3D.rotation.set(0, -Math.PI / 2, 0);
+
+      // Face the interior of the room. Materials are double-sided, but this
+      // keeps the artwork readable from the visitor side.
+      const lookTarget = roomCenter.clone();
+      lookTarget.y = pos.y;
+      this.el.object3D.lookAt(lookTarget);
+
       this.el.object3D.visible = true;
       this.el.setAttribute('visible', true);
-
       this._placed = true;
 
-      console.log('[sponsor-wall-anchor] placed on the real wall behind BAG REACTOR', {
-        reactor: reactorCenter.toArray().map((v) => +v.toFixed(3)),
-        pos: pos.toArray().map((v) => +v.toFixed(3)),
-        wallSamples: sampleCount
+      console.log('[sponsor-wall-anchor] BAG REACTOR wall / visitor-right placement', {
+        reactor: reactorCenter.toArray().map(v => +v.toFixed(3)),
+        right: right.toArray().map(v => +v.toFixed(3)),
+        pos: pos.toArray().map(v => +v.toFixed(3)),
+        wallHit: hits.length > 0
       });
     };
 
@@ -1380,6 +1391,7 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
     }
   }
 });
+
 
 AFRAME.registerComponent('gltf-animations', {
 
