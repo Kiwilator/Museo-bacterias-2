@@ -66,6 +66,7 @@
       <img id="ppb-bacteria-04" src="./assets/images/electroactivity-electrode-lab.jpg?v=20260914-img2" crossorigin="anonymous">
       <img id="ppb-bacteria-05" src="./assets/images/rubrivivax-gelatinosus-tem.jpg?v=20260914-img2" crossorigin="anonymous">
       <img id="ppb-bacteria-06" src="./assets/images/rhodomicrobium-budding.jpg?v=20260914-img2" crossorigin="anonymous">
+      <img id="sponsors" src="./assets/images/sponsors_logos.jpeg?v=20260916-sponsors1" crossorigin="anonymous">
     </a-assets>
 
 
@@ -118,6 +119,26 @@
     <a-circle id="PPB_VIDEO_04" place-ppb-circle="id: PPB_VIDEO_04" radius="0.01" material="src: #ppb-bacteria-04; shader: flat; side: double"></a-circle>
     <a-circle id="PPB_VIDEO_05" place-ppb-circle="id: PPB_VIDEO_05" radius="0.01" material="src: #ppb-bacteria-05; shader: flat; side: double"></a-circle>
     <a-circle id="PPB_VIDEO_06" place-ppb-circle="id: PPB_VIDEO_06" radius="0.01" material="src: #ppb-bacteria-06; shader: flat; side: double"></a-circle>
+
+
+    <!-- Sponsors / project acknowledgement wall, adapted from the original museum -->
+    <a-entity id="sponsors-wall"
+              sponsor-wall-placement
+              visible="false"
+              shadow="receive: true">
+      <a-plane width="3.2" height="2.0" color="#0d0f12"
+               material="metalness: 0.1; roughness: 0.9"
+               position="0 0 -0.02"
+               shadow="receive: true"></a-plane>
+      <a-image src="#sponsors"
+               width="3.0" height="1.8"
+               material="shader: standard; metalness: 0.0; roughness: 0.95"
+               shadow="receive: true"></a-image>
+      <a-plane width="3.0" height="1.8" position="0 0 0.01"
+               material="color: #ffffff; transparent: true; opacity: 0.06"></a-plane>
+      <a-entity light="type: point; color: #f4dcff; intensity: 0.22; distance: 2.4; decay: 2"
+                position="0 0.95 0.45"></a-entity>
+    </a-entity>
 
 
     <a-entity light="type: hemisphere; color: #f2d9cd; groundColor: #38233f; intensity: 0.20"></a-entity>
@@ -196,6 +217,6 @@
 
 
   <script src="./museum-i18n.js?v=20260916-credits1"></script>
-  <script src="./script.js?v=20260914-img2"></script>
+  <script src="./script.js?v=20260916-sponsors1"></script>
 </body>
 </html>
