@@ -1348,7 +1348,7 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
       const target = new THREE.Vector3(
         (2 * roomCenter.x) - sourceSide.x,
         spawn.y + 1.58,
-        THREE.MathUtils.lerp(sourceSide.z, roomCenter.z, 0.34)
+        THREE.MathUtils.lerp(sourceSide.z, roomCenter.z, 0.58)
       );
 
       // Snap it to the actual wall surface on that side, then pull it a few
@@ -1374,7 +1374,7 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
       if (inward.lengthSq() > 0.0001) inward.normalize();
       // Give the whole frame more clearance from the curved wall/protrusions.
       // This prevents the architecture from cutting the left/top edge of the sign.
-      pos.addScaledVector(inward, 0.19);
+      pos.addScaledVector(inward, 0.32);
 
       this.el.object3D.position.copy(pos);
       // Face the room from the new, more central wall position.
