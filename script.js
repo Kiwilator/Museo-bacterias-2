@@ -1348,7 +1348,7 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
       const target = new THREE.Vector3(
         (2 * roomCenter.x) - sourceSide.x,
         spawn.y + 1.54,
-        THREE.MathUtils.lerp(sourceSide.z, palCenter.z, 1.78)
+        THREE.MathUtils.lerp(sourceSide.z, palCenter.z, 2.15)
       );
 
       // Snap it to the actual wall surface on that side, then pull it a few
