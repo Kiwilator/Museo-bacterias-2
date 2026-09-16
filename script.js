@@ -1283,6 +1283,93 @@ AFRAME.registerComponent('respawn-guard', {
 
 
 
+
+AFRAME.registerComponent('sponsor-wall-anchor', {
+  init() {
+    this._placed = false;
+    this._place = () => {
+      if (this._placed) return;
+      const modelo = document.querySelector('#modelo');
+      const spawn = window.MUSEO_SPAWN;
+      const bounds = window.MUSEO_BOUNDS;
+      if (!modelo || !spawn || !bounds) return;
+
+      const root = modelo.object3D;
+      const byName = {};
+      const turquoise = [];
+
+      root.traverse((o) => {
+        if (o.name) byName[o.name] = o;
+        if (!o.isMesh || !o.material || o.material.name !== 'Neon_Turquoise') return;
+        const b = new THREE.Box3().setFromObject(o);
+        const size = b.getSize(new THREE.Vector3());
+        const center = b.getCenter(new THREE.Vector3());
+        if (center.x < 1.2 && size.y >= 0.9 && size.y <= 2.6 && Math.max(size.x, size.z) <= 1.6) {
+          turquoise.push({ p: center, minY: b.min.y, maxY: b.max.y });
+        }
+      });
+
+      turquoise.sort((a, b) => a.p.z - b.p.z);
+      const windows = [];
+      turquoise.forEach((n) => {
+        const close = windows.find((w) => Math.abs(w.p.z - n.p.z) < 0.6);
+        if (close) {
+          close.p.lerp(n.p, 0.5);
+          close.minY = Math.min(close.minY, n.minY);
+          close.maxY = Math.max(close.maxY, n.maxY);
+        } else {
+          windows.push({ p: n.p.clone(), minY: n.minY, maxY: n.maxY });
+        }
+      });
+
+      const bagWindow = windows[4];
+      const palustris = byName['Bacteria_GRUPO_Mesh_18'];
+      if (!bagWindow || !palustris) {
+        console.warn('[sponsor-wall-anchor] missing bag-reactor window or R. palustris anchor');
+        return;
+      }
+
+      const palBox = new THREE.Box3().setFromObject(palustris);
+      const palCenter = palBox.getCenter(new THREE.Vector3());
+
+      // Midpoint of the clear wall area shown between the BAG REACTOR panel
+      // and the R. palustris exhibit. It is calculated once, so the sign stays fixed.
+      const pos = bagWindow.p.clone().lerp(palCenter, 0.50);
+      pos.y = spawn.y + 1.62;
+
+      const roomCenter = new THREE.Vector3(
+        (bounds.minX + bounds.maxX) / 2,
+        pos.y,
+        (bounds.minZ + bounds.maxZ) / 2
+      );
+
+      // Pull the frame slightly into the room so it cannot be hidden inside the wall.
+      const inward = roomCenter.clone().sub(pos);
+      inward.y = 0;
+      if (inward.lengthSq() > 0.0001) inward.normalize();
+      pos.addScaledVector(inward, 0.075);
+
+      this.el.object3D.position.copy(pos);
+      this.el.object3D.lookAt(roomCenter);
+      this.el.setAttribute('visible', true);
+      this._placed = true;
+
+      console.log('[sponsor-wall-anchor] fixed at', {
+        x: pos.x.toFixed(3), y: pos.y.toFixed(3), z: pos.z.toFixed(3)
+      });
+    };
+
+    const modelo = document.querySelector('#modelo');
+    if (modelo) modelo.addEventListener('museo-modules-loaded', this._place);
+    window.setTimeout(this._place, 1100);
+  },
+  remove() {
+    const modelo = document.querySelector('#modelo');
+    if (modelo && this._place) modelo.removeEventListener('museo-modules-loaded', this._place);
+  }
+});
+
+
 AFRAME.registerComponent('gltf-animations', {
 
 
