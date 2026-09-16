@@ -1294,7 +1294,7 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
       const spawn = window.MUSEO_SPAWN;
       const bounds = window.MUSEO_BOUNDS;
       const wallMeshes = window.MUSEO_WALL_MESHES || [];
-      if (!modelo || !spawn || !bounds) return;
+      if (!modelo || !spawn || !bounds || !wallMeshes.length) return;
 
       const root = modelo.object3D;
       const byName = {};
@@ -1307,7 +1307,7 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
         const size = b.getSize(new THREE.Vector3());
         const center = b.getCenter(new THREE.Vector3());
         if (center.x < 1.2 && size.y >= 0.9 && size.y <= 2.6 && Math.max(size.x, size.z) <= 1.6) {
-          turquoise.push({ p: center, minY: b.min.y, maxY: b.max.y });
+          turquoise.push({ p: center });
         }
       });
 
@@ -1315,19 +1315,14 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
       const windows = [];
       turquoise.forEach((n) => {
         const close = windows.find((w) => Math.abs(w.p.z - n.p.z) < 0.6);
-        if (close) {
-          close.p.lerp(n.p, 0.5);
-          close.minY = Math.min(close.minY, n.minY);
-          close.maxY = Math.max(close.maxY, n.maxY);
-        } else {
-          windows.push({ p: n.p.clone(), minY: n.minY, maxY: n.maxY });
-        }
+        if (close) close.p.lerp(n.p, 0.5);
+        else windows.push({ p: n.p.clone() });
       });
 
       const bagWindow = windows[4];
       const capsule = byName['Exhibit_Mesh0_Capsule'];
       if (!bagWindow || !capsule) {
-        console.warn('[sponsor-wall-anchor] missing placement anchors');
+        console.warn('[sponsor-wall-anchor] missing bag-reactor or capsule anchor');
         return;
       }
 
@@ -1336,60 +1331,52 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
 
       const roomCenter = new THREE.Vector3(
         (bounds.minX + bounds.maxX) / 2,
-        spawn.y + 1.60,
+        spawn.y + 1.55,
         (bounds.minZ + bounds.maxZ) / 2
       );
 
-      // Base point: opposite wall, same depth as the BAG REACTOR zone.
-      const baseTarget = new THREE.Vector3(
-        (2 * roomCenter.x) - bagWindow.p.x,
-        spawn.y + 1.54,
-        bagWindow.p.z
+      // Work by ANGLE around the curved wall, not by X/Z distance.
+      // This places the sign between the bag-reactor side and the purple capsules,
+      // clearly biased toward the capsules (the user's "right" in the screenshots).
+      const dirBag = bagWindow.p.clone().sub(roomCenter);
+      dirBag.y = 0;
+      dirBag.normalize();
+
+      const dirCaps = capsuleCenter.clone().sub(roomCenter);
+      dirCaps.y = 0;
+      dirCaps.normalize();
+
+      const t = 0.72; // 72% of the way from bag-reactor side to capsule side
+      const wallDir = dirBag.multiplyScalar(1 - t).add(dirCaps.multiplyScalar(t)).normalize();
+
+      const ray = new THREE.Raycaster(
+        roomCenter.clone(),
+        wallDir,
+        0,
+        Math.max(bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ) * 2
       );
 
-      const snapToWall = (target) => {
-        if (!wallMeshes.length) return target.clone();
-        const dir = target.clone().sub(roomCenter);
-        dir.y = 0;
-        if (dir.lengthSq() < 0.0001) return target.clone();
-        const ray = new THREE.Raycaster(roomCenter.clone(), dir.clone().normalize(), 0, dir.length() + 2.0);
-        const hits = ray.intersectObjects(wallMeshes, true);
-        if (!hits.length) return target.clone();
-        const p = hits[0].point.clone();
-        p.y = target.y;
-        return p;
-      };
+      const hits = ray.intersectObjects(wallMeshes, true);
+      if (!hits.length) {
+        console.warn('[sponsor-wall-anchor] no wall hit for angular placement');
+        return;
+      }
 
-      let pos = snapToWall(baseTarget);
+      const pos = hits[0].point.clone();
+      pos.y = spawn.y + 1.54;
 
-      // Inward normal from this wall point.
-      let inward = roomCenter.clone().sub(pos);
+      // Pull the full frame into the room enough to avoid any curved-wall clipping.
+      const inward = roomCenter.clone().sub(pos);
       inward.y = 0;
       if (inward.lengthSq() > 0.0001) inward.normalize();
-
-      // TRUE lateral/right movement along the wall.
-      // Build the tangent to the wall and choose the direction that points toward the capsules.
-      let tangent = new THREE.Vector3(-inward.z, 0, inward.x).normalize();
-      const towardCapsules = capsuleCenter.clone().sub(pos);
-      towardCapsules.y = 0;
-      if (tangent.dot(towardCapsules) < 0) tangent.negate();
-
-      // Deliberately move a large amount sideways; do not alter depth to simulate "right".
-      pos.addScaledVector(tangent, 1.85);
-
-      // Do NOT radial-snap again, because that was cancelling the sideways movement.
-      // Just keep the frame clear of the wall.
-      inward = roomCenter.clone().sub(pos);
-      inward.y = 0;
-      if (inward.lengthSq() > 0.0001) inward.normalize();
-      pos.addScaledVector(inward, 0.58);
+      pos.addScaledVector(inward, 0.62);
 
       this.el.object3D.position.copy(pos);
       this.el.object3D.lookAt(new THREE.Vector3(roomCenter.x, pos.y, roomCenter.z));
       this.el.setAttribute('visible', true);
       this._placed = true;
 
-      console.log('[sponsor-wall-anchor] true lateral move toward capsules', {
+      console.log('[sponsor-wall-anchor] angular placement toward capsules', {
         x: pos.x.toFixed(3),
         y: pos.y.toFixed(3),
         z: pos.z.toFixed(3)
