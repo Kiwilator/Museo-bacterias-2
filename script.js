@@ -1289,9 +1289,11 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
     this._placed = false;
     this._place = () => {
       if (this._placed) return;
+
       const modelo = document.querySelector('#modelo');
       const spawn = window.MUSEO_SPAWN;
       const bounds = window.MUSEO_BOUNDS;
+      const wallMeshes = window.MUSEO_WALL_MESHES || [];
       if (!modelo || !spawn || !bounds) return;
 
       const root = modelo.object3D;
@@ -1325,37 +1327,62 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
       const bagWindow = windows[4];
       const palustris = byName['Bacteria_GRUPO_Mesh_18'];
       if (!bagWindow || !palustris) {
-        console.warn('[sponsor-wall-anchor] missing bag-reactor window or R. palustris anchor');
+        console.warn('[sponsor-wall-anchor] missing placement anchors');
         return;
       }
 
       const palBox = new THREE.Box3().setFromObject(palustris);
       const palCenter = palBox.getCenter(new THREE.Vector3());
 
-      // Midpoint of the clear wall area shown between the BAG REACTOR panel
-      // and the R. palustris exhibit. It is calculated once, so the sign stays fixed.
-      const pos = bagWindow.p.clone().lerp(palCenter, 0.50);
-      pos.y = spawn.y + 1.62;
+      // First calculate the longitudinal position from the known exhibits.
+      const sourceSide = bagWindow.p.clone().lerp(palCenter, 0.50);
 
       const roomCenter = new THREE.Vector3(
         (bounds.minX + bounds.maxX) / 2,
-        pos.y,
+        spawn.y + 1.68,
         (bounds.minZ + bounds.maxZ) / 2
       );
 
-      // Pull the frame slightly into the room so it cannot be hidden inside the wall.
+      // The user wants the frame on the OPPOSITE side of the room:
+      // mirror the previous position across the room's X centre line.
+      const target = new THREE.Vector3(
+        (2 * roomCenter.x) - sourceSide.x,
+        spawn.y + 1.68,
+        sourceSide.z
+      );
+
+      // Snap it to the actual wall surface on that side, then pull it a few
+      // centimetres into the room so the architecture cannot occlude it.
+      let pos = target.clone();
+      if (wallMeshes.length) {
+        const direction = target.clone().sub(roomCenter);
+        direction.y = 0;
+        const maxDist = direction.length() + 1.5;
+        if (direction.lengthSq() > 0.0001) {
+          direction.normalize();
+          const ray = new THREE.Raycaster(roomCenter.clone(), direction, 0, maxDist);
+          const hits = ray.intersectObjects(wallMeshes, true);
+          if (hits.length) {
+            pos.copy(hits[0].point);
+            pos.y = target.y;
+          }
+        }
+      }
+
       const inward = roomCenter.clone().sub(pos);
       inward.y = 0;
       if (inward.lengthSq() > 0.0001) inward.normalize();
-      pos.addScaledVector(inward, 0.075);
+      pos.addScaledVector(inward, 0.085);
 
       this.el.object3D.position.copy(pos);
-      this.el.object3D.lookAt(roomCenter);
+      this.el.object3D.lookAt(new THREE.Vector3(roomCenter.x, pos.y, roomCenter.z));
       this.el.setAttribute('visible', true);
       this._placed = true;
 
-      console.log('[sponsor-wall-anchor] fixed at', {
-        x: pos.x.toFixed(3), y: pos.y.toFixed(3), z: pos.z.toFixed(3)
+      console.log('[sponsor-wall-anchor] opposite-wall position', {
+        x: pos.x.toFixed(3),
+        y: pos.y.toFixed(3),
+        z: pos.z.toFixed(3)
       });
     };
 
@@ -1368,7 +1395,6 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
     if (modelo && this._place) modelo.removeEventListener('museo-modules-loaded', this._place);
   }
 });
-
 
 AFRAME.registerComponent('gltf-animations', {
 
