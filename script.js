@@ -371,53 +371,59 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
     if (!trigger || !panel) return;
     const close = panel.querySelector('.credits-close');
     const copy = window.getMuseumCreditsText ? window.getMuseumCreditsText() : null;
+
+    const renderNotes = (target, items) => {
+      if (!target) return;
+      target.innerHTML = '';
+      (items || []).forEach((note) => {
+        const p = document.createElement('span');
+        p.className = 'credits-note';
+        p.textContent = typeof note === 'string' ? note : (note.label || '');
+        target.appendChild(p);
+      });
+    };
+
+    const renderReferences = (target, items) => {
+      if (!target) return;
+      target.innerHTML = '';
+      (items || []).forEach((item) => {
+        const row = document.createElement('div');
+        row.className = 'credits-reference';
+
+        const label = document.createElement('span');
+        label.className = 'credits-note';
+        label.textContent = typeof item === 'string' ? item : (item.label || '');
+        row.appendChild(label);
+
+        if (item && typeof item === 'object' && item.url) {
+          const link = document.createElement('a');
+          link.href = item.url;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.textContent = item.url;
+          row.appendChild(link);
+        }
+        target.appendChild(row);
+      });
+    };
+
     if (copy) {
       const title = panel.querySelector('#credits-title');
-      const mediaTitle = panel.querySelector('#credits-media-title');
-      const scienceTitle = panel.querySelector('#credits-science-title');
       const developmentTitle = panel.querySelector('#credits-development-title');
+      const scienceTitle = panel.querySelector('#credits-science-title');
+      const mediaTitle = panel.querySelector('#credits-media-title');
+      const referencesTitle = panel.querySelector('#credits-references-title');
+
       if (title) title.textContent = copy.title || '';
-      if (mediaTitle) mediaTitle.textContent = copy.mediaTitle || '';
-      if (scienceTitle) scienceTitle.textContent = copy.scienceTitle || '';
       if (developmentTitle) developmentTitle.textContent = copy.developmentTitle || '';
+      if (scienceTitle) scienceTitle.textContent = copy.scienceTitle || '';
+      if (mediaTitle) mediaTitle.textContent = copy.mediaTitle || '';
+      if (referencesTitle) referencesTitle.textContent = copy.referencesTitle || '';
 
-      const media = panel.querySelector('#credits-media');
-      if (media) {
-        media.innerHTML = '';
-        (copy.media || []).forEach((group) => {
-          const row = document.createElement('div');
-          row.className = 'credits-year';
-          const year = document.createElement('strong');
-          year.textContent = group.year || '';
-          const names = document.createElement('span');
-          names.textContent = (group.names || []).join(', ');
-          row.appendChild(year);
-          row.appendChild(names);
-          media.appendChild(row);
-        });
-      }
-
-      const science = panel.querySelector('#credits-science');
-      if (science) {
-        science.innerHTML = '';
-        (copy.science || []).forEach((note) => {
-          const p = document.createElement('span');
-          p.className = 'credits-note';
-          p.textContent = note;
-          science.appendChild(p);
-        });
-      }
-
-      const development = panel.querySelector('#credits-development');
-      if (development) {
-        development.innerHTML = '';
-        (copy.development || []).forEach((note) => {
-          const p = document.createElement('span');
-          p.className = 'credits-note';
-          p.textContent = note;
-          development.appendChild(p);
-        });
-      }
+      renderNotes(panel.querySelector('#credits-development'), copy.development);
+      renderNotes(panel.querySelector('#credits-science'), copy.science);
+      renderNotes(panel.querySelector('#credits-media'), copy.media);
+      renderReferences(panel.querySelector('#credits-references'), copy.references);
     }
 
     const open = () => {
@@ -438,7 +444,6 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready);
   else ready();
 })();
-
 
 const MUSEO_HOTSPOT_COLOR = 0x4fe4dc;
 
