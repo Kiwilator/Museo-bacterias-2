@@ -57,10 +57,23 @@
   const credits = {
     en: {
       title: 'CREDITS & SOURCES',
-      mediaTitle: 'IMAGES & VIDEOS',
-      scienceTitle: 'SCIENTIFIC CONTENT',
-      developmentTitle: 'MUSEUM DEVELOPMENT',
+      mediaTitle: 'IMAGE & VIDEO CONTRIBUTORS',
+      scienceTitle: 'SCIENTIFIC COORDINATION & ADVISORY',
+      developmentTitle: 'DEVELOPMENT',
       media: [
+        {
+          year: 'CONTRIBUTORS',
+          names: [
+            'Berber Stevens',
+            'Demi Ligtenberg',
+            'Marta Cerruti',
+            'Heleen Ouboter',
+            'Guillaume Crosset-Perrotin',
+            'Maria Paula Giulianetti de Almeida',
+            'Camille Mondini',
+            'Mythili Ananth'
+          ]
+        },
         { year: 'Photobioreactor experiments, 2017', names: ['Berber Stevens', 'Demi Ligtenberg', 'Marta Cerruti', 'David Weissbrodt'] },
         { year: 'Purple reactor, 2017', names: ['Berber Stevens', 'Demi Ligtenberg', 'Marta Cerruti', 'David Weissbrodt'] },
         { year: 'Reactor laboratory, 2017', names: ['Heleen Ouboter', 'Marta Cerruti', 'David Weissbrodt'] },
@@ -78,6 +91,25 @@
         { year: 'Rhodomicrobium spp. from freshwater wetland soil', names: ["Arpita Bose's lab"] }
       ],
       science: [
+        'Daniel Melchor Puyol Santos — Scientific Coordination & Content Review',
+        'Ralph Lindeboom — Scientific Advisory & Content Development',
+        'Gabriel Capson-Tojo — Scientific Coordination & Contributor Liaison',
+        'Luis Diaz Allegue — Scientific Contributor',
+        'David Weissbrodt — Scientific & Visual Contributor',
+        'Baptiste Leroy — Scientific & Visual Contributor',
+        'Alessandra Adessi — Scientific & Visual Contributor',
+        'Arpita Bose — Scientific & Visual Contributor',
+        'Cristina Cavinato — Scientific & Visual Contributor',
+        'Fernando Muniesa — Scientific & Visual Contributor',
+        'Harun Koku — Scientific & Visual Contributor',
+        'Hartmut Grammel — Scientific & Visual Contributor',
+        'Andrea Turolla — Scientific & Visual Contributor',
+        'Joana Fradinho — Scientific & Visual Contributor',
+        'Damien Batstone — Scientific & Visual Contributor',
+        'Amanda Prado de Nicolás — Scientific & Visual Contributor',
+        'Víctor Galve Santacruz — Scientific & Visual Contributor',
+        'María José García López — Scientific & Visual Contributor',
+        'SCIENTIFIC SOURCES',
         'Blastochloris viridis (photosynthetic reaction center). PDB 5M7J · DOI 10.2210/pdb5M7J/pdb',
         'Rhodospirillum rubrum (spaceflight). Ilgrande et al., 2019 · DOI 10.1089/ast.2018.1973',
         'Rhodovulum sulfidophilum AB26. ISME Journal, 2021 · DOI 10.1038/s41396-021-01015-8',
@@ -88,15 +120,30 @@
         'Rubrivivax gelatinosus image · Markov & Weaver (2008) · https://doi.org/10.1007/s12010-007-8032-z'
       ],
       development: [
-        'Virtual museum design, integration and interactive implementation.'
+        'Sonia Rodríguez Revuelta — Lead Design & Development',
+        'José Luis Rubio Tamayo — Project Direction, Coordination & Development',
+        'Xabier Clemente Mintegui — Design & Technical Development'
       ]
     },
     es: {
       title: 'CRÉDITOS Y FUENTES',
-      mediaTitle: 'IMÁGENES Y VÍDEOS',
-      scienceTitle: 'CONTENIDO CIENTÍFICO',
-      developmentTitle: 'DESARROLLO DEL MUSEO',
+      mediaTitle: 'COLABORADORES DE IMAGEN Y VÍDEO',
+      scienceTitle: 'COORDINACIÓN Y ASESORÍA CIENTÍFICA',
+      developmentTitle: 'DESARROLLO',
       media: [
+        {
+          year: 'COLABORADORES',
+          names: [
+            'Berber Stevens',
+            'Demi Ligtenberg',
+            'Marta Cerruti',
+            'Heleen Ouboter',
+            'Guillaume Crosset-Perrotin',
+            'Maria Paula Giulianetti de Almeida',
+            'Camille Mondini',
+            'Mythili Ananth'
+          ]
+        },
         { year: 'Experimentos con fotobiorreactor, 2017', names: ['Berber Stevens', 'Demi Ligtenberg', 'Marta Cerruti', 'David Weissbrodt'] },
         { year: 'Reactor púrpura, 2017', names: ['Berber Stevens', 'Demi Ligtenberg', 'Marta Cerruti', 'David Weissbrodt'] },
         { year: 'Laboratorio de reactores, 2017', names: ['Heleen Ouboter', 'Marta Cerruti', 'David Weissbrodt'] },
@@ -114,6 +161,25 @@
         { year: 'Rhodomicrobium spp. de suelo de humedal de agua dulce', names: ['Laboratorio de Arpita Bose'] }
       ],
       science: [
+        'Daniel Melchor Puyol Santos — Coordinación científica y revisión de contenidos',
+        'Ralph Lindeboom — Asesoría científica y desarrollo de contenidos',
+        'Gabriel Capson-Tojo — Coordinación científica y enlace con colaboradores',
+        'Luis Diaz Allegue — Colaborador científico',
+        'David Weissbrodt — Colaborador científico y visual',
+        'Baptiste Leroy — Colaborador científico y visual',
+        'Alessandra Adessi — Colaboradora científica y visual',
+        'Arpita Bose — Colaboradora científica y visual',
+        'Cristina Cavinato — Colaboradora científica y visual',
+        'Fernando Muniesa — Colaborador científico y visual',
+        'Harun Koku — Colaborador científico y visual',
+        'Hartmut Grammel — Colaborador científico y visual',
+        'Andrea Turolla — Colaborador científico y visual',
+        'Joana Fradinho — Colaboradora científica y visual',
+        'Damien Batstone — Colaborador científico y visual',
+        'Amanda Prado de Nicolás — Colaboradora científica y visual',
+        'Víctor Galve Santacruz — Colaborador científico y visual',
+        'María José García López — Colaboradora científica y visual',
+        'FUENTES CIENTÍFICAS',
         'Blastochloris viridis (centro de reacción fotosintético). PDB 5M7J · DOI 10.2210/pdb5M7J/pdb',
         'Rhodospirillum rubrum (vuelo espacial). Ilgrande et al., 2019 · DOI 10.1089/ast.2018.1973',
         'Rhodovulum sulfidophilum AB26. ISME Journal, 2021 · DOI 10.1038/s41396-021-01015-8',
@@ -124,7 +190,9 @@
         'Imagen de Rubrivivax gelatinosus · Markov y Weaver (2008) · https://doi.org/10.1007/s12010-007-8032-z'
       ],
       development: [
-        'Diseño, integración digital e implementación interactiva del museo virtual.'
+        'Sonia Rodríguez Revuelta — Diseño y desarrollo principal',
+        'José Luis Rubio Tamayo — Dirección, coordinación y desarrollo del proyecto',
+        'Xabier Clemente Mintegui — Diseño y desarrollo técnico'
       ]
     }
   };
