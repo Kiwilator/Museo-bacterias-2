@@ -1327,7 +1327,7 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
       const bagWindow = windows[4];
       const capsule = byName['Exhibit_Mesh0_Capsule'];
       if (!bagWindow || !capsule) {
-        console.warn('[sponsor-wall-anchor] missing bag-reactor or capsule anchor');
+        console.warn('[sponsor-wall-anchor] missing placement anchors');
         return;
       }
 
@@ -1340,9 +1340,7 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
         (bounds.minZ + bounds.maxZ) / 2
       );
 
-      // Start from the same opposite wall, but DO NOT move "forward" along Z.
-      // The previous attempts changed depth. We now move laterally ALONG the wall,
-      // explicitly toward the bacteria capsules.
+      // Base point: opposite wall, same depth as the BAG REACTOR zone.
       const baseTarget = new THREE.Vector3(
         (2 * roomCenter.x) - bagWindow.p.x,
         spawn.y + 1.54,
@@ -1364,37 +1362,34 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
 
       let pos = snapToWall(baseTarget);
 
-      // Wall normal, pointing into the room.
+      // Inward normal from this wall point.
       let inward = roomCenter.clone().sub(pos);
       inward.y = 0;
       if (inward.lengthSq() > 0.0001) inward.normalize();
 
-      // Direction toward the capsule, projected onto the wall plane.
-      // This is the actual "RIGHT" movement the user is asking for.
-      const rightAlongWall = capsuleCenter.clone().sub(pos);
-      rightAlongWall.y = 0;
-      rightAlongWall.addScaledVector(inward, -rightAlongWall.dot(inward));
-      if (rightAlongWall.lengthSq() > 0.0001) {
-        rightAlongWall.normalize();
-        pos.addScaledVector(rightAlongWall, 1.20);
-      }
+      // TRUE lateral/right movement along the wall.
+      // Build the tangent to the wall and choose the direction that points toward the capsules.
+      let tangent = new THREE.Vector3(-inward.z, 0, inward.x).normalize();
+      const towardCapsules = capsuleCenter.clone().sub(pos);
+      towardCapsules.y = 0;
+      if (tangent.dot(towardCapsules) < 0) tangent.negate();
 
-      // Re-snap after the lateral move so the sign follows the curved wall.
-      pos = snapToWall(pos);
+      // Deliberately move a large amount sideways; do not alter depth to simulate "right".
+      pos.addScaledVector(tangent, 1.85);
 
+      // Do NOT radial-snap again, because that was cancelling the sideways movement.
+      // Just keep the frame clear of the wall.
       inward = roomCenter.clone().sub(pos);
       inward.y = 0;
       if (inward.lengthSq() > 0.0001) inward.normalize();
-
-      // Keep enough clearance so the curved wall cannot clip the frame.
-      pos.addScaledVector(inward, 0.52);
+      pos.addScaledVector(inward, 0.58);
 
       this.el.object3D.position.copy(pos);
       this.el.object3D.lookAt(new THREE.Vector3(roomCenter.x, pos.y, roomCenter.z));
       this.el.setAttribute('visible', true);
       this._placed = true;
 
-      console.log('[sponsor-wall-anchor] moved laterally toward capsules', {
+      console.log('[sponsor-wall-anchor] true lateral move toward capsules', {
         x: pos.x.toFixed(3),
         y: pos.y.toFixed(3),
         z: pos.z.toFixed(3)
