@@ -1320,35 +1320,34 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
       });
 
       const bagWindow = windows[4];
-      const palustris = byName['Bacteria_GRUPO_Mesh_18'];
-      if (!bagWindow || !palustris) {
-        console.warn('[sponsor-wall-anchor] missing bag-reactor or R. palustris anchor');
+      const capsule = byName['Exhibit_Mesh0_Capsule'];
+      if (!bagWindow || !capsule) {
+        console.warn('[sponsor-wall-anchor] missing bag-reactor or capsule anchor');
         return;
       }
 
-      const palBox = new THREE.Box3().setFromObject(palustris);
-      const palCenter = palBox.getCenter(new THREE.Vector3());
+      const capsuleBox = new THREE.Box3().setFromObject(capsule);
+      const capsuleCenter = capsuleBox.getCenter(new THREE.Vector3());
 
       const roomCenter = new THREE.Vector3(
         (bounds.minX + bounds.maxX) / 2,
-        spawn.y + 1.54,
+        spawn.y + 1.55,
         (bounds.minZ + bounds.maxZ) / 2
       );
 
-      // Place the sign on the SAME curved wall, but much closer to the
-      // R. palustris / purple-capsule side than to the BAG REACTOR side.
+      // Work by ANGLE around the curved wall, not by X/Z distance.
+      // This places the sign between the bag-reactor side and the purple capsules,
+      // clearly biased toward the capsules (the user's "right" in the screenshots).
       const dirBag = bagWindow.p.clone().sub(roomCenter);
       dirBag.y = 0;
       dirBag.normalize();
 
-      const dirPal = palCenter.clone().sub(roomCenter);
-      dirPal.y = 0;
-      dirPal.normalize();
+      const dirCaps = capsuleCenter.clone().sub(roomCenter);
+      dirCaps.y = 0;
+      dirCaps.normalize();
 
-      // Strong bias to the purple side: 86% toward R. palustris.
-      const wallDir = dirBag.clone().multiplyScalar(0.14)
-        .add(dirPal.clone().multiplyScalar(0.86))
-        .normalize();
+      const t = 0.72; // 72% of the way from bag-reactor side to capsule side
+      const wallDir = dirBag.multiplyScalar(1 - t).add(dirCaps.multiplyScalar(t)).normalize();
 
       const ray = new THREE.Raycaster(
         roomCenter.clone(),
@@ -1359,25 +1358,25 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
 
       const hits = ray.intersectObjects(wallMeshes, true);
       if (!hits.length) {
-        console.warn('[sponsor-wall-anchor] no wall hit');
+        console.warn('[sponsor-wall-anchor] no wall hit for angular placement');
         return;
       }
 
       const pos = hits[0].point.clone();
       pos.y = spawn.y + 1.54;
 
-      // Keep the frame fully in front of the wall.
+      // Pull the full frame into the room enough to avoid any curved-wall clipping.
       const inward = roomCenter.clone().sub(pos);
       inward.y = 0;
       if (inward.lengthSq() > 0.0001) inward.normalize();
-      pos.addScaledVector(inward, 0.55);
+      pos.addScaledVector(inward, 0.62);
 
       this.el.object3D.position.copy(pos);
       this.el.object3D.lookAt(new THREE.Vector3(roomCenter.x, pos.y, roomCenter.z));
       this.el.setAttribute('visible', true);
       this._placed = true;
 
-      console.log('[sponsor-wall-anchor] placed toward R. palustris', {
+      console.log('[sponsor-wall-anchor] angular placement toward capsules', {
         x: pos.x.toFixed(3),
         y: pos.y.toFixed(3),
         z: pos.z.toFixed(3)
