@@ -1287,31 +1287,43 @@ AFRAME.registerComponent('respawn-guard', {
 AFRAME.registerComponent('sponsor-wall-anchor', {
   init() {
     this._placed = false;
+    this._tries = 0;
+
     this._place = () => {
       if (this._placed) return;
 
       const modelo = document.querySelector('#modelo');
       const spawn = window.MUSEO_SPAWN;
       const bounds = window.MUSEO_BOUNDS;
-      const wallMeshes = window.MUSEO_WALL_MESHES || [];
-      if (!modelo || !spawn || !bounds || !wallMeshes.length) return;
+
+      if (!modelo || !spawn || !bounds) {
+        if (this._tries++ < 20) window.setTimeout(this._place, 300);
+        return;
+      }
 
       const root = modelo.object3D;
       const byName = {};
       const turquoise = [];
 
+      root.updateMatrixWorld(true);
       root.traverse((o) => {
         if (o.name) byName[o.name] = o;
+
         if (!o.isMesh || !o.material || o.material.name !== 'Neon_Turquoise') return;
         const b = new THREE.Box3().setFromObject(o);
         const size = b.getSize(new THREE.Vector3());
         const center = b.getCenter(new THREE.Vector3());
-        if (center.x < 1.2 && size.y >= 0.9 && size.y <= 2.6 && Math.max(size.x, size.z) <= 1.6) {
+
+        if (center.x < 1.2 &&
+            size.y >= 0.9 &&
+            size.y <= 2.6 &&
+            Math.max(size.x, size.z) <= 1.6) {
           turquoise.push({ p: center });
         }
       });
 
       turquoise.sort((a, b) => a.p.z - b.p.z);
+
       const windows = [];
       turquoise.forEach((n) => {
         const close = windows.find((w) => Math.abs(w.p.z - n.p.z) < 0.6);
@@ -1319,77 +1331,94 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
         else windows.push({ p: n.p.clone() });
       });
 
-      const bagWindow = windows[4];
-      const capsule = byName['Exhibit_Mesh0_Capsule'];
-      if (!bagWindow || !capsule) {
-        console.warn('[sponsor-wall-anchor] missing bag-reactor or capsule anchor');
-        return;
-      }
-
-      const capsuleBox = new THREE.Box3().setFromObject(capsule);
-      const capsuleCenter = capsuleBox.getCenter(new THREE.Vector3());
-
       const roomCenter = new THREE.Vector3(
         (bounds.minX + bounds.maxX) / 2,
-        spawn.y + 1.55,
+        spawn.y + 1.54,
         (bounds.minZ + bounds.maxZ) / 2
       );
 
-      // Work by ANGLE around the curved wall, not by X/Z distance.
-      // This places the sign between the bag-reactor side and the purple capsules,
-      // clearly biased toward the capsules (the user's "right" in the screenshots).
-      const dirBag = bagWindow.p.clone().sub(roomCenter);
-      dirBag.y = 0;
-      dirBag.normalize();
+      // Purple capsule / large bacteria exhibit.
+      const capsule = byName['Exhibit_Mesh0_Capsule'];
+      const bagWindow = windows[4];
 
-      const dirCaps = capsuleCenter.clone().sub(roomCenter);
-      dirCaps.y = 0;
-      dirCaps.normalize();
-
-      const t = 0.72; // 72% of the way from bag-reactor side to capsule side
-      const wallDir = dirBag.multiplyScalar(1 - t).add(dirCaps.multiplyScalar(t)).normalize();
-
-      const ray = new THREE.Raycaster(
-        roomCenter.clone(),
-        wallDir,
-        0,
-        Math.max(bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ) * 2
-      );
-
-      const hits = ray.intersectObjects(wallMeshes, true);
-      if (!hits.length) {
-        console.warn('[sponsor-wall-anchor] no wall hit for angular placement');
-        return;
+      let capsuleCenter = null;
+      if (capsule) {
+        capsuleCenter = new THREE.Box3()
+          .setFromObject(capsule)
+          .getCenter(new THREE.Vector3());
       }
 
-      const pos = hits[0].point.clone();
-      pos.y = spawn.y + 1.54;
+      let dir;
+      let radius;
 
-      // Pull the full frame into the room enough to avoid any curved-wall clipping.
-      const inward = roomCenter.clone().sub(pos);
-      inward.y = 0;
-      if (inward.lengthSq() > 0.0001) inward.normalize();
-      pos.addScaledVector(inward, 0.62);
+      if (capsuleCenter && bagWindow) {
+        const dirBag = bagWindow.p.clone().sub(roomCenter);
+        dirBag.y = 0;
+
+        const dirCapsule = capsuleCenter.clone().sub(roomCenter);
+        dirCapsule.y = 0;
+
+        const bagRadius = dirBag.length();
+        const capsuleRadius = dirCapsule.length();
+
+        dirBag.normalize();
+        dirCapsule.normalize();
+
+        // Put the panel in the blank wall area close to the PURPLE side.
+        // 82% towards the capsule, 18% towards the bag-reactor side.
+        dir = dirBag.multiplyScalar(0.18)
+          .add(dirCapsule.multiplyScalar(0.82))
+          .normalize();
+
+        // Do not raycast against the curved architecture: that was what made
+        // the panel disappear / jump to the wrong wall. Keep it slightly
+        // inside the exhibit radius so it is always visible.
+        radius = Math.max(1.0, Math.min(bagRadius, capsuleRadius) - 0.35);
+      } else if (capsuleCenter) {
+        dir = capsuleCenter.clone().sub(roomCenter);
+        dir.y = 0;
+        radius = Math.max(1.0, dir.length() - 0.35);
+        dir.normalize();
+      } else {
+        // Guaranteed fallback: visible on the right half of the room.
+        dir = new THREE.Vector3(0.85, 0, -0.52).normalize();
+        radius = Math.min(
+          Math.abs(bounds.maxX - bounds.minX),
+          Math.abs(bounds.maxZ - bounds.minZ)
+        ) * 0.40;
+      }
+
+      const pos = roomCenter.clone().addScaledVector(dir, radius);
+      pos.y = spawn.y + 1.54;
 
       this.el.object3D.position.copy(pos);
       this.el.object3D.lookAt(new THREE.Vector3(roomCenter.x, pos.y, roomCenter.z));
+
       this.el.setAttribute('visible', true);
+      this.el.object3D.visible = true;
+
       this._placed = true;
 
-      console.log('[sponsor-wall-anchor] angular placement toward capsules', {
+      console.log('[sponsor-wall-anchor] guaranteed visible placement', {
         x: pos.x.toFixed(3),
         y: pos.y.toFixed(3),
-        z: pos.z.toFixed(3)
+        z: pos.z.toFixed(3),
+        capsuleFound: !!capsuleCenter,
+        bagFound: !!bagWindow
       });
     };
 
+    // Do not depend on a single event: try both the museum event and timed retries.
     const modelo = document.querySelector('#modelo');
     if (modelo) modelo.addEventListener('museo-modules-loaded', this._place);
-    window.setTimeout(this._place, 1100);
+    window.setTimeout(this._place, 300);
   },
+
   remove() {
     const modelo = document.querySelector('#modelo');
-    if (modelo && this._place) modelo.removeEventListener('museo-modules-loaded', this._place);
+    if (modelo && this._place) {
+      modelo.removeEventListener('museo-modules-loaded', this._place);
+    }
   }
 });
 
