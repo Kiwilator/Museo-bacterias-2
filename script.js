@@ -1374,12 +1374,6 @@ AFRAME.registerComponent('sponsor-wall-anchor', {
       this.el.object3D.position.copy(pos);
       this.el.object3D.lookAt(new THREE.Vector3(roomCenter.x, pos.y, roomCenter.z));
 
-      // Explicit SCREEN-RIGHT shift: move along the sign's own horizontal axis.
-      // This avoids confusing "right" with forward/depth in world coordinates.
-      this.el.object3D.translateX(1.30);
-
-      // Re-face the room after the lateral shift.
-      this.el.object3D.lookAt(new THREE.Vector3(roomCenter.x, pos.y, roomCenter.z));
       this.el.setAttribute('visible', true);
       this._placed = true;
 
