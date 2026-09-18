@@ -927,7 +927,16 @@ AFRAME.registerComponent('setup-museum-model', {
       ent.object3D.traverse((o) => {
         if (!o.isMesh || !/^PEANA_/.test(o.name || '')) return;
         const b = boxOf(o);
-        peanas.push({ box: b, extra: extraFor(src, (b.min.x + b.max.x) / 2) });
+        const peanaCx = (b.min.x + b.max.x) / 2;
+        const extra = extraFor(src, peanaCx);
+        // Keep the exact translation of the whole pedestal. A neon base can be
+        // split into several meshes, but every segment must travel by this same
+        // delta or the outline opens up after widening the room.
+        peanas.push({
+          box: b,
+          extra,
+          dx: (peanaCx - cx) * (F - 1) + extra
+        });
       });
     });
     const peanaDe = (o) => {
@@ -957,8 +966,16 @@ AFRAME.registerComponent('setup-museum-model', {
         ent.object3D.traverse((o) => {
           if (!o.isMesh) return;
           const p = peanaDe(o);
-          if (p) { moveX(o, p.extra); piezas++; }      // anillo de peana/vitrina
-          else { stretchX(o); arq++; }                 // neon de pared o ventana
+          if (p) {
+            // The ring/base may be made of several independent neon meshes.
+            // Move all of them with the pedestal's translation, never from
+            // each segment's own centre (that was what pulled the pieces apart).
+            o.position.x += p.dx;
+            piezas++;
+          } else {
+            stretchX(o);
+            arq++;
+          }                                            // neon de pared o ventana
         });
         return;
       }
