@@ -116,7 +116,9 @@
         { label: 'Rhodospirillum rubrum (spaceflight) — Ilgrande et al., 2019', url: 'https://doi.org/10.1089/ast.2018.1973' },
         { label: 'Rhodovulum sulfidophilum AB26 — ISME Journal, 2021', url: 'https://doi.org/10.1038/s41396-021-01015-8' },
         { label: 'Rhodopseudomonas palustris TIE-1 — Bose et al., 2014, Nature Communications' },
+        { label: 'Rhodospirillum rubrum microscopy image — DSMZ BacDive', url: 'https://bacdive.dsmz.de/strain/14005' },
         { label: 'Blastochloris viridis image — University of Bayreuth', url: 'https://www.uni-bayreuth.de/press-releases/genetic-magnetization-of-living-bacteria' },
+        { label: 'Rhodovulum sulfidophilum microscopy image — Scientific American', url: 'https://www.scientificamerican.com/podcast/episode/these-bacteria-steal-from-iron-and-could-be-secretly-helping-to-curb-climate-change/' },
         { label: 'Cereibacter sphaeroides image — Wikipedia', url: 'https://de.wikipedia.org/wiki/Cereibacter_sphaeroides' },
         { label: 'Rhodobacter capsulatus image — Fedotova & Zeilstra-Ryalls (2014)', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC3923116/' },
         { label: 'Rubrivivax gelatinosus image — Markov & Weaver (2008)', url: 'https://doi.org/10.1007/s12010-007-8032-z' }
@@ -183,7 +185,9 @@
         { label: 'Rhodospirillum rubrum (spaceflight) — Ilgrande et al., 2019', url: 'https://doi.org/10.1089/ast.2018.1973' },
         { label: 'Rhodovulum sulfidophilum AB26 — ISME Journal, 2021', url: 'https://doi.org/10.1038/s41396-021-01015-8' },
         { label: 'Rhodopseudomonas palustris TIE-1 — Bose et al., 2014, Nature Communications' },
+        { label: 'Rhodospirillum rubrum microscopy image — DSMZ BacDive', url: 'https://bacdive.dsmz.de/strain/14005' },
         { label: 'Blastochloris viridis image — University of Bayreuth', url: 'https://www.uni-bayreuth.de/press-releases/genetic-magnetization-of-living-bacteria' },
+        { label: 'Rhodovulum sulfidophilum microscopy image — Scientific American', url: 'https://www.scientificamerican.com/podcast/episode/these-bacteria-steal-from-iron-and-could-be-secretly-helping-to-curb-climate-change/' },
         { label: 'Cereibacter sphaeroides image — Wikipedia', url: 'https://de.wikipedia.org/wiki/Cereibacter_sphaeroides' },
         { label: 'Rhodobacter capsulatus image — Fedotova & Zeilstra-Ryalls (2014)', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC3923116/' },
         { label: 'Rubrivivax gelatinosus image — Markov & Weaver (2008)', url: 'https://doi.org/10.1007/s12010-007-8032-z' }
