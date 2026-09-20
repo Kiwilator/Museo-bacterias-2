@@ -35,10 +35,10 @@
   `;
   document.head.appendChild(controlsSpacingFix);
 
-  /* Correct the four custom video windows: preserve aspect ratio, orientation
+  /* Correct the four custom video windows: preserve aspect ratio and orientation,
      and place biomass in the upper-right screen. */
   const videoWindowFix = document.createElement('script');
-  videoWindowFix.src = './video-window-fit.js?v=20260920-video-fit2';
+  videoWindowFix.src = './video-window-fit.js?v=20260920-video-fit3';
   videoWindowFix.onerror = () => console.error('[content-fix] could not load video window fit');
   document.head.appendChild(videoWindowFix);
 })();
