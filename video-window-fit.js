@@ -42,8 +42,8 @@
     const uv = new Float32Array(pos.count * 2);
 
     for (let i = 0; i < pos.count; i++) {
-      // The source video is not rotated. Z is the physical horizontal direction
-      // of these wall windows and Y is the physical vertical direction.
+      // Video axes are preserved exactly: horizontal video axis -> horizontal
+      // window axis (Z), vertical video axis -> vertical window axis (Y).
       const u = (pos.getZ(i) - box.min.z) / spanZ;
       const v = (pos.getY(i) - box.min.y) / spanY;
       uv[i * 2] = u;
@@ -70,8 +70,8 @@
     let repeatX = 1;
     let repeatY = 1;
 
-    // Same idea as object-fit: cover: scale until the entire window is filled,
-    // then crop only the excess. The video itself is never rotated or stretched.
+    // CSS object-fit: cover equivalent. Fill the complete window and crop only
+    // the excess. No rotation and no non-uniform stretching are ever applied.
     if (sourceAspect > targetAspect) {
       repeatX = Math.max(1e-6, targetAspect / sourceAspect);
     } else {
@@ -112,14 +112,14 @@
       const video = videoId && document.getElementById(videoId);
       if (!video) return;
 
-      // Ignore the exported UV orientation completely and project the video
-      // straight onto the physical window: horizontal -> Z, vertical -> Y.
+      // Ignore the exported UV orientation completely. The video is projected
+      // directly in the physical Y/Z plane of the window, with no rotation.
       screen.geometry = buildPlanarUvs(screen.geometry);
       const targetAspect = screenAspect(screen);
 
       const texture = new THREE.VideoTexture(video);
       texture.colorSpace = THREE.SRGBColorSpace;
-      texture.flipY = false;
+      texture.flipY = true;
       texture.wrapS = THREE.ClampToEdgeWrapping;
       texture.wrapT = THREE.ClampToEdgeWrapping;
       texture.minFilter = THREE.LinearFilter;
@@ -158,7 +158,7 @@
       entity.removeAttribute('video-window-materials');
     }
 
-    console.log(`[video-window-fit] ${corrected}/${screens.length} ventanas: video directo, sin giro, cover solamente`);
+    console.log(`[video-window-fit] ${corrected}/${screens.length}: direct video, no rotation, cover only`);
     return corrected > 0;
   }
 
