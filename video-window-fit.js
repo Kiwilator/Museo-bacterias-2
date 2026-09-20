@@ -1,21 +1,23 @@
-/* Robust video fitting for the four custom museum windows. */
+/* Video windows: use each source video exactly as encoded. No rotation, no canvas orientation changes. */
 (() => {
-  if (window.__MUSEO_VIDEO_WINDOW_CANVAS_FIX__) return;
-  window.__MUSEO_VIDEO_WINDOW_CANVAS_FIX__ = true;
+  if (window.__MUSEO_VIDEO_WINDOW_DIRECT_FIT__) return;
+  window.__MUSEO_VIDEO_WINDOW_DIRECT_FIT__ = true;
 
   const SOURCE_OVERRIDES = {
-    'ppb-video-window-02': './assets/videos/biomass.mp4?v=20260920-video-fit3',
-    'ppb-video-window-04': './assets/videos/rhodomicrobium-vannielii-animation.mp4?v=20260920-video-fit3'
+    'ppb-video-window-02': './assets/videos/biomass.mp4?v=20260920-video-fit4',
+    'ppb-video-window-04': './assets/videos/rhodomicrobium-vannielii-animation.mp4?v=20260920-video-fit4'
   };
 
   const VIDEO_BY_MESH = {
     'Mesh_0.004': 'ppb-video-window-01',
-    'Mesh_1.004': 'ppb-video-window-02',
-    'Mesh_2.003': 'ppb-video-window-03',
-    'Mesh_3.003': 'ppb-video-window-04'
+    'Mesh_1.004': 'ppb-video-window-02', // upper right
+    'Mesh_2.003': 'ppb-video-window-03', // left / flow + mixing
+    'Mesh_3.003': 'ppb-video-window-04'  // lower right
   };
 
-  const resources = [];
+  const liveMaterials = [];
+  const liveTextures = [];
+  const fitHandlers = [];
 
   function overrideSources() {
     Object.entries(SOURCE_OVERRIDES).forEach(([id, src]) => {
@@ -27,7 +29,7 @@
     });
   }
 
-  function rebuildWindowUvs(geometry) {
+  function buildPlanarUvs(geometry) {
     if (!geometry) return geometry;
     const cloned = geometry.clone();
     const pos = cloned.getAttribute('position');
@@ -40,130 +42,60 @@
     const uv = new Float32Array(pos.count * 2);
 
     for (let i = 0; i < pos.count; i++) {
-      // Physical horizontal axis = Z. Physical vertical axis = Y.
-      uv[i * 2] = (pos.getZ(i) - box.min.z) / spanZ;
-      uv[i * 2 + 1] = (pos.getY(i) - box.min.y) / spanY;
+      // The source video is not rotated. Z is the physical horizontal direction
+      // of these wall windows and Y is the physical vertical direction.
+      const u = (pos.getZ(i) - box.min.z) / spanZ;
+      const v = (pos.getY(i) - box.min.y) / spanY;
+      uv[i * 2] = u;
+      uv[i * 2 + 1] = v;
     }
+
     cloned.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     return cloned;
   }
 
-  function targetAspect(screen) {
+  function screenAspect(screen) {
     const g = screen.geometry;
     g.computeBoundingBox();
     const b = g.boundingBox;
-    const h = Math.max(1e-6, b.max.y - b.min.y);
-    const w = Math.max(1e-6, b.max.z - b.min.z);
-    return w / h;
+    const width = Math.max(1e-6, b.max.z - b.min.z);
+    const height = Math.max(1e-6, b.max.y - b.min.y);
+    return width / height;
   }
 
-  function makeCanvasForAspect(aspect) {
-    const maxSide = MUSEO_IS_MOBILE ? 384 : 640;
-    let width, height;
-    if (aspect >= 1) {
-      width = maxSide;
-      height = Math.max(256, Math.round(maxSide / aspect));
+  function fitCover(texture, video, targetAspect) {
+    if (!texture || !video || !video.videoWidth || !video.videoHeight) return;
+
+    const sourceAspect = video.videoWidth / video.videoHeight;
+    let repeatX = 1;
+    let repeatY = 1;
+
+    // Same idea as object-fit: cover: scale until the entire window is filled,
+    // then crop only the excess. The video itself is never rotated or stretched.
+    if (sourceAspect > targetAspect) {
+      repeatX = Math.max(1e-6, targetAspect / sourceAspect);
     } else {
-      height = maxSide;
-      width = Math.max(256, Math.round(maxSide * aspect));
-    }
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    return canvas;
-  }
-
-  function drawCover(ctx, canvas, video, rotate90) {
-    if (!video.videoWidth || !video.videoHeight) return;
-
-    const cw = canvas.width;
-    const ch = canvas.height;
-    ctx.save();
-    ctx.clearRect(0, 0, cw, ch);
-    ctx.fillStyle = '#020707';
-    ctx.fillRect(0, 0, cw, ch);
-
-    let sw = video.videoWidth;
-    let sh = video.videoHeight;
-    let dw, dh, dx, dy;
-
-    if (rotate90) {
-      // After rotation the effective source dimensions are exchanged.
-      const rotatedAspect = sh / sw;
-      const canvasAspect = cw / ch;
-      if (rotatedAspect > canvasAspect) {
-        dh = ch;
-        dw = dh * rotatedAspect;
-      } else {
-        dw = cw;
-        dh = dw / rotatedAspect;
-      }
-      dx = (cw - dw) / 2;
-      dy = (ch - dh) / 2;
-
-      ctx.translate(cw / 2, ch / 2);
-      ctx.rotate(Math.PI / 2);
-      // Coordinates are now in the rotated canvas coordinate system.
-      ctx.drawImage(video, -dh / 2, -dw / 2, dh, dw);
-    } else {
-      const videoAspect = sw / sh;
-      const canvasAspect = cw / ch;
-      if (videoAspect > canvasAspect) {
-        dh = ch;
-        dw = dh * videoAspect;
-      } else {
-        dw = cw;
-        dh = dw / videoAspect;
-      }
-      dx = (cw - dw) / 2;
-      dy = (ch - dh) / 2;
-      ctx.drawImage(video, dx, dy, dw, dh);
-    }
-    ctx.restore();
-  }
-
-  function installFramePump(video, canvas, texture, rotate90) {
-    const ctx = canvas.getContext('2d', { alpha: false });
-    let stopped = false;
-    let fallbackTimer = 0;
-
-    const render = () => {
-      if (stopped) return;
-      if (video.readyState >= 2) {
-        drawCover(ctx, canvas, video, rotate90);
-        texture.needsUpdate = true;
-      }
-    };
-
-    if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
-      const tick = () => {
-        if (stopped) return;
-        render();
-        video.requestVideoFrameCallback(tick);
-      };
-      video.requestVideoFrameCallback(tick);
-    } else {
-      fallbackTimer = window.setInterval(render, 33);
+      repeatY = Math.max(1e-6, sourceAspect / targetAspect);
     }
 
-    render();
-    return () => {
-      stopped = true;
-      if (fallbackTimer) window.clearInterval(fallbackTimer);
-    };
+    texture.repeat.set(repeatX, repeatY);
+    texture.offset.set((1 - repeatX) * 0.5, (1 - repeatY) * 0.5);
+    texture.needsUpdate = true;
   }
 
   function clearResources() {
-    while (resources.length) {
-      const r = resources.pop();
-      if (r.stop) r.stop();
-      if (r.material) r.material.dispose();
-      if (r.texture) r.texture.dispose();
+    while (fitHandlers.length) {
+      const { video, fn } = fitHandlers.pop();
+      video.removeEventListener('loadedmetadata', fn);
+      video.removeEventListener('resize', fn);
     }
+    while (liveMaterials.length) liveMaterials.pop().dispose();
+    while (liveTextures.length) liveTextures.pop().dispose();
   }
 
   function applyFix() {
     overrideSources();
+
     const entity = document.getElementById('video-window-model');
     if (!entity) return false;
     const model = entity.getObject3D('mesh');
@@ -180,15 +112,25 @@
       const video = videoId && document.getElementById(videoId);
       if (!video) return;
 
-      screen.geometry = rebuildWindowUvs(screen.geometry);
-      const aspect = targetAspect(screen);
-      const canvas = makeCanvasForAspect(aspect);
-      const texture = new THREE.CanvasTexture(canvas);
+      // Ignore the exported UV orientation completely and project the video
+      // straight onto the physical window: horizontal -> Z, vertical -> Y.
+      screen.geometry = buildPlanarUvs(screen.geometry);
+      const targetAspect = screenAspect(screen);
+
+      const texture = new THREE.VideoTexture(video);
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.flipY = false;
+      texture.wrapS = THREE.ClampToEdgeWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
       texture.minFilter = THREE.LinearFilter;
       texture.magFilter = THREE.LinearFilter;
       texture.generateMipmaps = false;
+
+      const updateFit = () => fitCover(texture, video, targetAspect);
+      video.addEventListener('loadedmetadata', updateFit);
+      video.addEventListener('resize', updateFit);
+      fitHandlers.push({ video, fn: updateFit });
+      updateFit();
 
       const material = new THREE.MeshBasicMaterial({
         map: texture,
@@ -196,22 +138,7 @@
         side: THREE.DoubleSide,
         toneMapped: false
       });
-
-      const decideAndStart = () => {
-        if (!video.videoWidth || !video.videoHeight) return;
-        const sourceAspect = video.videoWidth / video.videoHeight;
-        const targetIsPortrait = aspect < 1;
-        const sourceIsPortrait = sourceAspect < 1;
-        const rotate90 = targetIsPortrait !== sourceIsPortrait;
-
-        const old = resources.find((r) => r.screen === screen);
-        if (old && old.stop) old.stop();
-        const stop = installFramePump(video, canvas, texture, rotate90);
-        const entry = resources.find((r) => r.screen === screen);
-        if (entry) entry.stop = stop;
-
-        console.log(`[video-window-fit] ${screen.name}: source ${video.videoWidth}x${video.videoHeight}, target aspect ${aspect.toFixed(2)}, rotate90=${rotate90}`);
-      };
+      material.name = `Museum_Video_Direct_${screen.name}`;
 
       screen.material = material;
       screen.userData.museumVideo = video;
@@ -219,22 +146,19 @@
       screen.castShadow = false;
       screen.receiveShadow = false;
 
-      const entry = { screen, texture, material, stop: null };
-      resources.push(entry);
-
-      video.addEventListener('loadedmetadata', decideAndStart, { once: true });
-      if (video.readyState >= 1) decideAndStart();
+      liveTextures.push(texture);
+      liveMaterials.push(material);
+      corrected++;
 
       const play = video.play();
       if (play && play.catch) play.catch(() => {});
-      corrected++;
     });
 
     if (entity.hasAttribute('video-window-materials')) {
       entity.removeAttribute('video-window-materials');
     }
 
-    console.log(`[video-window-fit] ${corrected}/${screens.length} ventanas usando canvas orientado`);
+    console.log(`[video-window-fit] ${corrected}/${screens.length} ventanas: video directo, sin giro, cover solamente`);
     return corrected > 0;
   }
 
