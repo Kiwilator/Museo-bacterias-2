@@ -1870,7 +1870,7 @@ const PPB_CIRCLES = {
   PPB_VIDEO_01: { centroid: [-1.94093, 1.40719, 2.99479], normal: [0.92215, -0.38567, 0.02998], u: [0.37767, 0.88082, -0.28553], radius: 0.1904 },
   PPB_VIDEO_02: { centroid: [-1.84054, 1.39784, 2.26459], normal: [0.89861, -0.39303, 0.19501], u: [0.43474, 0.73765, -0.5166], radius: 0.1975 },
   PPB_VIDEO_03: { centroid: [-1.66489, 1.39732, 1.51321], normal: [0.89418, -0.40005, 0.20102], u: [0.4463, 0.76082, -0.47114], radius: 0.1955 },
-  PPB_VIDEO_04: { centroid: [-1.97822, 1.39696, -2.11191], normal: [0.86051, -0.43998, -0.25679], u: [-0.50805, -0.70407, -0.49615], radius: 0.2058 },
+  PPB_VIDEO_04: { centroid: [-1.97822, 1.39696, -2.11191], normal: [0.86051, -0.43998, -0.25679], u: [-0.50805, -0.70407, -0.49615], radius: 0.181, forwardOffset: 0.045 },
   PPB_VIDEO_05: { centroid: [-2.18675, 1.40212, -2.87555], normal: [0.87692, -0.43359, -0.20738], u: [-0.48008, -0.76949, -0.42119], radius: 0.1942 },
   PPB_VIDEO_06: { centroid: [-2.30118, 1.40707, -3.61543], normal: [0.90425, -0.4241, -0.04974], u: [-0.4165, -0.85032, -0.32169], radius: 0.1944 }
 };
@@ -1916,7 +1916,7 @@ AFRAME.registerComponent('place-ppb-circle', {
     const quat = new THREE.Quaternion().setFromRotationMatrix(rotMatrix);
 
     const worldRadius = data.radius * (uScaleFactor + vScaleFactor) / 2;
-    const forwardOffset = 0.015;
+    const forwardOffset = data.forwardOffset || 0.015;
 
     this.el.object3D.position.copy(worldPos).addScaledVector(worldNormal, forwardOffset);
     this.el.object3D.quaternion.copy(quat);

@@ -64,14 +64,14 @@
       if (content.bacteriaLarge02) {
         content.bacteriaLarge02.imageSources = [
           { label: 'Museum animation / own visualisation' },
-          { label: 'Source: Arpita Bose laboratory' }
+          { label: 'Source: Arpita Bose laboratory', url: 'https://bose.wustl.edu/' }
         ];
       }
 
       // Space-mission image comes from the original scientific material.
       if (content.spaceMission) {
         content.spaceMission.imageSources = [
-          { label: 'Source: original scientific material' }
+          { label: 'Source: Ilgrande et al. (2019)', url: 'https://doi.org/10.1089/ast.2018.1973' }
         ];
       }
     }
@@ -115,13 +115,13 @@
       if (es.bacteriaLarge02) {
         es.bacteriaLarge02.imageSources = [
           { label: 'Animación propia / visualización del museo' },
-          { label: 'Fuente: laboratorio de Arpita Bose' }
+          { label: 'Fuente: laboratorio de Arpita Bose', url: 'https://bose.wustl.edu/' }
         ];
       }
 
       if (es.spaceMission) {
         es.spaceMission.imageSources = [
-          { label: 'Fuente: material científico original' }
+          { label: 'Fuente: Ilgrande et al. (2019)', url: 'https://doi.org/10.1089/ast.2018.1973' }
         ];
       }
     }
