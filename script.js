@@ -5309,6 +5309,55 @@ AFRAME.scenes[0]?.addEventListener('loaded', () => {
 })();
 
 
+(function setupMuseumBackgroundMusic() {
+  const soundEl = document.getElementById('museum-background-music');
+  const scene = document.querySelector('a-scene');
+  if (!soundEl || !scene) return;
+
+  let playbackRequested = false;
+  let started = false;
+
+  const resumeAudioContext = () => {
+    const context = scene.audioListener && scene.audioListener.context;
+    if (context && context.state !== 'running') {
+      const resumed = context.resume();
+      if (resumed && resumed.catch) resumed.catch(() => {});
+    }
+  };
+
+  const removeUnlockListeners = () => {
+    window.removeEventListener('click', requestPlayback);
+    window.removeEventListener('touchstart', requestPlayback);
+    window.removeEventListener('keydown', requestPlayback);
+  };
+
+  const tryPlay = () => {
+    if (!playbackRequested || started) return;
+    const sound = soundEl.components && soundEl.components.sound;
+    if (!sound || !sound.loaded) return;
+    try {
+      sound.playSound();
+      started = true;
+      removeUnlockListeners();
+      console.log('[museum-background-music] musica de bacterias-purpura reproduciendose');
+    } catch (error) {
+      console.warn('[museum-background-music] no se pudo iniciar', error);
+    }
+  };
+
+  function requestPlayback() {
+    playbackRequested = true;
+    resumeAudioContext();
+    tryPlay();
+  }
+
+  soundEl.addEventListener('sound-loaded', tryPlay);
+  window.addEventListener('click', requestPlayback);
+  window.addEventListener('touchstart', requestPlayback, { passive: true });
+  window.addEventListener('keydown', requestPlayback);
+})();
+
+
 (function () {
   const scene = document.querySelector('a-scene');
   const screen = document.getElementById('loading-screen');
