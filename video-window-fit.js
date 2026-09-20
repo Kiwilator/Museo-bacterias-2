@@ -1,11 +1,11 @@
-/* Video windows: use each source video exactly as encoded. No rotation, no canvas orientation changes. */
+/* Video windows: preserve each MP4 exactly as encoded. No source rotation. */
 (() => {
-  if (window.__MUSEO_VIDEO_WINDOW_DIRECT_FIT__) return;
-  window.__MUSEO_VIDEO_WINDOW_DIRECT_FIT__ = true;
+  if (window.__MUSEO_VIDEO_WINDOW_WORLD_FIT__) return;
+  window.__MUSEO_VIDEO_WINDOW_WORLD_FIT__ = true;
 
   const SOURCE_OVERRIDES = {
-    'ppb-video-window-02': './assets/videos/biomass.mp4?v=20260920-video-fit4',
-    'ppb-video-window-04': './assets/videos/rhodomicrobium-vannielii-animation.mp4?v=20260920-video-fit4'
+    'ppb-video-window-02': './assets/videos/biomass.mp4?v=20260920-video-fit5',
+    'ppb-video-window-04': './assets/videos/rhodomicrobium-vannielii-animation.mp4?v=20260920-video-fit5'
   };
 
   const VIDEO_BY_MESH = {
@@ -29,49 +29,100 @@
     });
   }
 
-  function buildPlanarUvs(geometry) {
-    if (!geometry) return geometry;
-    const cloned = geometry.clone();
-    const pos = cloned.getAttribute('position');
-    if (!pos) return cloned;
+  function clearResources() {
+    while (fitHandlers.length) {
+      const { video, fn } = fitHandlers.pop();
+      video.removeEventListener('loadedmetadata', fn);
+      video.removeEventListener('resize', fn);
+    }
+    while (liveMaterials.length) liveMaterials.pop().dispose();
+    while (liveTextures.length) liveTextures.pop().dispose();
+  }
 
-    cloned.computeBoundingBox();
-    const box = cloned.boundingBox;
-    const spanY = Math.max(1e-6, box.max.y - box.min.y);
-    const spanZ = Math.max(1e-6, box.max.z - box.min.z);
+  function worldPlanarUvs(screen) {
+    const source = screen.geometry;
+    if (!source) return { geometry: source, aspect: 1 };
+
+    const geometry = source.clone();
+    const pos = geometry.getAttribute('position');
+    if (!pos || !pos.count) return { geometry, aspect: 1 };
+
+    screen.updateWorldMatrix(true, false);
+    const world = [];
+    const p = new THREE.Vector3();
+
+    let cx = 0, cz = 0;
+    let minY = Infinity, maxY = -Infinity;
+
+    for (let i = 0; i < pos.count; i++) {
+      p.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(screen.matrixWorld);
+      const q = p.clone();
+      world.push(q);
+      cx += q.x;
+      cz += q.z;
+      minY = Math.min(minY, q.y);
+      maxY = Math.max(maxY, q.y);
+    }
+
+    cx /= world.length;
+    cz /= world.length;
+
+    // Find the real horizontal direction of the window in WORLD XZ space.
+    // This removes any local rotation inherited from Rhino/Blender nodes.
+    let cxx = 0, cxz = 0, czz = 0;
+    world.forEach((q) => {
+      const dx = q.x - cx;
+      const dz = q.z - cz;
+      cxx += dx * dx;
+      cxz += dx * dz;
+      czz += dz * dz;
+    });
+
+    let hx = 1, hz = 0;
+    if (Math.abs(cxz) > 1e-9 || Math.abs(cxx - czz) > 1e-9) {
+      const theta = 0.5 * Math.atan2(2 * cxz, cxx - czz);
+      hx = Math.cos(theta);
+      hz = Math.sin(theta);
+    }
+
+    // Stable sign only prevents random mirroring between reloads.
+    if ((Math.abs(hx) >= Math.abs(hz) && hx < 0) ||
+        (Math.abs(hz) > Math.abs(hx) && hz < 0)) {
+      hx = -hx;
+      hz = -hz;
+    }
+
+    let minH = Infinity, maxH = -Infinity;
+    const hValues = world.map((q) => {
+      const h = (q.x - cx) * hx + (q.z - cz) * hz;
+      minH = Math.min(minH, h);
+      maxH = Math.max(maxH, h);
+      return h;
+    });
+
+    const spanH = Math.max(1e-6, maxH - minH);
+    const spanV = Math.max(1e-6, maxY - minY);
     const uv = new Float32Array(pos.count * 2);
 
     for (let i = 0; i < pos.count; i++) {
-      // Video axes are preserved exactly: horizontal video axis -> horizontal
-      // window axis (Z), vertical video axis -> vertical window axis (Y).
-      const u = (pos.getZ(i) - box.min.z) / spanZ;
-      const v = (pos.getY(i) - box.min.y) / spanY;
-      uv[i * 2] = u;
-      uv[i * 2 + 1] = v;
+      // Literal mapping requested:
+      // video horizontal -> real horizontal of the window
+      // video vertical   -> real vertical of the museum
+      uv[i * 2] = (hValues[i] - minH) / spanH;
+      uv[i * 2 + 1] = (world[i].y - minY) / spanV;
     }
 
-    cloned.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-    return cloned;
-  }
-
-  function screenAspect(screen) {
-    const g = screen.geometry;
-    g.computeBoundingBox();
-    const b = g.boundingBox;
-    const width = Math.max(1e-6, b.max.z - b.min.z);
-    const height = Math.max(1e-6, b.max.y - b.min.y);
-    return width / height;
+    geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    return { geometry, aspect: spanH / spanV };
   }
 
   function fitCover(texture, video, targetAspect) {
-    if (!texture || !video || !video.videoWidth || !video.videoHeight) return;
-
+    if (!video.videoWidth || !video.videoHeight) return;
     const sourceAspect = video.videoWidth / video.videoHeight;
     let repeatX = 1;
     let repeatY = 1;
 
-    // CSS object-fit: cover equivalent. Fill the complete window and crop only
-    // the excess. No rotation and no non-uniform stretching are ever applied.
+    // Scale only. No rotation, no axis swap, no non-uniform distortion.
     if (sourceAspect > targetAspect) {
       repeatX = Math.max(1e-6, targetAspect / sourceAspect);
     } else {
@@ -83,16 +134,6 @@
     texture.needsUpdate = true;
   }
 
-  function clearResources() {
-    while (fitHandlers.length) {
-      const { video, fn } = fitHandlers.pop();
-      video.removeEventListener('loadedmetadata', fn);
-      video.removeEventListener('resize', fn);
-    }
-    while (liveMaterials.length) liveMaterials.pop().dispose();
-    while (liveTextures.length) liveTextures.pop().dispose();
-  }
-
   function applyFix() {
     overrideSources();
 
@@ -102,6 +143,7 @@
     if (!model) return false;
 
     clearResources();
+    model.updateWorldMatrix(true, true);
 
     const screens = [];
     model.traverse((o) => { if (o.isMesh) screens.push(o); });
@@ -112,21 +154,19 @@
       const video = videoId && document.getElementById(videoId);
       if (!video) return;
 
-      // Ignore the exported UV orientation completely. The video is projected
-      // directly in the physical Y/Z plane of the window, with no rotation.
-      screen.geometry = buildPlanarUvs(screen.geometry);
-      const targetAspect = screenAspect(screen);
+      const mapped = worldPlanarUvs(screen);
+      screen.geometry = mapped.geometry;
 
       const texture = new THREE.VideoTexture(video);
       texture.colorSpace = THREE.SRGBColorSpace;
-      texture.flipY = true;
+      texture.flipY = false;
       texture.wrapS = THREE.ClampToEdgeWrapping;
       texture.wrapT = THREE.ClampToEdgeWrapping;
       texture.minFilter = THREE.LinearFilter;
       texture.magFilter = THREE.LinearFilter;
       texture.generateMipmaps = false;
 
-      const updateFit = () => fitCover(texture, video, targetAspect);
+      const updateFit = () => fitCover(texture, video, mapped.aspect);
       video.addEventListener('loadedmetadata', updateFit);
       video.addEventListener('resize', updateFit);
       fitHandlers.push({ video, fn: updateFit });
@@ -138,7 +178,7 @@
         side: THREE.DoubleSide,
         toneMapped: false
       });
-      material.name = `Museum_Video_Direct_${screen.name}`;
+      material.name = `Museum_Video_WorldUpright_${screen.name}`;
 
       screen.material = material;
       screen.userData.museumVideo = video;
@@ -158,14 +198,26 @@
       entity.removeAttribute('video-window-materials');
     }
 
-    console.log(`[video-window-fit] ${corrected}/${screens.length}: direct video, no rotation, cover only`);
+    console.log(`[video-window-fit] ${corrected}/${screens.length}: source unchanged, world-upright projection, cover only`);
     return corrected > 0;
   }
 
   function install() {
     const entity = document.getElementById('video-window-model');
     if (!entity) { window.setTimeout(install, 100); return; }
-    entity.addEventListener('model-loaded', () => window.setTimeout(applyFix, 0));
+
+    const reapply = () => window.setTimeout(applyFix, 40);
+    entity.addEventListener('model-loaded', reapply);
+
+    const scene = document.querySelector('a-scene');
+    if (scene) {
+      scene.addEventListener('loaded', reapply);
+      scene.addEventListener('renderstart', reapply, { once: true });
+      scene.addEventListener('museo-ready', reapply);
+    }
+
+    // One late pass catches the room widening/repositioning done after GLB load.
+    window.setTimeout(applyFix, 1200);
     if (!applyFix()) window.setTimeout(applyFix, 250);
   }
 
