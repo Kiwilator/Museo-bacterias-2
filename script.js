@@ -1874,6 +1874,9 @@ const PPB_CIRCLES = {
 AFRAME.registerComponent('place-ppb-circle', {
   schema: { id: { type: 'string' } },
   init() {
+    const numericId = parseInt(String(this.data.id).replace(/\D/g, ''), 10) || 0;
+    this._pulsePhase = numericId * 1.17;
+    this._placed = false;
     const modelo = document.querySelector('#modelo');
     if (!modelo) return;
     modelo.addEventListener('museo-modules-loaded', () => this.place());
@@ -1916,6 +1919,18 @@ AFRAME.registerComponent('place-ppb-circle', {
     this.el.object3D.position.copy(worldPos).addScaledVector(worldNormal, forwardOffset);
     this.el.object3D.quaternion.copy(quat);
     this.el.setAttribute('radius', worldRadius);
+    this.el.object3D.scale.setScalar(1);
+    this._placed = true;
+  },
+  tick(time) {
+    if (!this._placed) return;
+    const data = PPB_CIRCLES[this.data.id] || {};
+    const amp = data.pulseAmp || 0.026;
+    const drift = data.pulseDrift || 0.006;
+    const speed = data.pulseSpeed || 0.00105;
+    const t = time * speed + this._pulsePhase;
+    const pulse = 1 + (Math.sin(t) * amp) + (Math.sin(t * 0.43 + this._pulsePhase) * drift);
+    this.el.object3D.scale.setScalar(pulse);
   }
 });
 

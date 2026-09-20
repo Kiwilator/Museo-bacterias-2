@@ -37,6 +37,8 @@
       // Rhodovulum: use the SEM/EDS image corresponding to
       // Rhodovulum visakhapatnamense AB26, not the duplicated lab-device photo.
       if (content.bacteriaSmall04) {
+        content.bacteriaSmall04.title = 'RHODOVULUM VISAKHAPATNAMENSE AB26';
+        content.bacteriaSmall04.body = 'This exhibit focuses on strain AB26, used to study phototrophic extracellular electron uptake. The 2021 ISME Journal article described it as Rhodovulum sulfidophilum AB26; a later taxonomic re-evaluation classified AB26 as Rhodovulum visakhapatnamense.\n\nThe capability shown here remains the same: under illuminated conditions, this Rhodovulum strain can take up electrons from reduced iron or from an electrode and feed them into its photosynthetic electron transport chain.\n\nThese properties are of interest for bioelectrochemical processes and for converting low-value compounds into useful products.';
         content.bacteriaSmall04.images = [
           './assets/images/electroactivity-electrode-sem.jpg' + VERSION
         ];
@@ -98,6 +100,8 @@
       }
 
       if (es.bacteriaSmall04) {
+        es.bacteriaSmall04.title = 'RHODOVULUM VISAKHAPATNAMENSE AB26';
+        es.bacteriaSmall04.body = 'Esta pieza se centra en la cepa AB26, usada para estudiar la captación fototrófica de electrones. El artículo de ISME Journal de 2021 la describía como Rhodovulum sulfidophilum AB26; una reevaluación taxonómica posterior clasificó AB26 como Rhodovulum visakhapatnamense.\n\nLa capacidad mostrada sigue siendo la misma: bajo iluminación, esta cepa de Rhodovulum puede captar electrones de hierro reducido o de un electrodo e incorporarlos a su cadena fotosintética de transporte de electrones.\n\nEstas propiedades interesan para procesos bioelectroquímicos y para transformar compuestos de bajo valor en productos útiles.';
         es.bacteriaSmall04.imageSources = [
           {
             label: 'Fuente: ISME Journal (2021) · Rhodovulum visakhapatnamense AB26',
@@ -137,6 +141,9 @@
         item.label = item.label.replace(
           /Rhodovulum sulfidophilum AB26/g,
           'Rhodovulum visakhapatnamense AB26'
+        ).replace(
+          /Rhodovulum sulfidophilum microscopy image/g,
+          'Rhodovulum microscopy image'
         );
       });
     });
