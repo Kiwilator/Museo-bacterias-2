@@ -835,6 +835,187 @@ AFRAME.registerComponent('log-when-loaded', {
 });
 
 
+const MUSEO_STAINED_GLASS_PALETTE = [
+  0x6f3fa5, 0x9b4d96, 0xc45f7c, 0xe4a85d, 0x50a7a0, 0x4f78a8,
+  0x8157b5, 0xb66aa3, 0xd77a68, 0xe0bb69, 0x65b3a8, 0x607fb5
+];
+
+AFRAME.registerComponent('stained-glass-window-materials', {
+  init() {
+    this.materials = [];
+    this.textures = [];
+    this.onModelLoaded = () => this.applyMaterials();
+    this.el.addEventListener('model-loaded', this.onModelLoaded);
+  },
+
+  addPlanarUvs(geometry) {
+    if (geometry.getAttribute('uv')) return;
+    const position = geometry.getAttribute('position');
+    geometry.computeBoundingBox();
+    const box = geometry.boundingBox;
+    const spanY = Math.max(0.000001, box.max.y - box.min.y);
+    const spanZ = Math.max(0.000001, box.max.z - box.min.z);
+    const uv = new Float32Array(position.count * 2);
+    for (let i = 0; i < position.count; i++) {
+      uv[i * 2] = (position.getZ(i) - box.min.z) / spanZ;
+      uv[i * 2 + 1] = (position.getY(i) - box.min.y) / spanY;
+    }
+    geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  },
+
+  imageTexture(image) {
+    const texture = new THREE.Texture(image);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.flipY = false;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.needsUpdate = true;
+    this.textures.push(texture);
+    return texture;
+  },
+
+  applyMaterials() {
+    const model = this.el.getObject3D('mesh');
+    if (!model) return;
+
+    const panes = [];
+    model.traverse((object) => {
+      if (object.isMesh) panes.push(object);
+    });
+    panes.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true }));
+
+    const imageIds = [
+      'ppb-bacteria-01', 'ppb-bacteria-02', 'ppb-bacteria-03',
+      'ppb-bacteria-04', 'ppb-bacteria-05', 'ppb-bacteria-06'
+    ];
+    const imageByPane = new Map([0, 3, 7, 10, 13, 16].map((paneIndex, imageIndex) => [paneIndex, imageIndex]));
+    let imagePanes = 0;
+
+    panes.forEach((pane, index) => {
+      if (!pane.geometry.getAttribute('normal')) pane.geometry.computeVertexNormals();
+      const paletteColor = MUSEO_STAINED_GLASS_PALETTE[index % MUSEO_STAINED_GLASS_PALETTE.length];
+      const imageIndex = imageByPane.get(index);
+      let material;
+
+      if (imageIndex !== undefined) {
+        const image = document.getElementById(imageIds[imageIndex]);
+        if (image) {
+          this.addPlanarUvs(pane.geometry);
+          material = new THREE.MeshBasicMaterial({
+            map: this.imageTexture(image),
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.78,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            toneMapped: false
+          });
+          imagePanes++;
+        }
+      }
+
+      if (!material) {
+        const color = new THREE.Color(paletteColor);
+        material = new THREE.MeshPhysicalMaterial({
+          color,
+          emissive: color.clone().multiplyScalar(0.24),
+          emissiveIntensity: 0.42,
+          metalness: 0,
+          roughness: 0.18,
+          transmission: 0.22,
+          transparent: true,
+          opacity: 0.66,
+          ior: 1.46,
+          thickness: 0.018,
+          clearcoat: 0.85,
+          clearcoatRoughness: 0.16,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        });
+      }
+
+      material.name = `Stained_Glass_${String(index + 1).padStart(2, '0')}`;
+      this.materials.push(material);
+      pane.material = material;
+      pane.renderOrder = 4;
+      pane.castShadow = false;
+      pane.receiveShadow = false;
+    });
+
+    console.log(`[stained-glass-window-materials] ${panes.length} cristales: ${imagePanes} con imagen y ${panes.length - imagePanes} con color`);
+  },
+
+  remove() {
+    this.el.removeEventListener('model-loaded', this.onModelLoaded);
+    this.materials.forEach((material) => material.dispose());
+    this.textures.forEach((texture) => texture.dispose());
+  }
+});
+
+
+AFRAME.registerComponent('video-window-materials', {
+  init() {
+    this.materials = [];
+    this.textures = [];
+    this.videoIds = [
+      'ppb-video-window-01', 'ppb-video-window-02',
+      'ppb-video-window-03', 'ppb-video-window-04'
+    ];
+    this.onModelLoaded = () => this.applyVideos();
+    this.el.addEventListener('model-loaded', this.onModelLoaded);
+  },
+
+  applyVideos() {
+    const model = this.el.getObject3D('mesh');
+    if (!model) return;
+    const screens = [];
+    model.traverse((object) => {
+      if (object.isMesh) screens.push(object);
+    });
+    screens.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true }));
+
+    let connected = 0;
+    screens.slice(0, this.videoIds.length).forEach((screen, index) => {
+      const video = document.getElementById(this.videoIds[index]);
+      if (!video) return;
+      const texture = new THREE.VideoTexture(video);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.flipY = false;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.generateMipmaps = false;
+      const material = new THREE.MeshBasicMaterial({
+        map: texture,
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+        toneMapped: false
+      });
+      material.name = `Museum_Video_Window_${String(index + 1).padStart(2, '0')}`;
+      screen.material = material;
+      screen.userData.museumVideo = video;
+      screen.renderOrder = 3;
+      screen.castShadow = false;
+      screen.receiveShadow = false;
+      this.textures.push(texture);
+      this.materials.push(material);
+      connected++;
+      if (!MUSEO_IS_MOBILE) {
+        const play = video.play();
+        if (play?.catch) play.catch(() => {});
+      }
+    });
+
+    console.log(`[video-window-materials] ${connected}/${screens.length} pantallas conectadas`);
+  },
+
+  remove() {
+    this.el.removeEventListener('model-loaded', this.onModelLoaded);
+    this.materials.forEach((material) => material.dispose());
+    this.textures.forEach((texture) => texture.dispose());
+  }
+});
+
+
 AFRAME.registerComponent('setup-museum-model', {
   schema: {
     length: { type: 'number', default: 11 },
@@ -5077,15 +5258,26 @@ AFRAME.scenes[0]?.addEventListener('loaded', () => {
       const src = typeof mat === 'string'
         ? ((mat.match(/src:\s*#([\w-]+)/) || [])[1])
         : (mat && mat.src && (mat.src.id || String(mat.src).replace(/^#/, '')));
-      return src ? document.getElementById(src) : null;
+      const media = src ? document.getElementById(src) : null;
+      return media?.tagName === 'VIDEO' ? media : null;
     };
     const scanScreens = () => {
       const now = performance.now();
       if (now < nextScan && screens.length) return;
       nextScan = now + 1200;
-      screens = Array.from(document.querySelectorAll('a-circle[id^="PPB_VIDEO_"]'))
-        .map((circle) => ({ circle, video: videoFromCircle(circle) }))
-        .filter((item) => item.video && item.circle.object3D);
+      const circleScreens = Array.from(document.querySelectorAll('a-circle[id^="PPB_VIDEO_"]'))
+        .map((circle) => ({ object3D: circle.object3D, video: videoFromCircle(circle) }))
+        .filter((item) => item.video && item.object3D);
+      const modelScreens = [];
+      const windowModel = document.getElementById('video-window-model');
+      if (windowModel?.object3D) {
+        windowModel.object3D.traverse((object3D) => {
+          if (object3D.isMesh && object3D.userData.museumVideo) {
+            modelScreens.push({ object3D, video: object3D.userData.museumVideo });
+          }
+        });
+      }
+      screens = circleScreens.concat(modelScreens);
     };
     const update = () => {
       scanScreens();
@@ -5096,9 +5288,9 @@ AFRAME.scenes[0]?.addEventListener('loaded', () => {
       }
       const assigned = new Set(screens.map((item) => item.video));
       videos.forEach((video) => { if (!assigned.has(video)) pauseVideo(video); });
-      screens.forEach(({ circle, video }) => {
-        if (!circle.object3D.visible) { pauseVideo(video); return; }
-        const pos = circle.object3D.getWorldPosition(tmp2);
+      screens.forEach(({ object3D, video }) => {
+        if (!object3D.visible) { pauseVideo(video); return; }
+        const pos = object3D.getWorldPosition(tmp2);
         const dist = museoDistanceXZ(rigPos, pos);
         if (dist < MUSEO_MOBILE_VIDEO_PLAY_DISTANCE) playVideo(video);
         else if (dist > MUSEO_MOBILE_VIDEO_PAUSE_DISTANCE) pauseVideo(video);
