@@ -1,5 +1,26 @@
 /* Load the reviewed museum content/image fixes. */
 (() => {
+  /* Remove the old controls guide from the loading screen. The standalone
+     onboarding popup is the only controls tutorial and appears after load. */
+  const removeLoadingControls = () => {
+    document.querySelectorAll('#loading-screen .controls-loading-guide').forEach((node) => node.remove());
+  };
+
+  const loadingControlsStyle = document.createElement('style');
+  loadingControlsStyle.textContent = `
+    #loading-screen .controls-loading-guide {
+      display: none !important;
+    }
+  `;
+  document.head.appendChild(loadingControlsStyle);
+
+  if (document.body) {
+    removeLoadingControls();
+    const observer = new MutationObserver(removeLoadingControls);
+    observer.observe(document.body, { childList: true, subtree: true });
+    window.setTimeout(() => observer.disconnect(), 15000);
+  }
+
   const base = document.createElement('script');
   base.src = './content-fix-base-20260917.js?v=6';
   base.onerror = () => console.error('[content-fix] could not load base content fixes');
@@ -14,9 +35,10 @@
   `;
   document.head.appendChild(controlsSpacingFix);
 
-  /* Correct the four custom video windows: preserve aspect ratio and place biomass in the upper-right screen. */
+  /* Correct the four custom video windows: preserve aspect ratio, orientation
+     and place biomass in the upper-right screen. */
   const videoWindowFix = document.createElement('script');
-  videoWindowFix.src = './video-window-fit.js?v=20260920-video-fit1';
+  videoWindowFix.src = './video-window-fit.js?v=20260920-video-fit2';
   videoWindowFix.onerror = () => console.error('[content-fix] could not load video window fit');
   document.head.appendChild(videoWindowFix);
 })();
