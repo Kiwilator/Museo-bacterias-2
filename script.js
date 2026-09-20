@@ -178,20 +178,16 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
 (function museumCapabilities() {
   const known = (id) => MUSEO_CAP_ORDER.indexOf(id) !== -1;
 
+  // Capabilities are part of the current museum run. Clear older persisted
+  // progress so a browser refresh always starts the discovery sequence again.
   try {
-    const savedVersion = window.localStorage.getItem(MUSEO_CAP_VERSION_KEY);
-    if (savedVersion !== MUSEUM_GAME_VERSION) {
-      window.localStorage.removeItem(MUSEO_CAP_KEY);
-      window.localStorage.removeItem(MUSEO_CAP_FINAL_KEY);
-      window.localStorage.setItem(MUSEO_CAP_VERSION_KEY, MUSEUM_GAME_VERSION);
-    }
+    window.localStorage.removeItem(MUSEO_CAP_KEY);
+    window.localStorage.removeItem(MUSEO_CAP_FINAL_KEY);
+    window.localStorage.removeItem(MUSEO_CAP_VERSION_KEY);
   } catch (e) {}
 
   let unlocked = [];
-  try {
-    const raw = window.localStorage.getItem(MUSEO_CAP_KEY);
-    if (raw) unlocked = (JSON.parse(raw) || []).filter(known);
-  } catch (e) { unlocked = []; }
+  let finalShown = false;
 
   const copy = () => (window.getMuseumCapabilityText ? window.getMuseumCapabilityText() : {});
 
@@ -321,10 +317,8 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
 
   function maybeShowFinalCard(previousCount) {
     if (previousCount !== MUSEO_CAP_ORDER.length - 1 || unlocked.length !== MUSEO_CAP_ORDER.length) return;
-    try {
-      if (window.localStorage.getItem(MUSEO_CAP_FINAL_KEY) === MUSEUM_GAME_VERSION) return;
-      window.localStorage.setItem(MUSEO_CAP_FINAL_KEY, MUSEUM_GAME_VERSION);
-    } catch (e) {}
+    if (finalShown) return;
+    finalShown = true;
     window.setTimeout(showFinalCard, 4450);
   }
 
@@ -338,7 +332,6 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
     if (window.hasCapability(id)) return false;
     const previousCount = unlocked.length;
     unlocked.push(id);
-    try { window.localStorage.setItem(MUSEO_CAP_KEY, JSON.stringify(unlocked)); } catch (e) {}
     buildHud();
     render();
     showToast(id);
@@ -350,9 +343,11 @@ const MUSEO_CAP_ORDER = ['pha', 'nitrogen', 'electro', 'co', 'hydrogen', 'biomas
 
   window.resetCapabilities = function resetCapabilities() {
     unlocked = [];
+    finalShown = false;
     try {
       window.localStorage.removeItem(MUSEO_CAP_KEY);
       window.localStorage.removeItem(MUSEO_CAP_FINAL_KEY);
+      window.localStorage.removeItem(MUSEO_CAP_VERSION_KEY);
     } catch (e) {}
     render();
     return true;
