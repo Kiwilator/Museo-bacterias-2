@@ -21,16 +21,13 @@
         ];
       }
 
-      // 02 · Blastochloris viridis: the source document shows both the
-      // PDB 5M7J reaction centre and the Bayreuth electron micrograph.
+      // 02 · Blastochloris viridis: keep a single reaction-centre image.
       if (content.bacteriaSmall01) {
         content.bacteriaSmall01.images = [
-          'https://www.ebi.ac.uk/pdbe/static/entry/5m7j_deposited_chain_front_image-800x800.png',
-          './assets/images/blastochloris-viridis.png' + VERSION
+          'https://www.ebi.ac.uk/pdbe/static/entry/5m7j_deposited_chain_front_image-800x800.png'
         ];
         content.bacteriaSmall01.imageSources = [
-          { label: 'Source: PDB 5M7J · PDBe', url: 'https://doi.org/10.2210/pdb5M7J/pdb' },
-          { label: 'Source: University of Bayreuth', url: 'https://www.uni-bayreuth.de/press-releases/genetic-magnetization-of-living-bacteria' }
+          { label: 'Source: PDB 5M7J · PDBe', url: 'https://doi.org/10.2210/pdb5M7J/pdb' }
         ];
       }
 
@@ -94,8 +91,7 @@
 
       if (es.bacteriaSmall01) {
         es.bacteriaSmall01.imageSources = [
-          { label: 'Fuente: PDB 5M7J · PDBe', url: 'https://doi.org/10.2210/pdb5M7J/pdb' },
-          { label: 'Fuente: Universidad de Bayreuth', url: 'https://www.uni-bayreuth.de/press-releases/genetic-magnetization-of-living-bacteria' }
+          { label: 'Fuente: PDB 5M7J · PDBe', url: 'https://doi.org/10.2210/pdb5M7J/pdb' }
         ];
       }
 
