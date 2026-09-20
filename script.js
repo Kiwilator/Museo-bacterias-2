@@ -1874,26 +1874,26 @@ const museumContent = {
   },
 
 
-  window01: { display: false, tier: 'tertiary', windowIndex: 0, openable: false, icon: 'wave',
+  window01: { display: false, tier: 'tertiary', windowIndex: 0, openable: true, icon: 'wave',
     section: '01', title: 'LIGHT', lead: 'Energy for the culture',
     tags: ['LIGHT', 'PHOTOSYNTHESIS'],
     images: ['./assets/images/reactor-cultivation-02.jpg'],
     imageSources: [{ label: 'Own source' }],
     body: 'Light is the energy source, but it does not reach every cell equally. Outer layers can receive too much light while inner layers can remain shaded.\n\nFor this reason, lamp intensity, distance and distribution are adjusted. The aim is for as many cells as possible to receive a useful amount of light.' },
-  window02: { display: false, tier: 'tertiary', windowIndex: 1, openable: false, icon: 'form',
+  window02: { display: false, tier: 'tertiary', windowIndex: 1, openable: true, icon: 'form',
     section: '02', title: 'FLOW & MIXING', lead: 'Keeping the culture homogeneous',
     tags: ['MIXING', 'GAS EXCHANGE'],
 
     images: ['./assets/images/reactor-cultivation-01.jpg'],
     imageSources: [{ label: 'Own source' }],
     body: 'Mixing moves cells through the reactor and prevents some areas from having many nutrients while others have very little. It also helps gas exchange.\n\nMixing must be strong enough to keep the culture homogeneous, but not so strong that it wastes energy or damages the cells.' },
-  window03: { display: false, tier: 'tertiary', windowIndex: 2, openable: false, icon: 'scale',
+  window03: { display: false, tier: 'tertiary', windowIndex: 2, openable: true, icon: 'scale',
     section: '03', title: 'NUTRIENTS', lead: 'Feeding the process',
     tags: ['CARBON', 'NITROGEN', 'PHOSPHORUS'],
     images: ['./assets/images/photofermentation-culture.jpg'],
     imageSources: [{ label: 'Own source' }],
     body: 'Besides light, bacteria need carbon, nitrogen, phosphorus and other nutrients. The amount of each one changes how they grow and which products they generate.\n\nFeeding a reactor therefore does not simply mean adding more substrate. The composition of the medium must be adjusted to the goal of the culture.' },
-  window04: { display: false, tier: 'tertiary', windowIndex: 3, openable: false, icon: 'grid',
+  window04: { display: false, tier: 'tertiary', windowIndex: 3, openable: true, icon: 'grid',
     section: '04', title: 'BIOMASS', lead: 'When the cells are the product',
     tags: ['BIOMASS', 'RECOVERY'],
 
@@ -1901,7 +1901,7 @@ const museumContent = {
     images: ['./assets/images/biomass-concentration.jpg'],
     imageSources: [{ label: 'Own source' }],
     body: 'In some processes, the main product is the cells themselves. As the culture grows, biomass increases and eventually has to be separated from the liquid.\n\nIt can then be concentrated, dried or processed depending on its intended use. Biomass from these bacteria is being studied, among other uses, for feed and other biotechnological products.' },
-  window05: { display: false, tier: 'tertiary', windowIndex: 4, openable: false, icon: 'surface',
+  window05: { display: false, tier: 'tertiary', windowIndex: 4, openable: true, icon: 'surface',
     section: '05', title: 'BAG REACTOR', lead: 'A simple way to increase illuminated surface',
     tags: ['BAG REACTOR', 'SCALE-UP'],
 
@@ -1911,7 +1911,7 @@ const museumContent = {
     body: 'One way to reduce reactor cost is to use transparent plastic bags. The bag provides a large illuminated surface with a relatively simple structure.\n\nThis type of system has been studied for biomass production and for working at larger volumes without building a complex rigid reactor.' },
 
 
-  window06: { display: false, tier: 'tertiary', windowIndex: 5, openable: false, icon: 'transform',
+  window06: { display: false, tier: 'tertiary', windowIndex: 5, openable: true, icon: 'transform',
     section: '06', title: 'MODULAR SCALE-UP', lead: 'Growing by repeating units that already work',
     tags: ['SCALE-UP', 'MODULAR SYSTEM'],
 
