@@ -835,11 +835,6 @@ AFRAME.registerComponent('log-when-loaded', {
 });
 
 
-const MUSEO_STAINED_GLASS_PALETTE = [
-  0x6f3fa5, 0x9b4d96, 0xc45f7c, 0xe4a85d, 0x50a7a0, 0x4f78a8,
-  0x8157b5, 0xb66aa3, 0xd77a68, 0xe0bb69, 0x65b3a8, 0x607fb5
-];
-
 AFRAME.registerComponent('stained-glass-window-materials', {
   init() {
     this.materials = [];
@@ -863,12 +858,14 @@ AFRAME.registerComponent('stained-glass-window-materials', {
     geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   },
 
-  imageTexture(image) {
+  gradientTexture(image, paneIndex) {
     const texture = new THREE.Texture(image);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.flipY = false;
     texture.wrapS = THREE.ClampToEdgeWrapping;
     texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.center.set(0.5, 0.5);
+    texture.rotation = (paneIndex % 4) * Math.PI * 0.5;
     texture.needsUpdate = true;
     this.textures.push(texture);
     return texture;
@@ -884,65 +881,38 @@ AFRAME.registerComponent('stained-glass-window-materials', {
     });
     panes.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true }));
 
-    const imageIds = [
-      'ppb-bacteria-01', 'ppb-bacteria-02', 'ppb-bacteria-03',
-      'ppb-bacteria-04', 'ppb-bacteria-05', 'ppb-bacteria-06'
+    const gradientIds = [
+      'stained-glass-purple-01',
+      'stained-glass-purple-02',
+      'stained-glass-purple-03'
     ];
-    const imageByPane = new Map([0, 3, 7, 10, 13, 16].map((paneIndex, imageIndex) => [paneIndex, imageIndex]));
-    let imagePanes = 0;
+    const emissiveStrengths = [2.0, 1.2, 2.0];
 
     panes.forEach((pane, index) => {
       if (!pane.geometry.getAttribute('normal')) pane.geometry.computeVertexNormals();
-      const paletteColor = MUSEO_STAINED_GLASS_PALETTE[index % MUSEO_STAINED_GLASS_PALETTE.length];
-      const imageIndex = imageByPane.get(index);
-      let material;
-
-      if (imageIndex !== undefined) {
-        const image = document.getElementById(imageIds[imageIndex]);
-        if (image) {
-          this.addPlanarUvs(pane.geometry);
-          material = new THREE.MeshBasicMaterial({
-            map: this.imageTexture(image),
-            color: 0xffffff,
-            transparent: true,
-            opacity: 0.78,
-            side: THREE.DoubleSide,
-            depthWrite: false,
-            toneMapped: false
-          });
-          imagePanes++;
-        }
-      }
-
-      if (!material) {
-        const color = new THREE.Color(paletteColor);
-        material = new THREE.MeshPhysicalMaterial({
-          color,
-          emissive: color.clone().multiplyScalar(0.24),
-          emissiveIntensity: 0.42,
-          metalness: 0,
-          roughness: 0.18,
-          transmission: 0.22,
-          transparent: true,
-          opacity: 0.66,
-          ior: 1.46,
-          thickness: 0.018,
-          clearcoat: 0.85,
-          clearcoatRoughness: 0.16,
-          side: THREE.DoubleSide,
-          depthWrite: false
-        });
-      }
+      this.addPlanarUvs(pane.geometry);
+      const gradientIndex = index % gradientIds.length;
+      const image = document.getElementById(gradientIds[gradientIndex]);
+      const texture = this.gradientTexture(image, index);
+      const material = new THREE.MeshStandardMaterial({
+        color: 0x000000,
+        emissive: 0xffffff,
+        emissiveMap: texture,
+        emissiveIntensity: emissiveStrengths[gradientIndex],
+        metalness: 0,
+        roughness: 1,
+        side: THREE.DoubleSide
+      });
 
       material.name = `Stained_Glass_${String(index + 1).padStart(2, '0')}`;
       this.materials.push(material);
       pane.material = material;
       pane.renderOrder = 4;
-      pane.castShadow = false;
-      pane.receiveShadow = false;
+      pane.castShadow = true;
+      pane.receiveShadow = true;
     });
 
-    console.log(`[stained-glass-window-materials] ${panes.length} cristales: ${imagePanes} con imagen y ${panes.length - imagePanes} con color`);
+    console.log(`[stained-glass-window-materials] ${panes.length} cristales con los 3 degradados emisivos de bacterias-purpura`);
   },
 
   remove() {
@@ -1904,26 +1874,26 @@ const museumContent = {
   },
 
 
-  window01: { display: false, tier: 'tertiary', windowIndex: 0, openable: true, icon: 'wave',
+  window01: { display: false, tier: 'tertiary', windowIndex: 0, openable: false, icon: 'wave',
     section: '01', title: 'LIGHT', lead: 'Energy for the culture',
     tags: ['LIGHT', 'PHOTOSYNTHESIS'],
     images: ['./assets/images/reactor-cultivation-02.jpg'],
     imageSources: [{ label: 'Own source' }],
     body: 'Light is the energy source, but it does not reach every cell equally. Outer layers can receive too much light while inner layers can remain shaded.\n\nFor this reason, lamp intensity, distance and distribution are adjusted. The aim is for as many cells as possible to receive a useful amount of light.' },
-  window02: { display: false, tier: 'tertiary', windowIndex: 1, openable: true, icon: 'form',
+  window02: { display: false, tier: 'tertiary', windowIndex: 1, openable: false, icon: 'form',
     section: '02', title: 'FLOW & MIXING', lead: 'Keeping the culture homogeneous',
     tags: ['MIXING', 'GAS EXCHANGE'],
 
     images: ['./assets/images/reactor-cultivation-01.jpg'],
     imageSources: [{ label: 'Own source' }],
     body: 'Mixing moves cells through the reactor and prevents some areas from having many nutrients while others have very little. It also helps gas exchange.\n\nMixing must be strong enough to keep the culture homogeneous, but not so strong that it wastes energy or damages the cells.' },
-  window03: { display: false, tier: 'tertiary', windowIndex: 2, openable: true, icon: 'scale',
+  window03: { display: false, tier: 'tertiary', windowIndex: 2, openable: false, icon: 'scale',
     section: '03', title: 'NUTRIENTS', lead: 'Feeding the process',
     tags: ['CARBON', 'NITROGEN', 'PHOSPHORUS'],
     images: ['./assets/images/photofermentation-culture.jpg'],
     imageSources: [{ label: 'Own source' }],
     body: 'Besides light, bacteria need carbon, nitrogen, phosphorus and other nutrients. The amount of each one changes how they grow and which products they generate.\n\nFeeding a reactor therefore does not simply mean adding more substrate. The composition of the medium must be adjusted to the goal of the culture.' },
-  window04: { display: false, tier: 'tertiary', windowIndex: 3, openable: true, icon: 'grid',
+  window04: { display: false, tier: 'tertiary', windowIndex: 3, openable: false, icon: 'grid',
     section: '04', title: 'BIOMASS', lead: 'When the cells are the product',
     tags: ['BIOMASS', 'RECOVERY'],
 
@@ -1931,7 +1901,7 @@ const museumContent = {
     images: ['./assets/images/biomass-concentration.jpg'],
     imageSources: [{ label: 'Own source' }],
     body: 'In some processes, the main product is the cells themselves. As the culture grows, biomass increases and eventually has to be separated from the liquid.\n\nIt can then be concentrated, dried or processed depending on its intended use. Biomass from these bacteria is being studied, among other uses, for feed and other biotechnological products.' },
-  window05: { display: false, tier: 'tertiary', windowIndex: 4, openable: true, icon: 'surface',
+  window05: { display: false, tier: 'tertiary', windowIndex: 4, openable: false, icon: 'surface',
     section: '05', title: 'BAG REACTOR', lead: 'A simple way to increase illuminated surface',
     tags: ['BAG REACTOR', 'SCALE-UP'],
 
@@ -1941,7 +1911,7 @@ const museumContent = {
     body: 'One way to reduce reactor cost is to use transparent plastic bags. The bag provides a large illuminated surface with a relatively simple structure.\n\nThis type of system has been studied for biomass production and for working at larger volumes without building a complex rigid reactor.' },
 
 
-  window06: { display: false, tier: 'tertiary', windowIndex: 5, openable: true, icon: 'transform',
+  window06: { display: false, tier: 'tertiary', windowIndex: 5, openable: false, icon: 'transform',
     section: '06', title: 'MODULAR SCALE-UP', lead: 'Growing by repeating units that already work',
     tags: ['SCALE-UP', 'MODULAR SYSTEM'],
 
