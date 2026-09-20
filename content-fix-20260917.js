@@ -35,10 +35,10 @@
   `;
   document.head.appendChild(controlsSpacingFix);
 
-  /* Correct the four custom video windows: preserve aspect ratio and orientation,
-     and place biomass in the upper-right screen. */
+  /* Use each video exactly as encoded: no rotation; project it onto the window
+     and scale/crop only enough to fill the complete shape. */
   const videoWindowFix = document.createElement('script');
-  videoWindowFix.src = './video-window-fit.js?v=20260920-video-fit3';
+  videoWindowFix.src = './video-window-fit.js?v=20260920-video-fit4';
   videoWindowFix.onerror = () => console.error('[content-fix] could not load video window fit');
   document.head.appendChild(videoWindowFix);
 })();
