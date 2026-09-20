@@ -927,12 +927,140 @@ AFRAME.registerComponent('video-window-materials', {
   init() {
     this.materials = [];
     this.textures = [];
-    this.videoIds = [
-      'ppb-video-window-01', 'ppb-video-window-02',
-      'ppb-video-window-03', 'ppb-video-window-04'
-    ];
-    this.onModelLoaded = () => this.applyVideos();
+    this.metadataListeners = [];
+    // THREE.GLTFLoader elimina la puntuacion de estos nombres en tiempo de
+    // ejecucion. Conservamos aqui la correspondencia explicita con los cuatro
+    // nombres originales de video_windows.glb:
+    // Mesh_0.004, Mesh_1.004, Mesh_2.003 y Mesh_3.003.
+    this.screenVideoIds = new Map([
+      ['Mesh0004', 'ppb-video-window-01'],
+      ['Mesh1004', 'ppb-video-window-02'],
+      ['Mesh2003', 'ppb-video-window-03'],
+      ['Mesh3003', 'ppb-video-window-04']
+    ]);
+    this.modelReady = false;
+    this.museumReady = false;
+    this.applied = false;
+    this.museumEl = this.el.closest('[setup-museum-model]');
+    this.onModelLoaded = () => { this.modelReady = true; this.tryApply(); };
+    this.onMuseumLoaded = () => { this.museumReady = true; this.tryApply(); };
     this.el.addEventListener('model-loaded', this.onModelLoaded);
+    if (this.museumEl) this.museumEl.addEventListener('museo-modules-loaded', this.onMuseumLoaded);
+  },
+
+  tryApply() {
+    if (this.applied || !this.modelReady || !this.museumReady) return;
+    this.applied = this.applyVideos() === this.screenVideoIds.size;
+  },
+
+  roomCenter() {
+    const bounds = window.MUSEO_BOUNDS;
+    if (bounds) {
+      return new THREE.Vector3(
+        (bounds.minX + bounds.maxX) * 0.5,
+        0,
+        (bounds.minZ + bounds.maxZ) * 0.5
+      );
+    }
+    const center = new THREE.Vector3();
+    const root = this.museumEl ? this.museumEl.object3D : this.el.sceneEl.object3D;
+    return new THREE.Box3().setFromObject(root).getCenter(center);
+  },
+
+  horizontalWorldAxis(points, screenCenter, roomCenter) {
+    let meanX = 0;
+    let meanZ = 0;
+    points.forEach((point) => { meanX += point.x; meanZ += point.z; });
+    meanX /= points.length;
+    meanZ /= points.length;
+
+    let xx = 0;
+    let xz = 0;
+    let zz = 0;
+    points.forEach((point) => {
+      const x = point.x - meanX;
+      const z = point.z - meanZ;
+      xx += x * x;
+      xz += x * z;
+      zz += z * z;
+    });
+    const angle = 0.5 * Math.atan2(2 * xz, xx - zz);
+    const horizontal = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)).normalize();
+    const up = new THREE.Vector3(0, 1, 0);
+    const front = horizontal.clone().cross(up).normalize();
+    const towardRoom = roomCenter.clone().sub(screenCenter).setY(0);
+    if (front.dot(towardRoom) < 0) horizontal.negate();
+    return horizontal;
+  },
+
+  applyWorldCoverUvs(screen, video) {
+    const geometry = screen.geometry;
+    const position = geometry && geometry.getAttribute('position');
+    if (!position || !video.videoWidth || !video.videoHeight) return;
+
+    screen.updateWorldMatrix(true, false);
+    const points = [];
+    const point = new THREE.Vector3();
+    const screenCenter = new THREE.Vector3();
+    for (let i = 0; i < position.count; i++) {
+      point.fromBufferAttribute(position, i).applyMatrix4(screen.matrixWorld);
+      points.push(point.clone());
+      screenCenter.add(point);
+    }
+    screenCenter.multiplyScalar(1 / points.length);
+
+    const horizontal = this.horizontalWorldAxis(points, screenCenter, this.roomCenter());
+    let minU = Infinity;
+    let maxU = -Infinity;
+    let minV = Infinity;
+    let maxV = -Infinity;
+    const projected = points.map((worldPoint) => {
+      const u = worldPoint.dot(horizontal);
+      const v = worldPoint.y;
+      minU = Math.min(minU, u);
+      maxU = Math.max(maxU, u);
+      minV = Math.min(minV, v);
+      maxV = Math.max(maxV, v);
+      return { u, v };
+    });
+
+    const width = Math.max(0.0001, maxU - minU);
+    const height = Math.max(0.0001, maxV - minV);
+    const windowAspect = width / height;
+    const videoAspect = video.videoWidth / video.videoHeight;
+    let visibleU = 1;
+    let visibleV = 1;
+
+    if (videoAspect > windowAspect) visibleU = windowAspect / videoAspect;
+    else visibleV = videoAspect / windowAspect;
+
+    const uv = new Float32Array(position.count * 2);
+    for (let i = 0; i < position.count; i++) {
+      const u = (projected[i].u - minU) / width;
+      const v = (projected[i].v - minV) / height;
+      uv[i * 2] = 0.5 + (u - 0.5) * visibleU;
+      uv[i * 2 + 1] = 0.5 + (v - 0.5) * visibleV;
+    }
+    geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+
+    screen.userData.museumVideoMapping = {
+      horizontalWorld: horizontal.toArray(),
+      verticalWorld: [0, 1, 0],
+      windowAspect,
+      videoAspect,
+      coverU: visibleU,
+      coverV: visibleV
+    };
+  },
+
+  prepareWorldCover(screen, video) {
+    if (video.videoWidth && video.videoHeight) {
+      this.applyWorldCoverUvs(screen, video);
+      return;
+    }
+    const onMetadata = () => this.applyWorldCoverUvs(screen, video);
+    video.addEventListener('loadedmetadata', onMetadata, { once: true });
+    this.metadataListeners.push({ video, onMetadata });
   },
 
   applyVideos() {
@@ -940,14 +1068,16 @@ AFRAME.registerComponent('video-window-materials', {
     if (!model) return;
     const screens = [];
     model.traverse((object) => {
-      if (object.isMesh) screens.push(object);
+      const screenKey = (object.name || '').replace(/[^A-Za-z0-9]/g, '');
+      if (object.isMesh && this.screenVideoIds.has(screenKey)) screens.push(object);
     });
-    screens.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true }));
 
     let connected = 0;
-    screens.slice(0, this.videoIds.length).forEach((screen, index) => {
-      const video = document.getElementById(this.videoIds[index]);
+    screens.forEach((screen) => {
+      const screenKey = (screen.name || '').replace(/[^A-Za-z0-9]/g, '');
+      const video = document.getElementById(this.screenVideoIds.get(screenKey));
       if (!video) return;
+      this.prepareWorldCover(screen, video);
       const texture = new THREE.VideoTexture(video);
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.flipY = false;
@@ -960,7 +1090,7 @@ AFRAME.registerComponent('video-window-materials', {
         side: THREE.DoubleSide,
         toneMapped: false
       });
-      material.name = `Museum_Video_Window_${String(index + 1).padStart(2, '0')}`;
+      material.name = `Museum_Video_${screen.name}`;
       screen.material = material;
       screen.userData.museumVideo = video;
       screen.renderOrder = 3;
@@ -975,11 +1105,14 @@ AFRAME.registerComponent('video-window-materials', {
       }
     });
 
-    console.log(`[video-window-materials] ${connected}/${screens.length} pantallas conectadas`);
+    console.log(`[video-window-materials] ${connected}/${this.screenVideoIds.size} pantallas con UV mundiales verticales y recorte cover`);
+    return connected;
   },
 
   remove() {
     this.el.removeEventListener('model-loaded', this.onModelLoaded);
+    if (this.museumEl) this.museumEl.removeEventListener('museo-modules-loaded', this.onMuseumLoaded);
+    this.metadataListeners.forEach(({ video, onMetadata }) => video.removeEventListener('loadedmetadata', onMetadata));
     this.materials.forEach((material) => material.dispose());
     this.textures.forEach((texture) => texture.dispose());
   }

@@ -35,10 +35,4 @@
   `;
   document.head.appendChild(controlsSpacingFix);
 
-  /* Window videos: source files stay untouched; only world-space planar mapping
-     and proportional cover scaling are applied. */
-  const videoWindowFix = document.createElement('script');
-  videoWindowFix.src = './video-window-fit.js?v=20260920-video-fit5';
-  videoWindowFix.onerror = () => console.error('[content-fix] could not load video window fit');
-  document.head.appendChild(videoWindowFix);
 })();
