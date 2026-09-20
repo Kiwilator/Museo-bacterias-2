@@ -5,9 +5,9 @@
 
   const SOURCE_OVERRIDES = {
     // Upper-right window: biomass belongs here.
-    'ppb-video-window-02': './assets/videos/biomass.mp4?v=20260920-video-fit1',
+    'ppb-video-window-02': './assets/videos/biomass.mp4?v=20260920-video-fit2',
     // Lower-right window: restore the video that occupied this screen before biomass was moved here.
-    'ppb-video-window-04': './assets/videos/rhodomicrobium-vannielii-animation.mp4?v=20260920-video-fit1'
+    'ppb-video-window-04': './assets/videos/rhodomicrobium-vannielii-animation.mp4?v=20260920-video-fit2'
   };
 
   const VIDEO_BY_MESH = {
@@ -32,7 +32,7 @@
     });
   }
 
-  function normalizeUvs(geometry) {
+  function normalizeAndOrientUvs(geometry) {
     if (!geometry) return geometry;
     const cloned = geometry.clone();
     const uv = cloned.getAttribute('uv');
@@ -44,11 +44,20 @@
       minU = Math.min(minU, u); maxU = Math.max(maxU, u);
       minV = Math.min(minV, v); maxV = Math.max(maxV, v);
     }
+
     const spanU = Math.max(1e-6, maxU - minU);
     const spanV = Math.max(1e-6, maxV - minV);
+
     for (let i = 0; i < uv.count; i++) {
-      uv.setXY(i, (uv.getX(i) - minU) / spanU, (uv.getY(i) - minV) / spanV);
+      const u = (uv.getX(i) - minU) / spanU;
+      const v = (uv.getY(i) - minV) / spanV;
+
+      // Rhino/Blender exported these window UVs with the image axes exchanged:
+      // U follows the physical vertical axis and V the horizontal one. Rotate
+      // the UV coordinates 90 degrees clockwise so portrait videos stay upright.
+      uv.setXY(i, v, 1 - u);
     }
+
     uv.needsUpdate = true;
     return cloned;
   }
@@ -118,9 +127,9 @@
       const video = document.getElementById(videoId);
       if (!video) return;
 
-      // The exported UVs contain a margin. Normalize them first so aspect fitting
-      // uses the full window instead of an already-cropped subsection.
-      screen.geometry = normalizeUvs(screen.geometry);
+      // Normalize the exported UV range and rotate it to the real window
+      // orientation before applying the aspect-ratio crop.
+      screen.geometry = normalizeAndOrientUvs(screen.geometry);
       const screenAspect = screenAspectFor(screen);
 
       const texture = new THREE.VideoTexture(video);
@@ -166,7 +175,7 @@
       entity.removeAttribute('video-window-materials');
     }
 
-    console.log(`[video-window-fit] ${corrected}/${screens.length} ventanas corregidas sin deformacion`);
+    console.log(`[video-window-fit] ${corrected}/${screens.length} ventanas corregidas, proporcionadas y orientadas`);
     return corrected > 0;
   }
 
