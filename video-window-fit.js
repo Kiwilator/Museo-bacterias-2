@@ -37,6 +37,7 @@
   const textures = [];
   const geometries = [];
   const listeners = [];
+  const staticImageMotions = [];
   let appliedModel = null;
 
   function roomCenter() {
@@ -141,7 +142,34 @@
     texture.repeat.set(repeatX, repeatY);
     texture.offset.set((1 - repeatX) * 0.5, (1 - repeatY) * 0.5);
     texture.needsUpdate = true;
+    return [repeatX, repeatY];
   }
+
+  function addStaticImageMotion(texture) {
+    const visibleX = THREE.MathUtils.clamp(texture.repeat.x, 0, 1);
+    const visibleY = THREE.MathUtils.clamp(texture.repeat.y, 0, 1);
+    staticImageMotions.push({
+      texture,
+      baseX: texture.offset.x,
+      baseY: texture.offset.y,
+      amplitudeX: Math.min(0.022, (1 - visibleX) * 0.275),
+      amplitudeY: Math.min(0.022, (1 - visibleY) * 0.275),
+      speed: 0.18,
+      phase: 0.85
+    });
+  }
+
+  AFRAME.registerComponent('museum-media-window-motion', {
+    tick(time) {
+      const seconds = time * 0.001;
+      staticImageMotions.forEach((motion) => {
+        motion.texture.offset.x = motion.baseX +
+          Math.sin(seconds * motion.speed + motion.phase) * motion.amplitudeX;
+        motion.texture.offset.y = motion.baseY +
+          Math.cos(seconds * motion.speed * 0.79 + motion.phase) * motion.amplitudeY;
+      });
+    }
+  });
 
   function prepareVideo(video, src) {
     video.muted = true;
@@ -175,6 +203,7 @@
     materials.splice(0).forEach((material) => material.dispose());
     textures.splice(0).forEach((texture) => texture.dispose());
     geometries.splice(0).forEach((geometry) => geometry.dispose());
+    staticImageMotions.length = 0;
   }
 
   function applyVideos() {
@@ -220,6 +249,7 @@
       }
       updateFit();
       texture.needsUpdate = true;
+      if (image) addStaticImageMotion(texture);
 
       const material = new THREE.MeshBasicMaterial({
         map: texture,
@@ -266,6 +296,7 @@
       window.setTimeout(install, 100);
       return;
     }
+    entity.setAttribute('museum-media-window-motion', '');
 
     let modelReady = !!entity.getObject3D('mesh');
     let museumReady = !!window.MUSEO_BOUNDS;

@@ -26,6 +26,7 @@
       this.materials = [];
       this.textures = [];
       this.geometries = [];
+      this.animatedTextures = [];
       this.applied = false;
       this.smallWindow = null;
       this.museumEl = this.el.closest('[setup-museum-model]');
@@ -185,6 +186,33 @@
       return texture;
     },
 
+    addTextureMotion(texture, visibleFraction, baseOffset = texture.offset.clone()) {
+      const visibleX = THREE.MathUtils.clamp(visibleFraction[0], 0, 1);
+      const visibleY = THREE.MathUtils.clamp(visibleFraction[1], 0, 1);
+      const marginX = (1 - visibleX) * 0.5;
+      const marginY = (1 - visibleY) * 0.5;
+      const index = this.animatedTextures.length;
+      this.animatedTextures.push({
+        texture,
+        baseX: baseOffset.x,
+        baseY: baseOffset.y,
+        amplitudeX: Math.min(0.022, marginX * 0.55),
+        amplitudeY: Math.min(0.022, marginY * 0.55),
+        speed: 0.14 + index * 0.017,
+        phase: index * 1.37
+      });
+    },
+
+    tick(time) {
+      const seconds = time * 0.001;
+      this.animatedTextures.forEach((motion) => {
+        motion.texture.offset.x = motion.baseX +
+          Math.sin(seconds * motion.speed + motion.phase) * motion.amplitudeX;
+        motion.texture.offset.y = motion.baseY +
+          Math.cos(seconds * motion.speed * 0.79 + motion.phase) * motion.amplitudeY;
+      });
+    },
+
     applyTexture(screen, config) {
       const image = document.getElementById(config.assetId);
       if (!image) return false;
@@ -229,6 +257,7 @@
         uniformScale: true,
         fit: 'cover'
       };
+      this.addTextureMotion(texture, mapped.visibleFraction);
 
       this.textures.push(texture);
       this.materials.push(material);
@@ -298,6 +327,7 @@
       root.add(plane);
 
       this.smallWindow = plane;
+      this.addTextureMotion(texture, [visibleX, visibleY], texture.offset.clone());
       this.geometries.push(geometry);
       this.textures.push(texture);
       this.materials.push(material);
@@ -349,6 +379,7 @@
       this.materials.forEach((material) => material.dispose());
       this.textures.forEach((texture) => texture.dispose());
       this.geometries.forEach((geometry) => geometry.dispose());
+      this.animatedTextures.length = 0;
     }
   });
 })();
