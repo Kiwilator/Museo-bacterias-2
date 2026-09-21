@@ -938,6 +938,9 @@ AFRAME.registerComponent('video-window-materials', {
       ['Mesh2003', 'ppb-video-window-03'],
       ['Mesh3003', 'ppb-video-window-04']
     ]);
+    // Solo estas dos fuentes necesitan corregir su orientacion visual 180°.
+    // La geometria, sus UV de cover y la posicion de las ventanas no cambian.
+    this.rotateTexture180 = new Set(['Mesh1004', 'Mesh2003']);
     this.modelReady = false;
     this.museumReady = false;
     this.applied = false;
@@ -1041,7 +1044,13 @@ AFRAME.registerComponent('video-window-materials', {
       uv[i * 2] = 0.5 + (u - 0.5) * visibleU;
       uv[i * 2 + 1] = 0.5 + (v - 0.5) * visibleV;
     }
-    geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    const currentUv = geometry.getAttribute('uv');
+    if (currentUv && currentUv.itemSize === 2 && currentUv.count === position.count) {
+      currentUv.array.set(uv);
+      currentUv.needsUpdate = true;
+    } else {
+      geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    }
 
     screen.userData.museumVideoMapping = {
       horizontalWorld: horizontal.toArray(),
@@ -1084,6 +1093,10 @@ AFRAME.registerComponent('video-window-materials', {
       texture.minFilter = THREE.LinearFilter;
       texture.magFilter = THREE.LinearFilter;
       texture.generateMipmaps = false;
+      if (this.rotateTexture180.has(screenKey)) {
+        texture.center.set(0.5, 0.5);
+        texture.rotation = Math.PI;
+      }
       const material = new THREE.MeshBasicMaterial({
         map: texture,
         color: 0xffffff,
