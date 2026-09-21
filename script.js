@@ -2471,16 +2471,27 @@ AFRAME.registerComponent('exhibit-info', {
   setupWindowTag(it) {
 
 
-    const dir = this.wallFacingDir(it.pos);
-    const dirX = dir.x, dirZ = dir.z;
-    const yaw = Math.atan2(dirX, dirZ);
+    const placementDir = this.wallFacingDir(it.pos);
+    const dirX = placementDir.x, dirZ = placementDir.z;
+    const visitorFacingIds = new Set(['window02', 'window03', 'window04']);
+    const faceDir = { x: dirX, z: dirZ };
+    const spawn = window.MUSEO_SPAWN;
+    if (visitorFacingIds.has(it.id) && spawn && typeof spawn.x === 'number') {
+      const dx = spawn.x - it.pos.x;
+      const dz = spawn.z - it.pos.z;
+      const length = Math.hypot(dx, dz);
+      if (length > 0.001) {
+        faceDir.x = dx / length;
+        faceDir.z = dz / length;
+      }
+    }
+    const yaw = Math.atan2(faceDir.x, faceDir.z);
 
 
     const HEIGHT = 0.26;
     const WIDTH = it.id === 'window04' ? 0.392 : 0.28;
 
 
-    const spawn = window.MUSEO_SPAWN;
     const floorY = (spawn && typeof spawn.y === 'number')
       ? spawn.y
       : (it.bottomY !== null ? it.bottomY - 1.0 : it.pos.y - 1.2);
@@ -2513,7 +2524,8 @@ AFRAME.registerComponent('exhibit-info', {
       new THREE.MeshStandardMaterial({
         color: 0xffffff, map: texture,
         emissive: new THREE.Color(ROOM2_ACCENT), emissiveIntensity: 0.08,
-        roughness: 0.9, metalness: 0, side: THREE.DoubleSide
+        roughness: 0.9, metalness: 0,
+        side: visitorFacingIds.has(it.id) ? THREE.FrontSide : THREE.DoubleSide
       })
     );
     plane.position.set(0, poleH + HEIGHT * 0.5, 0.001);
