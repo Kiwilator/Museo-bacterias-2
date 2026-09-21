@@ -1,11 +1,12 @@
 /* Explicit mesh-to-image mapping for ventanas_imagenes2.glb. */
 (() => {
+  const HORIZONTAL_ART_ZOOM = 1.58;
   const IMAGE_BY_MESH = {
     mesh_2: {
       role: 'horizontal',
       assetId: 'window-art-horizontal',
       src: './assets/images/window-art-horizontal.png?v=20260921-images1',
-      zoom: 1.58
+      zoom: HORIZONTAL_ART_ZOOM
     },
     mesh_0: {
       role: 'vertical-left',
@@ -18,6 +19,7 @@
       src: './assets/images/window-art-vertical-02.png?v=20260921-images1'
     }
   };
+  const SMALL_WINDOW_FRAME = 'NEON_TURQUESA_19';
 
   AFRAME.registerComponent('image-window-materials', {
     init() {
@@ -25,6 +27,7 @@
       this.textures = [];
       this.geometries = [];
       this.applied = false;
+      this.smallWindow = null;
       this.museumEl = this.el.closest('[setup-museum-model]');
       this.onModelLoaded = () => this.tryApply();
       this.onMuseumLoaded = () => this.tryApply();
@@ -167,6 +170,21 @@
       };
     },
 
+    createTexture(image) {
+      const texture = new THREE.Texture(image);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.flipY = true;
+      texture.wrapS = THREE.ClampToEdgeWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.generateMipmaps = false;
+      texture.repeat.set(1, 1);
+      texture.offset.set(0, 0);
+      texture.needsUpdate = true;
+      return texture;
+    },
+
     applyTexture(screen, config) {
       const image = document.getElementById(config.assetId);
       if (!image) return false;
@@ -184,17 +202,7 @@
       screen.geometry = mapped.geometry;
       this.geometries.push(mapped.geometry);
 
-      const texture = new THREE.Texture(image);
-      texture.colorSpace = THREE.SRGBColorSpace;
-      texture.flipY = true;
-      texture.wrapS = THREE.ClampToEdgeWrapping;
-      texture.wrapT = THREE.ClampToEdgeWrapping;
-      texture.minFilter = THREE.LinearFilter;
-      texture.magFilter = THREE.LinearFilter;
-      texture.generateMipmaps = false;
-      texture.repeat.set(1, 1);
-      texture.offset.set(0, 0);
-      texture.needsUpdate = true;
+      const texture = this.createTexture(image);
 
       const material = new THREE.MeshBasicMaterial({
         map: texture,
@@ -227,38 +235,117 @@
       return true;
     },
 
+    applySmallWindow() {
+      if (this.smallWindow || !this.museumEl) return !!this.smallWindow;
+      const frame = this.museumEl.object3D.getObjectByName(SMALL_WINDOW_FRAME);
+      const image = document.getElementById('window-art-horizontal');
+      const sourceWidth = image && (image.naturalWidth || image.width);
+      const sourceHeight = image && (image.naturalHeight || image.height);
+      if (!frame || !sourceWidth || !sourceHeight) return false;
+
+      frame.updateWorldMatrix(true, true);
+      const frameBox = new THREE.Box3().setFromObject(frame);
+      const frameSize = frameBox.getSize(new THREE.Vector3());
+      const width = Math.max(frameSize.x, frameSize.z) * 0.78;
+      const height = frameSize.y * 0.78;
+      if (width < 0.05 || height < 0.05) return false;
+
+      const geometry = new THREE.PlaneGeometry(width, height);
+      const texture = this.createTexture(image);
+      const sourceAspect = sourceWidth / sourceHeight;
+      const targetAspect = width / height;
+      let visibleX = 1;
+      let visibleY = 1;
+      if (sourceAspect > targetAspect) visibleX = targetAspect / sourceAspect;
+      else visibleY = sourceAspect / targetAspect;
+      visibleX /= HORIZONTAL_ART_ZOOM;
+      visibleY /= HORIZONTAL_ART_ZOOM;
+      texture.repeat.set(visibleX, visibleY);
+      texture.offset.set((1 - visibleX) * 0.5, (1 - visibleY) * 0.5);
+      texture.needsUpdate = true;
+
+      const material = new THREE.MeshBasicMaterial({
+        map: texture,
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+        toneMapped: false
+      });
+      material.name = 'Museum_Image_Window_small-horizontal';
+
+      const plane = new THREE.Mesh(geometry, material);
+      plane.name = 'Museum_Image_Window_small-horizontal';
+      plane.renderOrder = 3;
+      plane.castShadow = false;
+      plane.receiveShadow = false;
+
+      const root = this.museumEl.object3D;
+      const position = frameBox.getCenter(new THREE.Vector3());
+      position.x -= 0.04;
+      root.worldToLocal(position);
+      plane.position.copy(position);
+      plane.lookAt(position.clone().add(new THREE.Vector3(-3, 0, 0)));
+      plane.userData.museumImageWindow = {
+        role: 'small-horizontal',
+        source: IMAGE_BY_MESH.mesh_2.src,
+        frame: SMALL_WINDOW_FRAME,
+        sourceAspect,
+        targetAspect,
+        visibleFraction: [visibleX, visibleY],
+        zoom: HORIZONTAL_ART_ZOOM,
+        uniformScale: true,
+        fit: 'cover'
+      };
+      root.add(plane);
+
+      this.smallWindow = plane;
+      this.geometries.push(geometry);
+      this.textures.push(texture);
+      this.materials.push(material);
+      window.__MUSEO_IMAGE_WINDOWS_STATUS__ = {
+        ...(window.__MUSEO_IMAGE_WINDOWS_STATUS__ || {}),
+        smallWindow: IMAGE_BY_MESH.mesh_2.src,
+        totalConnected: 4
+      };
+      console.log('[image-window-materials] ventana pequeña conectada a la imagen horizontal');
+      return true;
+    },
+
     tryApply() {
-      if (this.applied) return;
       const model = this.el.getObject3D('mesh');
       if (!model || !window.MUSEO_BOUNDS) return;
 
-      model.updateWorldMatrix(true, true);
-      const foundNames = [];
-      let connected = 0;
-      model.traverse((screen) => {
-        if (!screen.isMesh) return;
-        foundNames.push(screen.name || '(sin nombre)');
-        const config = IMAGE_BY_MESH[screen.name];
-        if (config && this.applyTexture(screen, config)) connected++;
-      });
+      if (!this.applied) {
+        model.updateWorldMatrix(true, true);
+        const foundNames = [];
+        let connected = 0;
+        model.traverse((screen) => {
+          if (!screen.isMesh) return;
+          foundNames.push(screen.name || '(sin nombre)');
+          const config = IMAGE_BY_MESH[screen.name];
+          if (config && this.applyTexture(screen, config)) connected++;
+        });
 
-      if (connected !== Object.keys(IMAGE_BY_MESH).length) {
-        console.error(`[image-window-materials] ${connected}/3 superficies conectadas; meshes: ${foundNames.join(', ')}`);
-        return;
+        if (connected !== Object.keys(IMAGE_BY_MESH).length) {
+          console.error(`[image-window-materials] ${connected}/3 superficies conectadas; meshes: ${foundNames.join(', ')}`);
+          return;
+        }
+        this.applied = true;
+        window.__MUSEO_IMAGE_WINDOWS_STATUS__ = {
+          connected,
+          mapping: Object.fromEntries(
+            Object.entries(IMAGE_BY_MESH).map(([meshName, config]) => [meshName, config.src])
+          )
+        };
+        console.log('[image-window-materials] 3/3 superficies conectadas por nombre de mesh', window.__MUSEO_IMAGE_WINDOWS_STATUS__);
       }
-      this.applied = true;
-      window.__MUSEO_IMAGE_WINDOWS_STATUS__ = {
-        connected,
-        mapping: Object.fromEntries(
-          Object.entries(IMAGE_BY_MESH).map(([meshName, config]) => [meshName, config.src])
-        )
-      };
-      console.log('[image-window-materials] 3/3 superficies conectadas por nombre de mesh', window.__MUSEO_IMAGE_WINDOWS_STATUS__);
+
+      this.applySmallWindow();
     },
 
     remove() {
       this.el.removeEventListener('model-loaded', this.onModelLoaded);
       if (this.museumEl) this.museumEl.removeEventListener('museo-modules-loaded', this.onMuseumLoaded);
+      if (this.smallWindow && this.smallWindow.parent) this.smallWindow.parent.remove(this.smallWindow);
       this.materials.forEach((material) => material.dispose());
       this.textures.forEach((texture) => texture.dispose());
       this.geometries.forEach((geometry) => geometry.dispose());
