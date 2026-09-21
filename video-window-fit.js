@@ -1,9 +1,9 @@
-/* Single source of truth for the four GLB video-window meshes. */
+/* Single source of truth for the four GLB media-window meshes. */
 (() => {
   if (window.__MUSEO_VIDEO_WINDOW_FIT__) return;
   window.__MUSEO_VIDEO_WINDOW_FIT__ = true;
 
-  const VIDEO_BY_MESH = {
+  const MEDIA_BY_MESH = {
     'Mesh_0.004': {
       videoId: 'ppb-video-window-01',
       src: './assets/videos/nutrientes.mp4?v=20260921-final1',
@@ -20,14 +20,15 @@
       invertV: true
     },
     'Mesh_3.003': {
-      videoId: 'ppb-video-window-04',
-      src: './assets/videos/rhodomicrobium-vannielii-animation.mp4?v=20260921-final1',
-      invertV: false
+      imageId: 'window-art-horizontal',
+      src: './assets/images/window-art-horizontal.png?v=20260921-images1',
+      invertV: false,
+      zoom: 1.58
     }
   };
 
   const configByRuntimeName = new Map(
-    Object.entries(VIDEO_BY_MESH).map(([meshName, config]) => [
+    Object.entries(MEDIA_BY_MESH).map(([meshName, config]) => [
       meshName.replace(/[^A-Za-z0-9]/g, ''),
       { meshName, ...config }
     ])
@@ -76,7 +77,7 @@
     return horizontal;
   }
 
-  function worldCoverGeometry(screen, video, invertV) {
+  function worldCoverGeometry(screen, invertV) {
     const geometry = screen.geometry.clone();
     const position = geometry.getAttribute('position');
     if (!position || !position.count) return { geometry, aspect: 1 };
@@ -126,13 +127,17 @@
     return { geometry, aspect: spanH / spanV };
   }
 
-  function fitCover(texture, video, targetAspect) {
-    if (!video.videoWidth || !video.videoHeight) return;
-    const sourceAspect = video.videoWidth / video.videoHeight;
+  function fitCover(texture, media, targetAspect, zoom = 1) {
+    const sourceWidth = media.videoWidth || media.naturalWidth || media.width;
+    const sourceHeight = media.videoHeight || media.naturalHeight || media.height;
+    if (!sourceWidth || !sourceHeight) return;
+    const sourceAspect = sourceWidth / sourceHeight;
     let repeatX = 1;
     let repeatY = 1;
     if (sourceAspect > targetAspect) repeatX = targetAspect / sourceAspect;
     else repeatY = sourceAspect / targetAspect;
+    repeatX /= zoom;
+    repeatY /= zoom;
     texture.repeat.set(repeatX, repeatY);
     texture.offset.set((1 - repeatX) * 0.5, (1 - repeatY) * 0.5);
     texture.needsUpdate = true;
@@ -187,29 +192,34 @@
       const runtimeName = (screen.name || '').replace(/[^A-Za-z0-9]/g, '');
       const config = configByRuntimeName.get(runtimeName);
       if (!config) return;
-      const video = document.getElementById(config.videoId);
-      if (!video) return;
+      const video = config.videoId && document.getElementById(config.videoId);
+      const image = config.imageId && document.getElementById(config.imageId);
+      const media = image || video;
+      if (!media) return;
 
-      prepareVideo(video, config.src);
-      const mapped = worldCoverGeometry(screen, video, config.invertV);
+      if (video) prepareVideo(video, config.src);
+      const mapped = worldCoverGeometry(screen, config.invertV);
       screen.geometry = mapped.geometry;
       geometries.push(mapped.geometry);
 
-      const texture = new THREE.VideoTexture(video);
+      const texture = video ? new THREE.VideoTexture(video) : new THREE.Texture(image);
       texture.colorSpace = THREE.SRGBColorSpace;
-      texture.flipY = false;
+      texture.flipY = !video;
       texture.wrapS = THREE.ClampToEdgeWrapping;
       texture.wrapT = THREE.ClampToEdgeWrapping;
       texture.minFilter = THREE.LinearFilter;
       texture.magFilter = THREE.LinearFilter;
       texture.generateMipmaps = false;
 
-      const updateFit = () => fitCover(texture, video, mapped.aspect);
-      video.addEventListener('loadedmetadata', updateFit);
-      video.addEventListener('resize', updateFit);
-      listeners.push({ video, type: 'loadedmetadata', fn: updateFit });
-      listeners.push({ video, type: 'resize', fn: updateFit });
+      const updateFit = () => fitCover(texture, media, mapped.aspect, config.zoom || 1);
+      if (video) {
+        video.addEventListener('loadedmetadata', updateFit);
+        video.addEventListener('resize', updateFit);
+        listeners.push({ video, type: 'loadedmetadata', fn: updateFit });
+        listeners.push({ video, type: 'resize', fn: updateFit });
+      }
       updateFit();
+      texture.needsUpdate = true;
 
       const material = new THREE.MeshBasicMaterial({
         map: texture,
@@ -217,16 +227,26 @@
         side: THREE.DoubleSide,
         toneMapped: false
       });
-      material.name = `Museum_Video_${config.meshName}`;
+      material.name = `${video ? 'Museum_Video' : 'Museum_Image'}_${config.meshName}`;
       screen.material = material;
-      screen.userData.museumVideo = video;
+      if (video) screen.userData.museumVideo = video;
+      else {
+        delete screen.userData.museumVideo;
+        screen.userData.museumImageWindow = {
+          role: 'bag-small-horizontal',
+          source: config.src,
+          zoom: config.zoom || 1,
+          uniformScale: true,
+          fit: 'cover'
+        };
+      }
       screen.renderOrder = 3;
       screen.castShadow = false;
       screen.receiveShadow = false;
 
       textures.push(texture);
       materials.push(material);
-      playWhenReady(video, texture, updateFit);
+      if (video) playWhenReady(video, texture, updateFit);
       connected++;
     });
 
@@ -235,7 +255,7 @@
       return false;
     }
     appliedModel = model;
-    console.log(`[video-window-fit] ${connected}/${configByRuntimeName.size} pantallas conectadas por nombre de malla`);
+    console.log(`[video-window-fit] ${connected}/${configByRuntimeName.size} pantallas multimedia conectadas por nombre de malla`);
     return true;
   }
 
