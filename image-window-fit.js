@@ -23,7 +23,6 @@
       this.materials = [];
       this.textures = [];
       this.geometries = [];
-      this.imageListeners = [];
       this.applied = false;
       this.museumEl = this.el.closest('[setup-museum-model]');
       this.onModelLoaded = () => this.tryApply();
@@ -74,7 +73,7 @@
       return horizontal;
     },
 
-    worldCoverGeometry(screen) {
+    worldCoverGeometry(screen, sourceAspect) {
       const geometry = screen.geometry.clone();
       const position = geometry.getAttribute('position');
       if (!position || !position.count) return null;
@@ -106,40 +105,48 @@
 
       const spanH = Math.max(0.000001, maxH - minH);
       const spanV = Math.max(0.000001, maxY - minY);
+      const targetAspect = spanH / spanV;
+
+      // Uniform cover scale in world units. One source-image unit has the
+      // same physical scale on both axes; only the excess is cropped.
+      let displayWidth;
+      let displayHeight;
+      if (sourceAspect > targetAspect) {
+        displayHeight = spanV;
+        displayWidth = displayHeight * sourceAspect;
+      } else {
+        displayWidth = spanH;
+        displayHeight = displayWidth / sourceAspect;
+      }
+
+      const centerH = (minH + maxH) * 0.5;
+      const centerY = (minY + maxY) * 0.5;
       const uv = new Float32Array(position.count * 2);
       for (let i = 0; i < position.count; i++) {
-        uv[i * 2] = (projected[i] - minH) / spanH;
-        uv[i * 2 + 1] = (points[i].y - minY) / spanV;
+        uv[i * 2] = 0.5 + (projected[i] - centerH) / displayWidth;
+        uv[i * 2 + 1] = 0.5 + (points[i].y - centerY) / displayHeight;
       }
       geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
 
       return {
         geometry,
-        aspect: spanH / spanV,
+        sourceAspect,
+        targetAspect,
         center: center.toArray(),
         horizontal: horizontal.toArray(),
-        size: [spanH, spanV]
+        windowSize: [spanH, spanV],
+        displayedImageSize: [displayWidth, displayHeight],
+        visibleFraction: [spanH / displayWidth, spanV / displayHeight]
       };
-    },
-
-    fitCover(texture, image, targetAspect) {
-      const sourceWidth = image.naturalWidth || image.width;
-      const sourceHeight = image.naturalHeight || image.height;
-      if (!sourceWidth || !sourceHeight) return;
-      const sourceAspect = sourceWidth / sourceHeight;
-      let repeatX = 1;
-      let repeatY = 1;
-      if (sourceAspect > targetAspect) repeatX = targetAspect / sourceAspect;
-      else repeatY = sourceAspect / targetAspect;
-      texture.repeat.set(repeatX, repeatY);
-      texture.offset.set((1 - repeatX) * 0.5, (1 - repeatY) * 0.5);
-      texture.needsUpdate = true;
     },
 
     applyTexture(screen, config) {
       const image = document.getElementById(config.assetId);
       if (!image) return false;
-      const mapped = this.worldCoverGeometry(screen);
+      const sourceWidth = image.naturalWidth || image.width;
+      const sourceHeight = image.naturalHeight || image.height;
+      if (!sourceWidth || !sourceHeight) return false;
+      const mapped = this.worldCoverGeometry(screen, sourceWidth / sourceHeight);
       if (!mapped) return false;
 
       screen.geometry = mapped.geometry;
@@ -153,13 +160,9 @@
       texture.minFilter = THREE.LinearFilter;
       texture.magFilter = THREE.LinearFilter;
       texture.generateMipmaps = false;
-
-      const updateTexture = () => this.fitCover(texture, image, mapped.aspect);
-      if (image.complete && image.naturalWidth) updateTexture();
-      else {
-        image.addEventListener('load', updateTexture, { once: true });
-        this.imageListeners.push({ image, fn: updateTexture });
-      }
+      texture.repeat.set(1, 1);
+      texture.offset.set(0, 0);
+      texture.needsUpdate = true;
 
       const material = new THREE.MeshBasicMaterial({
         map: texture,
@@ -177,8 +180,13 @@
         source: config.src,
         center: mapped.center,
         horizontal: mapped.horizontal,
-        size: mapped.size,
-        aspect: mapped.aspect
+        sourceAspect: mapped.sourceAspect,
+        targetAspect: mapped.targetAspect,
+        windowSize: mapped.windowSize,
+        displayedImageSize: mapped.displayedImageSize,
+        visibleFraction: mapped.visibleFraction,
+        uniformScale: true,
+        fit: 'cover'
       };
 
       this.textures.push(texture);
@@ -218,7 +226,6 @@
     remove() {
       this.el.removeEventListener('model-loaded', this.onModelLoaded);
       if (this.museumEl) this.museumEl.removeEventListener('museo-modules-loaded', this.onMuseumLoaded);
-      this.imageListeners.forEach(({ image, fn }) => image.removeEventListener('load', fn));
       this.materials.forEach((material) => material.dispose());
       this.textures.forEach((texture) => texture.dispose());
       this.geometries.forEach((geometry) => geometry.dispose());
