@@ -44,7 +44,7 @@
       return new THREE.Vector3(0, 0, 0);
     },
 
-    horizontalWorldAxis(points, screenCenter) {
+    projectedHorizontalAxis(points, screenCenter) {
       let meanX = 0;
       let meanZ = 0;
       points.forEach((point) => {
@@ -73,7 +73,30 @@
       return horizontal;
     },
 
-    worldCoverGeometry(screen, sourceAspect) {
+    surfaceHorizontalAxis(screen, screenCenter) {
+      const normalAttribute = screen.geometry.getAttribute('normal');
+      if (!normalAttribute || !normalAttribute.count) return null;
+
+      const normalMatrix = new THREE.Matrix3().getNormalMatrix(screen.matrixWorld);
+      const averageNormal = new THREE.Vector3();
+      const normal = new THREE.Vector3();
+      for (let i = 0; i < normalAttribute.count; i++) {
+        normal.fromBufferAttribute(normalAttribute, i).applyNormalMatrix(normalMatrix);
+        averageNormal.add(normal);
+      }
+
+      const front = averageNormal.setY(0);
+      if (front.lengthSq() < 0.000001) return null;
+      front.normalize();
+      const towardRoom = this.roomCenter().sub(screenCenter).setY(0);
+      if (front.dot(towardRoom) < 0) front.negate();
+
+      // horizontal × world-up must point toward the visitor. Deriving the
+      // axis from the surface normal prevents vertical tilt from leaking into U.
+      return new THREE.Vector3(0, 1, 0).cross(front).normalize();
+    },
+
+    worldCoverGeometry(screen, sourceAspect, useSurfaceAxis) {
       const geometry = screen.geometry.clone();
       const position = geometry.getAttribute('position');
       if (!position || !position.count) return null;
@@ -89,7 +112,8 @@
       }
       center.multiplyScalar(1 / points.length);
 
-      const horizontal = this.horizontalWorldAxis(points, center);
+      const horizontal = (useSurfaceAxis && this.surfaceHorizontalAxis(screen, center)) ||
+        this.projectedHorizontalAxis(points, center);
       let minH = Infinity;
       let maxH = -Infinity;
       let minY = Infinity;
@@ -146,7 +170,11 @@
       const sourceWidth = image.naturalWidth || image.width;
       const sourceHeight = image.naturalHeight || image.height;
       if (!sourceWidth || !sourceHeight) return false;
-      const mapped = this.worldCoverGeometry(screen, sourceWidth / sourceHeight);
+      const mapped = this.worldCoverGeometry(
+        screen,
+        sourceWidth / sourceHeight,
+        config.role.startsWith('vertical-')
+      );
       if (!mapped) return false;
 
       screen.geometry = mapped.geometry;
