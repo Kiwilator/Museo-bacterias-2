@@ -26,6 +26,13 @@
   base.onerror = () => console.error('[content-fix] could not load base content fixes');
   document.head.appendChild(base);
 
+  /* Room 2 labels: keep every placard below/clear of its media and move
+     BAG REACTOR laterally away from the BIOMASS image. */
+  const placardLayout = document.createElement('script');
+  placardLayout.src = './room2-placard-layout-fix.js?v=20260921-1';
+  placardLayout.onerror = () => console.error('[content-fix] could not load room 2 placard layout fix');
+  document.head.appendChild(placardLayout);
+
   /* Keep the LOOK arrows visually separated from the mouse illustration. */
   const controlsSpacingFix = document.createElement('style');
   controlsSpacingFix.textContent = `
