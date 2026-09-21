@@ -1,4 +1,4 @@
-/* Explicit mesh-to-image mapping for ventanas_imagenes.glb. */
+/* Explicit mesh-to-image mapping for ventanas_imagenes2.glb. */
 (() => {
   const IMAGE_BY_MESH = {
     mesh_2: {
