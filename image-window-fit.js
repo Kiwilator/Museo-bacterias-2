@@ -4,7 +4,8 @@
     mesh_2: {
       role: 'horizontal',
       assetId: 'window-art-horizontal',
-      src: './assets/images/window-art-horizontal.png?v=20260921-images1'
+      src: './assets/images/window-art-horizontal.png?v=20260921-images1',
+      zoom: 1.58
     },
     mesh_0: {
       role: 'vertical-left',
@@ -96,7 +97,7 @@
       return new THREE.Vector3(0, 1, 0).cross(front).normalize();
     },
 
-    worldCoverGeometry(screen, sourceAspect, useSurfaceAxis) {
+    worldCoverGeometry(screen, sourceAspect, useSurfaceAxis, zoom = 1) {
       const geometry = screen.geometry.clone();
       const position = geometry.getAttribute('position');
       if (!position || !position.count) return null;
@@ -142,6 +143,8 @@
         displayWidth = spanH;
         displayHeight = displayWidth / sourceAspect;
       }
+      displayWidth *= zoom;
+      displayHeight *= zoom;
 
       const centerH = (minH + maxH) * 0.5;
       const centerY = (minY + maxY) * 0.5;
@@ -173,7 +176,8 @@
       const mapped = this.worldCoverGeometry(
         screen,
         sourceWidth / sourceHeight,
-        config.role.startsWith('vertical-')
+        config.role.startsWith('vertical-'),
+        config.zoom || 1
       );
       if (!mapped) return false;
 
@@ -213,6 +217,7 @@
         windowSize: mapped.windowSize,
         displayedImageSize: mapped.displayedImageSize,
         visibleFraction: mapped.visibleFraction,
+        zoom: config.zoom || 1,
         uniformScale: true,
         fit: 'cover'
       };
