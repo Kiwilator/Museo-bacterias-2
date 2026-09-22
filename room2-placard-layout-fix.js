@@ -19,21 +19,30 @@
     return (it && it.pos ? it.pos.y : 1.2) - 1.2;
   }
 
-  function faceVisitor(wrapper, it) {
-    const spawn = window.MUSEO_SPAWN;
-    if (!wrapper || !it || !it.pos || !spawn || typeof spawn.x !== 'number') return;
-    const dx = spawn.x - it.pos.x;
-    const dz = spawn.z - it.pos.z;
-    const len = Math.hypot(dx, dz);
-    if (len < 0.001) return;
+  /* All placards in this window row must stay parallel to one another.
+     Derive one shared facing direction from the row toward the room interior,
+     instead of making every placard point independently toward the spawn. */
+  function sharedFacingYaw(info, items) {
+    const rowItems = items.filter((it) => ['window02', 'window03', 'window04', 'window05'].includes(it.id));
+    const source = rowItems.length ? rowItems : items;
+    const center = source.reduce((acc, it) => acc.add(it.pos), new THREE.Vector3())
+      .multiplyScalar(1 / Math.max(source.length, 1));
 
-    let yaw = Math.atan2(dx / len, dz / len);
-
-    // The NUTRIENTS placard's plane faces opposite to the others in the
-    // current window layout, so rotate only this generated placard by 180°.
-    if (it.id === 'window03') yaw += Math.PI;
-
-    wrapper.object3D.rotation.y = yaw;
+    let dir = info.wallFacingDir ? info.wallFacingDir(center) : null;
+    if (!dir || (!dir.x && !dir.z)) {
+      const bounds = window.MUSEO_BOUNDS;
+      if (bounds) {
+        const roomCenterX = (bounds.minX + bounds.maxX) * 0.5;
+        const roomCenterZ = (bounds.minZ + bounds.maxZ) * 0.5;
+        const dx = roomCenterX - center.x;
+        const dz = roomCenterZ - center.z;
+        const len = Math.hypot(dx, dz) || 1;
+        dir = { x: dx / len, z: dz / len };
+      } else {
+        dir = { x: 0, z: 1 };
+      }
+    }
+    return Math.atan2(dir.x, dir.z);
   }
 
   function rebuildPlacardPlane(info, it) {
@@ -56,6 +65,7 @@
     );
     if (plane.material) {
       plane.material.map = texture;
+      plane.material.side = THREE.FrontSide;
       plane.material.needsUpdate = true;
     }
     if (oldMap && oldMap !== texture && oldMap.dispose) oldMap.dispose();
@@ -104,6 +114,8 @@
     const items = info.items.filter((it) => TARGET_IDS.includes(it.id));
     if (!items.length || items.some((it) => !it.tag || !it.tag.wrapper)) return false;
 
+    const rowYaw = sharedFacingYaw(info, items);
+
     items.forEach((it) => {
       rebuildPlacardPlane(info, it);
       setPoleHeight(it);
@@ -113,7 +125,7 @@
 
       const floorY = floorYFor(it);
       it.tag.wrapper.object3D.position.set(placement.x, floorY, placement.z);
-      faceVisitor(it.tag.wrapper, it);
+      it.tag.wrapper.object3D.rotation.set(0, rowYaw, 0);
     });
 
     window.__ROOM2_PLACARD_LAYOUT_STATUS__ = {
@@ -123,7 +135,7 @@
       width: TARGET_WIDTH,
       height: TARGET_HEIGHT,
       window05SideShift: WINDOW05_SIDE_SHIFT,
-      correctedOrientation: 'window03'
+      sharedRowYaw: rowYaw
     };
 
     console.log('[room2-placards] layout corrected', window.__ROOM2_PLACARD_LAYOUT_STATUS__);
