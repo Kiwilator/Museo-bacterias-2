@@ -26,6 +26,13 @@
   base.onerror = () => console.error('[content-fix] could not load base content fixes');
   document.head.appendChild(base);
 
+  /* Replace the six circular PPB images with the new artwork set. The
+     original image references remain untouched in index.html for rollback. */
+  const circleArt = document.createElement('script');
+  circleArt.src = './circle-art-loader.js?v=20260922-circle1';
+  circleArt.onerror = () => console.error('[content-fix] could not load circle artwork');
+  document.head.appendChild(circleArt);
+
   /* Room 2 labels: keep every placard below/clear of its media and move
      BAG REACTOR laterally away from the BIOMASS image. */
   const placardLayout = document.createElement('script');
