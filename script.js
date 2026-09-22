@@ -2196,6 +2196,28 @@ AFRAME.registerComponent('exhibit-info', {
     });
 
 
+    // Room 2 window placards (02–05) must read as one coherent family: same
+    // size, all parallel to one another, all facing the same way. Derive
+    // that shared orientation once here from the row's own average position
+    // (the real wall normal) instead of pointing each sign at the spawn or
+    // the camera — that is what made some of them face different ways.
+    this._room2Row = null;
+    {
+      const rowIds = ['window02', 'window03', 'window04', 'window05'];
+      const rowItems = this.items.filter((it) => rowIds.includes(it.id));
+      if (rowItems.length) {
+        const center = rowItems.reduce((acc, it) => acc.add(it.pos), new THREE.Vector3())
+          .multiplyScalar(1 / rowItems.length);
+        const dir = this.wallFacingDir(center);
+        this._room2Row = {
+          ids: rowIds,
+          dir,
+          yaw: Math.atan2(dir.x, dir.z),
+          biomass: rowItems.find((it) => it.id === 'window04') || null
+        };
+      }
+    }
+
     this.items.forEach((it) => {
       if (it.data.tier !== 'tertiary' || !it.data.openable) return;
       this.setupWindowTag(it);
@@ -2261,28 +2283,20 @@ AFRAME.registerComponent('exhibit-info', {
 
   setupWindowTag(it) {
 
-
-    const placementDir = this.wallFacingDir(it.pos);
+    // Room 2 row (02–05) shares one wall-normal direction and yaw so the
+    // whole family stays parallel; every other window keeps its own
+    // per-item wall normal, exactly as before.
+    const row = this._room2Row && this._room2Row.ids.includes(it.id) ? this._room2Row : null;
+    const placementDir = row ? row.dir : this.wallFacingDir(it.pos);
     const dirX = placementDir.x, dirZ = placementDir.z;
-    const visitorFacingIds = new Set(['window02', 'window03', 'window04']);
-    const faceDir = { x: dirX, z: dirZ };
-    const spawn = window.MUSEO_SPAWN;
-    if (visitorFacingIds.has(it.id) && spawn && typeof spawn.x === 'number') {
-      const dx = spawn.x - it.pos.x;
-      const dz = spawn.z - it.pos.z;
-      const length = Math.hypot(dx, dz);
-      if (length > 0.001) {
-        faceDir.x = dx / length;
-        faceDir.z = dz / length;
-      }
-    }
-    const yaw = Math.atan2(faceDir.x, faceDir.z);
+    const yaw = row ? row.yaw : Math.atan2(dirX, dirZ);
 
 
     const HEIGHT = 0.26;
-    const WIDTH = it.id === 'window04' ? 0.392 : 0.28;
+    const WIDTH = 0.28;
 
 
+    const spawn = window.MUSEO_SPAWN;
     const floorY = (spawn && typeof spawn.y === 'number')
       ? spawn.y
       : (it.bottomY !== null ? it.bottomY - 1.0 : it.pos.y - 1.2);
@@ -2291,8 +2305,22 @@ AFRAME.registerComponent('exhibit-info', {
     const POLE_RADIUS = 0.012;
     const poleH = Math.max(0.3, SIGN_CENTER_Y - floorY - HEIGHT * 0.5);
 
-    const px = it.pos.x + dirX * STAND_OUT;
-    const pz = it.pos.z + dirZ * STAND_OUT;
+    let px = it.pos.x + dirX * STAND_OUT;
+    let pz = it.pos.z + dirZ * STAND_OUT;
+
+    // BAG REACTOR (05) sits right next to BIOMASS (04) on the same wall and
+    // reads as "the BIOMASS sign" unless nudged sideways along the wall,
+    // away from BIOMASS — never toward the room, which would break the
+    // shared row orientation.
+    if (row && it.id === 'window05' && row.biomass) {
+      const tangent = new THREE.Vector3(dirZ, 0, -dirX).normalize();
+      const a = new THREE.Vector3(px, 0, pz).addScaledVector(tangent, 0.34);
+      const b = new THREE.Vector3(px, 0, pz).addScaledVector(tangent, -0.34);
+      const biomassXZ = new THREE.Vector3(row.biomass.pos.x, 0, row.biomass.pos.z);
+      const chosen = a.distanceTo(biomassXZ) >= b.distanceTo(biomassXZ) ? a : b;
+      px = chosen.x;
+      pz = chosen.z;
+    }
 
     const wrapper = document.createElement('a-entity');
     wrapper.object3D.position.set(px, floorY, pz);
@@ -2316,7 +2344,10 @@ AFRAME.registerComponent('exhibit-info', {
         color: 0xffffff, map: texture,
         emissive: new THREE.Color(ROOM2_ACCENT), emissiveIntensity: 0.08,
         roughness: 0.9, metalness: 0,
-        side: visitorFacingIds.has(it.id) ? THREE.FrontSide : THREE.DoubleSide
+        // Orientation now comes from the real wall normal (never lookAt()),
+        // so DoubleSide is just a safety net for viewing from a slight
+        // angle — not a workaround for backwards text.
+        side: THREE.DoubleSide
       })
     );
     plane.position.set(0, poleH + HEIGHT * 0.5, 0.001);
