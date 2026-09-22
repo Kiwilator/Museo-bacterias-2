@@ -26,7 +26,14 @@
     const dz = spawn.z - it.pos.z;
     const len = Math.hypot(dx, dz);
     if (len < 0.001) return;
-    wrapper.object3D.rotation.y = Math.atan2(dx / len, dz / len);
+
+    let yaw = Math.atan2(dx / len, dz / len);
+
+    // The NUTRIENTS placard's plane faces opposite to the others in the
+    // current window layout, so rotate only this generated placard by 180°.
+    if (it.id === 'window03') yaw += Math.PI;
+
+    wrapper.object3D.rotation.y = yaw;
   }
 
   function rebuildPlacardPlane(info, it) {
@@ -115,7 +122,8 @@
       centerAboveFloor: SIGN_CENTER_ABOVE_FLOOR,
       width: TARGET_WIDTH,
       height: TARGET_HEIGHT,
-      window05SideShift: WINDOW05_SIDE_SHIFT
+      window05SideShift: WINDOW05_SIDE_SHIFT,
+      correctedOrientation: 'window03'
     };
 
     console.log('[room2-placards] layout corrected', window.__ROOM2_PLACARD_LAYOUT_STATUS__);
