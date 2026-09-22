@@ -30,12 +30,10 @@
      lives directly in setupWindowTag() in script.js — a single source of
      truth instead of a separate post-hoc correction script. */
 
-  /* Replace the six circular PPB images with the new artwork set. The
-     original image references remain untouched in index.html for rollback. */
-  const circleArt = document.createElement('script');
-  circleArt.src = './circle-art-loader.js?v=20260922-circle1';
-  circleArt.onerror = () => console.error('[content-fix] could not load circle artwork');
-  document.head.appendChild(circleArt);
+  /* The six circular PPB images now reference the full-resolution artwork
+     files directly from index.html (assets/images/circle-art-0X.png) —
+     no runtime loader needed. The previous images stay unreferenced but
+     un-deleted in assets/images for rollback. */
 
   /* Keep the LOOK arrows visually separated from the mouse illustration. */
   const controlsSpacingFix = document.createElement('style');
