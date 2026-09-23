@@ -79,7 +79,7 @@
     return horizontal;
   }
 
-  function worldCoverGeometry(screen, invertV) {
+  function worldCoverGeometry(screen, invertV, rotate180 = false) {
     const geometry = screen.geometry.clone();
     const position = geometry.getAttribute('position');
     if (!position || !position.count) return { geometry, aspect: 1 };
@@ -114,8 +114,17 @@
     const uv = new Float32Array(position.count * 2);
     for (let i = 0; i < position.count; i++) {
       const v = (points[i].y - minY) / spanV;
-      uv[i * 2] = (projected[i] - minH) / spanH;
-      uv[i * 2 + 1] = invertV ? 1 - v : v;
+
+      let u = (projected[i] - minH) / spanH;
+      let finalV = invertV ? 1 - v : v;
+
+      if (rotate180) {
+      u = 1 - u;
+      finalV = 1 - finalV;
+      }
+
+      uv[i * 2] = u;
+      uv[i * 2 + 1] = finalV;
     }
 
     const currentUv = geometry.getAttribute('uv');
@@ -228,7 +237,11 @@
       if (!media) return;
 
       if (video) prepareVideo(video, config.src);
-      const mapped = worldCoverGeometry(screen, config.invertV);
+      const mapped = worldCoverGeometry(
+      screen,
+      config.invertV,
+      config.rotate180 || false
+      );
       screen.geometry = mapped.geometry;
       geometries.push(mapped.geometry);
 
@@ -240,10 +253,6 @@
       texture.minFilter = THREE.LinearFilter;
       texture.magFilter = THREE.LinearFilter;
       texture.generateMipmaps = false;
-      if (config.rotate180) {
-        texture.center.set(0.5, 0.5);
-        texture.rotation = Math.PI;
-      }
 
       const updateFit = () => fitCover(texture, media, mapped.aspect, config.zoom || 1);
       if (video) {
