@@ -1,1 +1,0 @@
-The partner logos are rendered from PNG source artwork.
