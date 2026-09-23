@@ -8,6 +8,7 @@
       videoId: 'ppb-video-window-01',
       src: './assets/videos/nutrientes.mp4?v=20260921-final1',
       invertV: false
+      rotate180: true
     },
     'Mesh_1.004': {
       videoId: 'ppb-video-window-02',
@@ -239,6 +240,10 @@
       texture.minFilter = THREE.LinearFilter;
       texture.magFilter = THREE.LinearFilter;
       texture.generateMipmaps = false;
+      if (config.rotate180) {
+        texture.center.set(0.5, 0.5);
+        texture.rotation = Math.PI;
+      }
 
       const updateFit = () => fitCover(texture, media, mapped.aspect, config.zoom || 1);
       if (video) {
